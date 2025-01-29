@@ -1,5 +1,5 @@
 # godfinger
-Godfinger rcon hookup &amp; plugin systems to simplify serverside external scripting for OpenJK in python.
+Godfinger rcon hookup &amp; plugin systems to simplify serverside external scripting for MBII OpenJK in python.
 
 `** REQUIRES PYTHON 3.11+ **`
 
