@@ -1,8 +1,12 @@
-# MBII OpenJK "Godfinger" scripting platform
+# ㅤㅤㅤMBII OpenJK "Godfinger" scripting platform
 
 </br>
 
-Godfinger is a modular script system that allows rcon hookup &amp; plugin interaction to simplify serverside external scripting for MBII OpenJK.
+ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ![GC logo](https://github.com/MBII-Galactic-Conquest/clientize/blob/main/gc.png)
+
+</br>
+
+Godfinger is a modular script system that allows rcon hookup &amp; plugin interaction to simplify serverside external scripting for MBII OpenJK in python.
 
 Originally created by [`ViceDice`](https://github.com/ViceDice) & [`ACHUTA`](https://github.com/mantlar), redistributed for a public MIT release.
 
@@ -16,9 +20,11 @@ If you wish to dl & use `RTV` as a plugin, download the [release](https://github
 
 `** REQUIRES PYTHON 3.11+ **`
 
-Execute "prepare.bat" to install dependancy modules, sufficiently fill out config jsons, then just start the "startRefactor.bat".
+Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startRefactor.bat"`
 
 Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your server.cfg.
+
+Ensure your logfile is set to `server.log` in your `server.cfg`
 
 
 </br>
