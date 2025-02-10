@@ -1,5 +1,5 @@
 lib/private/*
-!lib/shhared/.keep
+!lib/private/.keep
 plugins/private/*
 !plugins/private/.keep
 
