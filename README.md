@@ -6,13 +6,34 @@
 
 </br>
 
-Godfinger is a modular script system that allows rcon hookup &amp; plugin interaction to simplify serverside external scripting for MBII OpenJK in python.
+A modular script system that allows rcon hookup &amp; plugin interaction to simplify serverside external scripting for MBII OpenJK in python.
+
+```
+The possibilities of this system allow for myriad of custom logfile implements, such as:
+
+- moderation,
+- kill tracking,
+- points tracking,
+- teamconfig management,
+- custom gamemodes,
+- round information,
+- rcon chat injection,
+- smod smsay chat commands,
+- account systems,
+- discord integration, & more.
+```
+
+</br>
+
+</br>
+
+This system is used originally for the [`MBII Supremacy Project`](https://community.moviebattles.org/threads/supremacy-release-tracker.10667/) now available for public use.
 
 Originally created by [`ViceDice`](https://github.com/ViceDice) & [`ACHUTA`](https://github.com/mantlar), redistributed for a public MIT release.
 
 All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)
 
-</br>
+We will not accept custom plugins in the form of pull requests, outside of crucial widespread plugins like `RTV.`
 
 If you wish to dl & use `RTV` as a plugin, download the [release](https://github.com/MBII-Galactic-Conquest/godfinger/releases) for that branch, or you may view the branch [remotely.](https://github.com/MBII-Galactic-Conquest/godfinger/tree/plugins/rtv)
 
