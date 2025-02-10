@@ -10,9 +10,11 @@ Godfinger is a modular script system that allows rcon hookup &amp; plugin intera
 
 Originally created by [`ViceDice`](https://github.com/ViceDice) & [`ACHUTA`](https://github.com/mantlar), redistributed for a public MIT release.
 
+All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)
+
 </br>
 
-If you wish to dl & use `RTV` as a plugin, download the [release](https://github.com/MBII-Galactic-Conquest/godfinger/releases) for that branch, or you may view the branch [remotely](https://github.com/MBII-Galactic-Conquest/godfinger/tree/plugins/rtv).
+If you wish to dl & use `RTV` as a plugin, download the [release](https://github.com/MBII-Galactic-Conquest/godfinger/releases) for that branch, or you may view the branch [remotely.](https://github.com/MBII-Galactic-Conquest/godfinger/tree/plugins/rtv)
 
 </br>
 
@@ -20,11 +22,11 @@ If you wish to dl & use `RTV` as a plugin, download the [release](https://github
 
 `** REQUIRES PYTHON 3.11+ **`
 
-Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startRefactor.bat"`
-
-Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your server.cfg.
-
 Ensure your logfile is set to `server.log` in your `server.cfg`
+
+Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg`
+
+Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startRefactor.bat"`
 
 
 </br>
