@@ -6,7 +6,7 @@
 
 </br>
 
-#### A modular script system that allows rcon hookup &amp; plugin interaction to simplify serverside external scripting for MBII in python.
+#### A modular script system that allows streamlined rcon &amp; plugin interaction to simplify serverside processing for MBII in python.</br>Aimed to better equip server owners to improve their own creative works, and have more expression over their game servers.
 
 ```
 The possibilities of this system allow for myriad of custom logfile implements, such as:
@@ -48,13 +48,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 </br>
 
 > [!NOTE]
-> This system was created initially for the [`MBII Supremacy Project`](https://community.moviebattles.org/threads/supremacy-release-tracker.10667/), now available for public use.
+> This system was created initially for the [`MBII Supremacy Project`](https://community.moviebattles.org/threads/supremacy-release-tracker.10667/), now available for public use.</br>Originally created by [`ViceDice`](https://github.com/ViceDice) & [`ACHUTA`](https://github.com/mantlar), redistributed for a public MIT release.
 >
-> Originally created by [`ViceDice`](https://github.com/ViceDice) & [`ACHUTA`](https://github.com/mantlar), redistributed for a public MIT release.
->
-> All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)
->
-> We will not accept custom plugins upstream, outside of crucial widespread plugins like `RTV`, designed for abstract server hosting.
+> All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)</br>We will not accept custom plugins upstream, outside of crucial widespread plugins like `RTV`, designed for abstract server hosting.
 >
 > If you wish to dl & use `RTV` as a plugin, download the [release](https://github.com/MBII-Galactic-Conquest/godfinger/releases) for that branch, or you may view the branch [remotely.](https://github.com/MBII-Galactic-Conquest/godfinger/tree/plugins/rtv)
 
