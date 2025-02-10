@@ -6,7 +6,7 @@
 
 </br>
 
-#### A modular script system that allows streamlined rcon &amp; plugin interaction to simplify serverside processing for MBII in python.</br>Aimed to better equip server owners to improve their own creative works, and have more expression over their game servers.
+#### A modular script system that allows streamlined rcon &amp; plugin interaction to simplify serverside processing for MBII in python. Aimed to better equip server owners to improve their own creative works, and have more expression over their game servers.
 
 ```
 The possibilities of this system allow for myriad of custom logfile implements, such as:
