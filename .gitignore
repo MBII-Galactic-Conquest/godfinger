@@ -1,0 +1,14 @@
+lib/private/*
+!lib/shhared/.keep
+plugins/private/*
+!plugins/private/.keep
+
+*.env
+*.pyc
+__pycache__/*
+bigdata.log
+
+godfingerCfg.json
+
+*.db
+*.DB
