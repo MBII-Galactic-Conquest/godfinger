@@ -2,7 +2,7 @@
 import logging;
 import godfingerEvent;
 import pluginExports;
-import lib.serverdata as serverdata
+import lib.shared.serverdata as serverdata
 
 SERVER_DATA = None;
 

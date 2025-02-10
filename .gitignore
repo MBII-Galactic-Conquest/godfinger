@@ -6,7 +6,7 @@ plugins/private/*
 *.env
 *.pyc
 __pycache__/*
-bigdata.log
+*.log
 
 godfingerCfg.json
 
