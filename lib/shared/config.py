@@ -5,8 +5,6 @@ import json;
 
 class Config(object):
     ''' 
-    A helper class that contains a RTE instance's configuration data.
-
     When instantiated directly, contains the default configuration.
 
     When instantiated with the fromJSON method, contains the configuration stored in the JSON file at the given file path.
