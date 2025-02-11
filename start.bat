@@ -1,2 +1,2 @@
-python ./godfinger.py -lf "./bigdata.log"
+python ./godfinger.py
 PAUSE
