@@ -1,0 +1,2 @@
+python ./godfinger.py
+PAUSE

@@ -1,10 +1,7 @@
 import threading
-import lib.campaignrotation as campaignrotation;
-import lib.teamconfig as teamconfig;
-import lib.pk3 as pk3;
+import lib.shared.pk3 as pk3;
 import godfingerAPI;
-import datetime;
-import lib.rcon as rcon;
+import lib.shared.rcon as rcon;
 
 
 
@@ -18,7 +15,6 @@ class ServerData():
         self.mapName = "";
         self.rcon = rcon;
         self.maxPlayers = 0;
-        self.realInit = False;
 
     def GetServerVar(self, var) -> object:
         with self.lock:

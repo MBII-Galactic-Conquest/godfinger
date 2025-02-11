@@ -2,7 +2,7 @@
 
 </br>
 
-ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ![GC logo](https://github.com/MBII-Galactic-Conquest/clientize/blob/main/gc.png)
+ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ![GC logo](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/gc.png)
 
 </br>
 
@@ -22,7 +22,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 - fun interactions with chat,
 - remote cvar injection,
 - smod smsay admin chat commands,
-- implementing shell scripts,
+- incorporating shell scripts,
 - account systems,
 - sql databases,
 - AI responses,
@@ -41,7 +41,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > 
 > Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg`
 > 
-> Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startRefactor.bat"`
+> Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startDebug.bat"` or `"start.bat".`
 
 
 </br>
@@ -63,25 +63,11 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > </br>
 >
-> #1) File backwards reading module in original form doesnt support ANSI-WIN1252 text encoding that is used by the MBIIServer to log stuff, until this dependancy is resolved via any means, manual modification is required, results are untested.
->
-> ```
-> AppData\Local\Programs\Python\Python312\Lib\site-packages\file_read_backwards\file_read_backwards.py
->
-> BEFORE:
-> supported_encodings = ["utf-8", "ascii", "latin-1"]
-> 
-> AFTER:
-> supported_encodings = ["utf-8", "ascii", "latin-1", "ansi"]
-> ```
+> #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII`
 >
 > </br>
 >
-> #2) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII`
->
-> </br>
->
-> #3) `138` is the maximum bytes for svsay, `993` for vstr, and `2048` for general rcon payload in MBII OpenJK.</br>Estimating roughly `5 rcon messages per 0.02 seconds` *( 20 milliseconds, 50 fps )*
+> #2) `138` is the maximum bytes for svsay, `993` for vstr, and `2048` for general rcon payload in MBII OpenJK.</br>Estimating roughly `5 rcon messages per 0.02 seconds` *( 20 milliseconds, 50 fps )*
 > 
 > > The rcon messaging if rate is limiting will block calling thread until next timeframe, because we have to send/recieve rcon messaging in sync mode.
 > 
@@ -112,6 +98,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "serverFileName" : Name of the server executable file to use.
 > - "logicDelay" : Interval of time to pass between script heartbeat loops.
 > - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
+> - "paths" : A list of string paths to append to system path, used to pass import directories for dependancies of plugins and such.
+> - "prologueMessage" : A string to post in svsay when the platform is up.
+> - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
 > - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
 > ```
@@ -126,14 +115,15 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >    "Plugins":
 >    [
 >        {
->            "path":"plugins.pluginfolder.pluginfile"
+>            "path":"plugins.shared.pluginfolder.pluginfile"
 >        }
 >    ]
 >}
 >
 > - "plugins" : do not modify, native plugins dirpath
+> - "shared" : shared, or private directory, depending on plugins use
 > - "pluginfolder" : name of your custom plugin folder
 > - "pluginfile" : name of your custom plugin file, do not add .py extension
 > ```
 >
-> [Example of test plugin integration](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/plugins/test/testPlugin.py)
+> [Example of test plugin integration](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/plugins/shared/test/testPlugin.py)

@@ -1,0 +1,4 @@
+file-read-backwards
+psutil
+asyncio
+python-dotenv
