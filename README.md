@@ -22,6 +22,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 - fun interactions with chat,
 - remote cvar injection,
 - smod smsay admin chat commands,
+- implementing shell scripts,
 - account systems,
 - sql databases,
 - AI responses,
@@ -76,11 +77,17 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > </br>
 >
-> #2) `138` is the maximum bytes for svsay, `993` for vstr, and `2048` for general rcon payload in MBII OpenJK.</br>Estimating roughly `5 rcon messages per 0.02 seconds` *( 20 milliseconds, 50 fps )*
+> #2) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII`
+>
+> </br>
+>
+> #3) `138` is the maximum bytes for svsay, `993` for vstr, and `2048` for general rcon payload in MBII OpenJK.</br>Estimating roughly `5 rcon messages per 0.02 seconds` *( 20 milliseconds, 50 fps )*
 > 
 > > The rcon messaging if rate is limiting will block calling thread until next timeframe, because we have to send/recieve rcon messaging in sync mode.
 > 
 > > So i.e, if you send 6 rcons within 20 miliseconds frame time, it will send 5 and then wait for 20 milliseconds and send the 6th rcon afterwards.
+>
+>
 </br>
 
 </br>
