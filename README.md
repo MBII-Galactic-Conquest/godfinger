@@ -41,7 +41,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > 
 > Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg`
 > 
-> Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startRefactor.bat"`
+> Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startDebug.bat"`
 
 
 </br>
@@ -112,6 +112,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "serverFileName" : Name of the server executable file to use.
 > - "logicDelay" : Interval of time to pass between script heartbeat loops.
 > - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
+> - "paths" : A list of string paths to append to system path, used to pass import directories for dependancies of plugins and such.
+> - "prologueMessage" : A string to post in svsay when the platform is up.
+> - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
 > - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
 > ```
