@@ -21,7 +21,7 @@ def main():
                 epilog = contents[posEnd:];
                 modified = prolog + "supported_encodings = [\"utf-8\", \"ascii\", \"ansi\", \"latin-1\"]" + epilog;
                 f = open(targetPath, "w");
-                f.write(modified);
+                f.write(modified);  
                 f.close();
                 print("Done");
         else:
