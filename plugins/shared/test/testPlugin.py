@@ -10,6 +10,15 @@ SERVER_DATA = None;
 
 Log = logging.getLogger(__name__);
 
+def MyCoolFunction() -> int:
+    return 1337;
+
+class MyVariables():
+    def __init__(self):
+        self.myCoolVariable = 0;
+
+MyCoolVariablesTable : MyVariables = MyVariables();
+
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     logMode = logging.INFO;
@@ -29,26 +38,32 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     SERVER_DATA = serverData; # keep it stored
     if exports != None:
         # e.g
-        #exports.Add("MyCoolFunction", MyCoolFunction);
-        #exports.Add("MyCoolVariable", MyCoolVariable, isFunc = False);
+        exports.Add("MyCoolFunction", MyCoolFunction);
+        # Primitive variables are passed by assigment, not reference, so you'd better wrap your values in some kind of export data class to make it work.
+        exports.Add("MyCoolVariables", MyCoolVariablesTable, isFunc = False);
         pass;
     return True; # indicate plugin load success
 
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     # You can get your cross plugin dependancies here, e.g
-    # targetPlug = serverData.API.GetPlugin("plugins.test.testPlugin");
-    # if targetPlug != None:
-    #     xprts = targetPlug.GetExports();
-    #     if xprts != None:
-    #         myCoolFunction = xprts.Get("MyCoolFunction").pointer;
-    #         myCoolFunction(); # Execute it, if you want, or store for future use.
-    #     else:
-    #         Log.error("Failure at importing API from testPlugin.");
-    #         return False;
-    # else:
-    #     Log.error("Failure in getting testPlugin.");
-    #     return False;
+    targetPlug = SERVER_DATA.API.GetPlugin("shared.test.testPlugin");
+    if targetPlug != None:
+        xprts = targetPlug.GetExports();
+        if xprts != None:
+            myCoolFunction = xprts.Get("MyCoolFunction").pointer;
+            myCoolVars : MyVariables = xprts.Get("MyCoolVariables").pointer;
+            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
+            myCoolVars.myCoolVariable = myCoolFunction(); # Execute it, if you want, or store for future use.
+            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
+            myCoolVars = xprts.Get("MyCoolVariables").pointer;
+            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
+        else:
+            Log.error("Failure at importing API from testPlugin.");
+            return False;
+    else:
+        Log.error("Failure in getting testPlugin.");
+        return False;
     return True; # indicate plugin start success
 
 # Called each loop tick from the system, TODO? maybe add a return timeout for next call
