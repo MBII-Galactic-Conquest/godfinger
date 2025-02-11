@@ -2,7 +2,7 @@
 
 </br>
 
-ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ![GC logo](https://github.com/MBII-Galactic-Conquest/clientize/blob/main/gc.png)
+ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ![GC logo](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/gc.png)
 
 </br>
 
@@ -22,7 +22,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 - fun interactions with chat,
 - remote cvar injection,
 - smod smsay admin chat commands,
-- implementing shell scripts,
+- incorporating shell scripts,
 - account systems,
 - sql databases,
 - AI responses,
@@ -115,14 +115,15 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >    "Plugins":
 >    [
 >        {
->            "path":"plugins.pluginfolder.pluginfile"
+>            "path":"plugins.shared.pluginfolder.pluginfile"
 >        }
 >    ]
 >}
 >
 > - "plugins" : do not modify, native plugins dirpath
+> - "shared" : shared, or private directory, depending on plugins use
 > - "pluginfolder" : name of your custom plugin folder
 > - "pluginfile" : name of your custom plugin file, do not add .py extension
 > ```
 >
-> [Example of test plugin integration](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/plugins/test/testPlugin.py)
+> [Example of test plugin integration](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/plugins/shared/test/testPlugin.py)
