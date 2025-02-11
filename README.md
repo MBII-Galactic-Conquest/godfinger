@@ -41,7 +41,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > 
 > Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg`
 > 
-> Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startDebug.bat" or "start.bat".
+> Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startDebug.bat"` or `"start.bat".`
 
 
 </br>
