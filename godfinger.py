@@ -66,7 +66,7 @@ import lib.shared.teams as teams;
 INVALID_ID = -1;
 USERINFO_LEN = len("userinfo: ");
 
-CONFIG_DEFAULT_PATH = "./godfingerCfg.json";
+CONFIG_DEFAULT_PATH = os.path.join(os.getcwd(),"godfingerCfg.json");
 # Things like port and ip can be omitted in future, since this thing is supposed to be sharing the filesystem with the server, it could read it's config for credentials.
 CONFIG_FALLBACK = \
 """{
@@ -91,8 +91,7 @@ CONFIG_FALLBACK = \
 
     "paths":
     [
-        ".\\lib",
-        ".\\plugins"
+        ".\\",
     ],
 
     "prologueMessage":"Initialized Godfinger System",
@@ -101,7 +100,7 @@ CONFIG_FALLBACK = \
     "Plugins":
     [
         {
-            "path":"shared.test.testPlugin"
+            "path":"plugins.shared.test.testPlugin"
         }
     ]
 }
@@ -155,7 +154,7 @@ class MBIIServer:
         
         if "paths" in self._config.cfg:
             for path in self._config.cfg["paths"]:
-                sys.path.append(path);
+                sys.path.append(os.path.normpath(path));
         
         Log.debug("System path total %s", str(sys.path));
         
@@ -627,7 +626,7 @@ class MBIIServer:
         allClients = self._clientManager.GetAllClients();
         #with self._clientManager._lock:
         for client in allClients:
-            Log.debug("Disconnecting client %s" %str(client));
+            Log.debug("Shutdown pseudo-disconnecting client %s" %str(client));
             self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( client, {}, godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN ) );
         
         self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN, None ) );
