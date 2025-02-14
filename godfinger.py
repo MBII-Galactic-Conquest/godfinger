@@ -100,7 +100,7 @@ CONFIG_FALLBACK = \
     "Plugins":
     [
         {
-            "path":"plugins.shared.test.testPlugin"
+            "path":"lib.shared.test.testPlugin"
         }
     ]
 }
@@ -326,6 +326,7 @@ class MBIIServer:
                     sleepTime = 0;
                 time.sleep(sleepTime);  
         except KeyboardInterrupt:
+            s = signal.signal(signal.SIGINT, signal.SIG_IGN);
             Log.info("Interrupt recieved.");
             Sighandler(signal.SIGINT, -1);
             
