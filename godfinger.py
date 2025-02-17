@@ -100,7 +100,7 @@ CONFIG_FALLBACK = \
     "Plugins":
     [
         {
-            "path":"lib.shared.test.testPlugin"
+            "path":"plugins.shared.test.testPlugin"
         }
     ]
 }
