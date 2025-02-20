@@ -91,6 +91,7 @@ CONFIG_FALLBACK = \
 
     "paths":
     [
+        "./"
     ],
 
     "prologueMessage":"Initialized Godfinger System",
