@@ -73,6 +73,11 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > 
 > > So i.e, if you send 6 rcons within 20 miliseconds frame time, it will send 5 and then wait for 20 milliseconds and send the 6th rcon afterwards.
 >
+> </br>
+>
+> #3) Occasionally you will encounter script errors if you accidentally merge `__pycache__` folders from other servers, systems, or plugins.
+>
+> > For good measure when moving godfinger installations, and fresh installs, run `cleanup.bat`, which removes cached python data that can cause conflicts. This often also happens when merging plugins others make, and is generally good practice to run the cleanup procedure.
 >
 </br>
 
