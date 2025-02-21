@@ -29,10 +29,16 @@ class Timeout:
     def LeftDHMS(self):
         left = self.Left();
         if left > 0:
-            minutes = (left/60) % 60;
-            hours = (minutes/3600) % 60;
-            days = (hours/24);
-            return "%d:%d:%d:%d"%(days, hours, minutes, (left%60));
+            minutes = int((left/60) % 60);
+            hours = int((minutes/3600) % 60);
+            days = int(hours/24);
+            seconds = int(left%60)
+            minutes = str(minutes).zfill(2)
+            hours = str(hours).zfill(2)
+            days = str(days).zfill(2)
+            seconds = str(seconds).zfill(2)
+                
+            return f"{days}:{hours}:{minutes}:{seconds}";
         else:
             return "00:00:00";
 
