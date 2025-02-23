@@ -22,6 +22,7 @@ CONFIG_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "vpnmonitorCfg.jso
 
 # blacklist is used incase the VPN is not recognized by third party services like iphub, but you still consider those IP addresses a VPN
 #   it will not be listed in database.
+# action 0 = kick only, 1 = ban by ip then kick
 CONFIG_FALLBACK = \
 """{
     "apikey":"your_api_key",
@@ -29,6 +30,7 @@ CONFIG_FALLBACK = \
     [
         1, 2
     ],
+    "action":0,
     "whitelist":
     [
         "127.0.0.1"
@@ -140,11 +142,16 @@ class VPNMonitor():
     def ProcessVpnClient(self, id, ip, vpnType):
         blockable = self.config.GetValue("block", []);
         if vpnType in blockable:
-            Log.debug("Kicking a player with ip %s due to VPN block rules" % client.GetIp());
+            Log.debug("Kicking a player with ip %s due to VPN block rules" % ip);
+            if self.config.GetValue("action", 0) == 1:
+                self._serverData.rcon.clientban(ip);
             self._serverData.rcon.clientkick(id);
+        
         blacklist = self.config.cfg["blacklist"];
         if ip in blacklist:
-            Log.debug("Kicking a player with ip %s due to VPN blacklist rules" % client.GetIp());
+            Log.debug("Kicking a player with ip %s due to VPN blacklist rules" % ip);
+            if self.config.GetValue("action", 0) == 1:
+                self._serverData.rcon.clientban(ip);
             self._serverData.rcon.clientkick(id);
 
     def OnClientDisconnect(self, client : client.Client, reason, data ) -> bool:
@@ -194,10 +201,10 @@ def OnEvent(event) -> bool:
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
-        if event.isStartup:
-            return False; #Ignore startup messages
-        else:
-            return PluginInstance.OnClientConnect(event.client, event.data);
+        #if event.isStartup:
+        #    return False; #Ignore startup messages
+        #else:
+        return PluginInstance.OnClientConnect(event.client, event.data);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
