@@ -19,48 +19,49 @@ GODFINGER_EVENT_TYPE_PLAYER_SPAWN       = 14; # player spawned event, data : dic
 GODFINGER_EVENT_TYPE_CLIENT_BEGIN       = 15; # just a client begin signal, called each time the client window is refreshed ( post connect, spawn, team switch, maybe something else )
 
 class Event():
-    def __init__(self, type : int, data : dict):
+    def __init__(self, type : int, data : dict, isStartup = False):
         self.type = type;
         self.data = data;
+        self.isStartup = isStartup;
 
 class KillEvent(Event):
-    def __init__(self, cl : client.Client, victimCl : client.Client, weaponStr : str, data : dict):
+    def __init__(self, cl : client.Client, victimCl : client.Client, weaponStr : str, data : dict, isStartup = False):
         self.client = cl;
         self.victim = victimCl;
         self.weaponStr = weaponStr;
-        super().__init__(GODFINGER_EVENT_TYPE_KILL, data)
+        super().__init__(GODFINGER_EVENT_TYPE_KILL, data, isStartup)
 
 # Probably not required
 class PlayerEvent(Event):
-    def __init__(self, cl : client.Client, data : dict):
+    def __init__(self, cl : client.Client, data : dict, isStartup = False):
         self.client = cl;
-        super().__init__(GODFINGER_EVENT_TYPE_PLAYER, data)
+        super().__init__(GODFINGER_EVENT_TYPE_PLAYER, data, isStartup)
 
 class PlayerSpawnEvent(Event):
-    def __init__(self, cl : client.Client, data : dict):
+    def __init__(self, cl : client.Client, data : dict, isStartup = False):
         self.client = cl;
-        super().__init__(GODFINGER_EVENT_TYPE_PLAYER_SPAWN, data)
+        super().__init__(GODFINGER_EVENT_TYPE_PLAYER_SPAWN, data, isStartup)
 
 class ExitEvent(Event):
-    def __init__(self, data : dict):
-        super().__init__(GODFINGER_EVENT_TYPE_EXIT, data)
+    def __init__(self, data : dict, isStartup = False):
+        super().__init__(GODFINGER_EVENT_TYPE_EXIT, data, isStartup)
 
 class MessageEvent(Event):
-    def __init__(self, cl : client.Client, message : str, data : dict, teamId = teams.TEAM_GLOBAL):
+    def __init__(self, cl : client.Client, message : str, data : dict, teamId = teams.TEAM_GLOBAL, isStartup = False):
         self.client = cl;
         self.message = message;
         self.teamId = teamId;
-        super().__init__(GODFINGER_EVENT_TYPE_MESSAGE, data);
+        super().__init__(GODFINGER_EVENT_TYPE_MESSAGE, data, isStartup);
 
 class ClientConnectEvent(Event):
-    def __init__(self, cl : client.Client, data : dict ):
+    def __init__(self, cl : client.Client, data : dict , isStartup = False):
         self.client = cl;
-        super().__init__(GODFINGER_EVENT_TYPE_CLIENTCONNECT, data);
+        super().__init__(GODFINGER_EVENT_TYPE_CLIENTCONNECT, data, isStartup);
 
 class ClientBeginEvent(Event):
-    def __init__(self, cl : client.Client, data : dict ):
+    def __init__(self, cl : client.Client, data : dict , isStartup = False):
         self.client = cl;
-        super().__init__(GODFINGER_EVENT_TYPE_CLIENT_BEGIN, data);
+        super().__init__(GODFINGER_EVENT_TYPE_CLIENT_BEGIN, data, isStartup);
 
 class ClientDisconnectEvent(Event):
     # clients disconnected with REASON_SERVER_SHUTDOWN are clients that are actually still active serverside until any other reason is fired
@@ -69,26 +70,26 @@ class ClientDisconnectEvent(Event):
     REASON_KICK = 2;
     REASON_BAN = 3;
     REASON_TIMEOUT = 4; # connection lost and timed out on await, usually due to crashes/network issues, not implemented, technically speaking, it's natural
-    def __init__(self, cl : client.Client, data : dict, reason = REASON_NATURAL ):
+    def __init__(self, cl : client.Client, data : dict, reason = REASON_NATURAL , isStartup = False):
         self.client = cl;
         self.reason = reason;
-        super().__init__(GODFINGER_EVENT_TYPE_CLIENTDISCONNECT, data);
+        super().__init__(GODFINGER_EVENT_TYPE_CLIENTDISCONNECT, data, isStartup);
 
 class ClientChangedEvent(Event):
-    def __init__(self, cl : client.Client, data : dict ):
+    def __init__(self, cl : client.Client, data : dict , isStartup = False):
         self.client = cl;
-        super().__init__(GODFINGER_EVENT_TYPE_CLIENTCHANGED, data);
+        super().__init__(GODFINGER_EVENT_TYPE_CLIENTCHANGED, data, isStartup);
 
 class MapChangeEvent(Event):
-    def __init__(self, mapName : str, oldMapName : str):
+    def __init__(self, mapName : str, oldMapName : str, isStartup = False):
         self.mapName = mapName;
         self.oldMapName = oldMapName;
-        super().__init__(GODFINGER_EVENT_TYPE_MAPCHANGE, {})
+        super().__init__(GODFINGER_EVENT_TYPE_MAPCHANGE, {}, isStartup)
 
 class SmodSayEvent(Event):
-    def __init__(self, playerName : str, smodID : int, adminIP : str, message : str):
+    def __init__(self, playerName : str, smodID : int, adminIP : str, message : str, isStartup = False):
         self.playerName = playerName
         self.smodID = smodID
         self.adminIP = adminIP
         self.message = message
-        super().__init__(GODFINGER_EVENT_TYPE_SMSAY, {})
+        super().__init__(GODFINGER_EVENT_TYPE_SMSAY, {}, isStartup)

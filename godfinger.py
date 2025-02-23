@@ -61,6 +61,7 @@ import queue;
 import database;
 import plugin;
 import lib.shared.teams as teams;
+import logMessage;
 
 
 INVALID_ID = -1;
@@ -309,7 +310,7 @@ class MBIIServer:
                 prestartLines.reverse();
                 with self._logMessagesLock:
                     for i in range(len(prestartLines)):
-                        self._logMessagesQueue.put(prestartLines[i]);
+                        self._logMessagesQueue.put(logMessage.LogMessage(prestartLines[i], True));
             self._FetchStatus();
             if not self._pluginManager.Start():
                 return;
@@ -349,7 +350,7 @@ class MBIIServer:
         with self._logMessagesLock:
             while not self._logMessagesQueue.empty():
                 message = self._logMessagesQueue.get();
-                self._ParseLine(message);
+                self._ParseMessage(message);
         self._pluginManager.Loop();
     
     def _GetClients(self):
@@ -373,14 +374,15 @@ class MBIIServer:
                     self._pluginManager.Event( godfingerEvent.ClientConnectEvent( newClient, None ) );
         
 
-    def _ParseLine(self, line):
-
+    def _ParseMessage(self, message : logMessage.LogMessage):
+        
+        line = message.content;
         if line.startswith("ShutdownGame"):
-            self.OnShutdownGame(line);
+            self.OnShutdownGame(message);
             return;
     
         elif line.startswith("gsess"):
-            self.OnRealInit();
+            self.OnRealInit(message);
             return;
 
         lineParse = line.split()
@@ -396,7 +398,7 @@ class MBIIServer:
             # strip timestamp
             skippedLine = skippedLine[7:]
             if len(skippedLine) > 0:
-                self._logMessagesQueue.queue.appendleft(skippedLine)
+                self._logMessagesQueue.queue.appendleft(logMessage.LogMessage(skippedLine, False));
         l = len(lineParse);
         # we shouldn't ever see blank lines in the server log if it isn't tampered with but just in case
         if l > 1:
@@ -404,30 +406,29 @@ class MBIIServer:
                 if lineParse[1] == "say:":      # smod server say (admin message)
                     pass
                 elif lineParse[1] == "smsay:":   # smod chat smsay (admin-only chat message)
-                    self.OnSmsay(line)
+                    self.OnSmsay(message)
             elif lineParse[1] == "say:":  # Handle say messages by players (not server)
-                self.OnChatMessage(line);
+                self.OnChatMessage(message)
             elif lineParse[1] == "sayteam:":
-                self.OnChatMessageTeam(line);
+                self.OnChatMessageTeam(message)
             elif lineParse[0] == "Player":
-                self.OnPlayer(line); # it's gonna be a long ride
+                self.OnPlayer(message); # it's gonna be a long ride
             elif lineParse[0] == "Kill:":
-                self.OnKill(line);
+                self.OnKill(message);
             elif lineParse[0] == "Exit:":
-                self.OnExit(line);
+                self.OnExit(message);
             if lineParse[0] == "ClientConnect:":
-                self.OnClientConnect(line);
+                self.OnClientConnect(message);
             if lineParse[0] == "ClientBegin:":
-                self.OnClientBegin(line);
+                self.OnClientBegin(message);
             elif lineParse[0] == "InitGame:":
-                self.OnInitGame(line);
+                self.OnInitGame(message);
             elif lineParse[0] == "ClientDisconnect:":
-                self.OnClientDisconnect(line);
+                self.OnClientDisconnect(message);
             elif lineParse[0] == "ClientUserinfoChanged:":
-                self.OnClientUserInfoChanged(line);
+                self.OnClientUserInfoChanged(message);
             else:
                 return;
-
 
     # Make it read from bottom to first ServerInit: message, incase if we're started after someone connected, 
     # because rcon status notrunc doesnt provide team info on players
@@ -453,24 +454,27 @@ class MBIIServer:
                     break;
             log.close();
     
-    def OnChatMessage(self, messageRaw : str):
+    def OnChatMessage(self, logMessage : logMessage.LogMessage):
+        messageRaw = logMessage.content;
         Log.debug("Chat message %s ", (messageRaw));
         lineParse = messageRaw.split();
         senderId = int(lineParse[0].strip(":"))
         senderClient = self._clientManager.GetClientById(senderId);
         message : str = messageRaw.split("\"")[1]   # quote characters cannot appear in chat messages, meaning that index 1 will always contain the whole chat message
-        self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw } ) );
+        self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, logMessage.isStartup ) );
 
-    def OnChatMessageTeam(self, messageRaw : str):
+    def OnChatMessageTeam(self, logMessage : logMessage.LogMessage):
+        messageRaw = logMessage.content;
         lineParse = messageRaw.split();
         senderId = int(lineParse[0].strip(":"))
         senderClient = self._clientManager.GetClientById(senderId);
         message : str = messageRaw.split("\"")[1] 
         Log.debug("Team chat meassge %s, with teamId %s", messageRaw, senderClient.GetTeamId);
-        self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId() ) );
+        self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), logMessage.isStartup ) );
     
     
-    def OnPlayer(self, textified : str):
+    def OnPlayer(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug("On Player log entry %s ", textified);
         posUi = textified.find("u");
         if posUi != -1:
@@ -500,15 +504,16 @@ class MBIIServer:
                             changedOld["ja_guid"] = cl._jaguid;
                             cl._jaguid = vars["ja_guid"];
                 if len(changedOld) > 0 :
-                    self._pluginManager.Event( godfingerEvent.ClientChangedEvent(cl, changedOld)); # a spawned client changed
+                    self._pluginManager.Event( godfingerEvent.ClientChangedEvent(cl, changedOld, logMessage.isStartup ) ); # a spawned client changed
                 else:
-                    self._pluginManager.Event( godfingerEvent.PlayerSpawnEvent ( cl, vars ) ); # a newly spawned client
+                    self._pluginManager.Event( godfingerEvent.PlayerSpawnEvent ( cl, vars, logMessage.isStartup ) ); # a newly spawned client
             else:
                 Log.warning("Client \"Player\" event with client is None.");
         self._pluginManager.Event( godfingerEvent.PlayerEvent(cl, {"text":textified}));   
 
 
-    def OnKill(self, textified : str):
+    def OnKill(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug("Kill log entry %s", textified);
         splitted = textified.split();
         pidNum = splitted[1];
@@ -522,10 +527,11 @@ class MBIIServer:
                     # dude changed their team to spectator with self kill
                     oldTeam = cl.GetTeamId();
                     cl._teamId = teams.TEAM_SPEC;
-                    self._pluginManager.Event( godfingerEvent.ClientChangedEvent(cl, {"team":oldTeam}))
-            self._pluginManager.Event( godfingerEvent.KillEvent(cl, clVictim, weaponStr, None ) );
+                    self._pluginManager.Event( godfingerEvent.ClientChangedEvent(cl, {"team":oldTeam} , logMessage.isStartup))
+            self._pluginManager.Event( godfingerEvent.KillEvent(cl, clVictim, weaponStr, None, logMessage.isStartup ) );
     
-    def OnExit(self, textified : str):
+    def OnExit(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         textsplit = textified.split()
         Log.debug("Exit log entry %s", textified);
         scoreLine = None
@@ -543,10 +549,11 @@ class MBIIServer:
         scoreLine = scoreLine.strip()
         teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
         exitReason = ' '.join(textsplit[1:])
-        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores} ) );
+        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, logMessage.isStartup ) );
 
 
-    def OnClientConnect(self, textified : str):
+    def OnClientConnect(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug("Client connect log entry %s", textified);
         lineParse = textified.split();
         extraName = len(lineParse) - 6;
@@ -561,33 +568,36 @@ class MBIIServer:
         if not id in [cl.GetId() for cl in self.API_GetAllClients()]:
             newClient = client.Client(id, name, ip);
             self._clientManager.AddClient(newClient); # make sure its added BEFORE events are processed
-            self._pluginManager.Event( godfingerEvent.ClientConnectEvent( newClient, None ) );
+            self._pluginManager.Event( godfingerEvent.ClientConnectEvent( newClient, None, logMessage.isStartup ) );
         else:
             Log.warning(f"Duplicate client with ID {id} connected, ignoring")
             pass
 
-    def OnClientBegin(self, textified : str ):
+    def OnClientBegin(self, logMessage : logMessage.LogMessage ):
+        textified = logMessage.content;
         #Log.debug("Client begin log entry %s", textified);
         lineParse = textified.split();
         clientId = int(lineParse[1]);
         client = self._clientManager.GetClientById(clientId);
         if client != None:
             #Log.debug("Client is not none, sending begin event to plugins.");
-            self._pluginManager.Event( godfingerEvent.ClientBeginEvent( client, {} ) );
+            self._pluginManager.Event( godfingerEvent.ClientBeginEvent( client, {}, logMessage.isStartup ) );
     
-    def OnClientDisconnect(self, textified : str):
+    def OnClientDisconnect(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug("Client disconnect log entry %s", textified); 
         lineParse = textified.split();
         dcId = int(lineParse[1]);
         cl = self._clientManager.GetClientById(dcId);
         if cl != None:
             Log.debug("Player with dcId %s disconnected ", str(dcId));
-            self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( cl, None ) );
+            self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( cl, None, logMessage.isStartup ) );
             self._clientManager.RemoveClient(cl); # make sure its removed AFTER events are processed by plugins
         else:
             pass # player reconnected ( thats how server shits in logs for some reason)
 
-    def OnClientUserInfoChanged(self, textified : str):
+    def OnClientUserInfoChanged(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug("Client user info changed log entry %s", textified);
         lineParse = textified.split();
         clientId = int(lineParse[1])
@@ -595,11 +605,12 @@ class MBIIServer:
         cl = self._clientManager.GetClientById(clientId);
         if cl != None:
             cl.Update(userInfo);
-            self._pluginManager.Event( godfingerEvent.ClientChangedEvent( cl, cl.GetInfo() ) );
+            self._pluginManager.Event( godfingerEvent.ClientChangedEvent( cl, cl.GetInfo(), logMessage.isStartup ) );
         else:
             Log.warning(f"Attempted to update userinfo of client {clientId} which does not exist, ignoring")
 
-    def OnInitGame(self, textified : str):
+    def OnInitGame(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug("Init game log entry %s", textified);
 
         configStr = textified[len("InitGame: \\"):len(textified)];
@@ -619,28 +630,30 @@ class MBIIServer:
         
         Log.info("Current map name on init : %s", self._serverData.mapName);
         
-        self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_INIT, { "vars" : vars } ) );
-        self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT, {} ) );
+        self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_INIT, { "vars" : vars }, logMessage.isStartup ) );
+        self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT, {}, logMessage.isStartup ) );
 
-    def OnShutdownGame(self, textified : str):
+    def OnShutdownGame(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug("Shutdown game log entry %s", textified);
         allClients = self._clientManager.GetAllClients();
         #with self._clientManager._lock:
         for client in allClients:
             Log.debug("Shutdown pseudo-disconnecting client %s" %str(client));
-            self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( client, {}, godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN ) );
+            self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( client, {}, godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN, logMessage.isStartup ) );
         
-        self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN, None ) );
+        self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN, None, logMessage.isStartup ) );
     
-    def OnRealInit(self):
+    def OnRealInit(self, logMessage : logMessage.LogMessage):
         Log.debug("Server starting up for real.");
-        self._pluginManager.Event(godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT, None ));
+        self._pluginManager.Event(godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT, None, logMessage.isStartup ));
 
     def OnMapChange(self, mapName : str, oldMapName : str):
         Log.debug(f"Map change event received: {mapName}")
-        self._pluginManager.Event(godfingerEvent.MapChangeEvent(mapName, oldMapName))
+        self._pluginManager.Event(godfingerEvent.MapChangeEvent(mapName, oldMapName));
 
-    def OnSmsay(self, textified : str):
+    def OnSmsay(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content;
         Log.debug(f"Smod say event received: {textified}")
         lineSplit = textified.split()
         adminIDIndex = lineSplit.index('(adminID:')
@@ -649,7 +662,7 @@ class MBIIServer:
             senderName = ' '.join(lineSplit[2:adminIDIndex])
             senderIP = lineSplit[adminIDIndex + 3].strip("):")
             message = ' '.join(lineSplit[adminIDIndex + 4:])
-            self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message))
+            self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message, logMessage.isStartup))
         else:
             # somehow malformed smsay message 
             pass

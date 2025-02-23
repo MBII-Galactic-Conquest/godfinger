@@ -19,7 +19,7 @@ class ADatabase():
         pass;
     
     def FetchQuery(self):
-        pass;
+        print("Fetch query unimplemented");
     
     def LoadExtension(self, extpath : str):
         pass;
