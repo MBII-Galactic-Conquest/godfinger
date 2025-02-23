@@ -1,0 +1,11 @@
+{
+    "prefix":"^5[AutoMessage] ^7",
+    "interval": 10,
+    "messages": [
+        "Message 1",
+        "Message 2",
+        "Message 3",
+        "Message 4",
+        "Message 5"
+    ]
+}

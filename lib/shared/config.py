@@ -13,7 +13,7 @@ class Config(object):
         self.cfg = {}
 
     @classmethod
-    def fromJSON(cls, jsonPath):
+    def fromJSON(cls, jsonPath, default : str = None):
         try:
             with open(jsonPath) as file:
                 config = json.load(file)        
@@ -21,7 +21,16 @@ class Config(object):
                 cls.cfg = config
                 return cls
         except:
-            return None
+            if default == None:
+                return None
+            else:
+                config = json.loads(default);
+                cls = cls();
+                cls.cfg = config;
+                f = open(jsonPath, "wt")
+                f.write(default)
+                f.close()
+                return cls;
         
     def GetValue(self, paramName : str, defaultValue : any):
         if paramName in self.cfg:
