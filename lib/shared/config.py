@@ -22,3 +22,9 @@ class Config(object):
                 return cls
         except:
             return None
+        
+    def GetValue(self, paramName : str, defaultValue : any):
+        if paramName in self.cfg:
+            return self.cfg[paramName];
+        else:
+            return defaultValue;
