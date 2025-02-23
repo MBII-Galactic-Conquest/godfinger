@@ -447,7 +447,7 @@ class MBIIServer:
                             for line in lines:
                                 if len(line) > 0:
                                     line = line[7:];
-                                    self._logMessagesQueue.put(line);
+                                    self._logMessagesQueue.put(logMessage.LogMessage(line));
                     else:
                         time.sleep(sleepTime)
                 else:
