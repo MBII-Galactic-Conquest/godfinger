@@ -140,11 +140,11 @@ class VPNMonitor():
     def ProcessVpnClient(self, id, ip, vpnType):
         blockable = self.config.GetValue("block", []);
         if vpnType in blockable:
-            Log.debug("Kicking a player with id %s due to VPN block rules" % client.GetIp());
+            Log.debug("Kicking a player with ip %s due to VPN block rules" % client.GetIp());
             self._serverData.rcon.clientkick(id);
         blacklist = self.config.cfg["blacklist"];
         if ip in blacklist:
-            Log.debug("Kicking a player with id %s due to VPN blacklist rules" % client.GetIp());
+            Log.debug("Kicking a player with ip %s due to VPN blacklist rules" % client.GetIp());
             self._serverData.rcon.clientkick(id);
 
     def OnClientDisconnect(self, client : client.Client, reason, data ) -> bool:
