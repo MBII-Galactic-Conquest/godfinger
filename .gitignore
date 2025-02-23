@@ -9,6 +9,7 @@ __pycache__/*
 *.log
 
 godfingerCfg.json
+automessageCfg.json
 
 *.db
 *.DB
