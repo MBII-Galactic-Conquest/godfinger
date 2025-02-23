@@ -10,6 +10,7 @@ __pycache__/*
 
 godfingerCfg.json
 automessageCfg.json
+vpnmonitorCfg.json
 
 *.db
 *.DB
