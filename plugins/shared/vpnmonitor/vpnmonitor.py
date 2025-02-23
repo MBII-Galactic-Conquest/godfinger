@@ -74,6 +74,21 @@ class VPNMonitor():
             self._status = -1;
 
     def Start(self) -> bool:
+        status = self._serverData.rcon.status();
+        if status != None:
+            statusStr = status.decode("UTF-8", "ignore");
+            Log.debug(statusStr);
+            splitted = statusStr.splitlines();
+            l = len( splitted );
+            if l > 10:
+                for i in range (10, l-1):
+                    line = splitted[i];
+                    playerSplit = line.split();
+                    addr = playerSplit[-2];
+                    ip = addr[:addr.rfind(":")];
+                    id = int(playerSplit[0]);
+                    vpnType = self.GetIpVpnType(ip);
+                    self.ProcessVpnClient(id, ip, vpnType);
         if self._status == 0:
             return True;
         else:
@@ -86,27 +101,22 @@ class VPNMonitor():
         vpnType = self.GetClientVPNType(client);
         if vpnType < 0:
             return False;
-        blockable = self.config.GetValue("block", []);
-        if vpnType in blockable:
-            Log.debug("Kicking a player with id %s due to VPN block rules" % client.GetIp());
-            self._serverData.rcon.clientkick(client.GetId());
-            return False;
-        ip = client.GetIp();
-        blacklist = self.config.cfg["blacklist"];
-        if ip in blacklist:
-            Log.debug("Kicking a player with id %s due to VPN blacklist rules" % client.GetIp());
-            self._serverData.rcon.clientkick(client.GetId());
-            return False;
+        self.ProcessVpnClient(client.GetId(), client.GetIp(), vpnType);
         return False;
+        
     
     def GetClientVPNType(self, client : client.Client) -> int:
         ip = client.GetIp();
+        return self.GetIpVpnType(ip);
+        
+
+    def GetIpVpnType(self, ip : str ) -> int:
         whitelist = self.config.cfg["whitelist"];
         if ip in whitelist:
             if not self._serverData.args.debug:
                 return -1;
     
-        Log.debug("Getting vpn associated with client address %s", ip);
+        Log.debug("Getting vpn associated with ip address %s", ip);
         existing = self._database.ExecuteQuery("SELECT vpn FROM iplist WHERE ip=\""+ip+"\"", True);
         vpnType = -1;
         if existing == None or len(existing) == 0:
@@ -122,10 +132,20 @@ class VPNMonitor():
             else:
                 Log.error("Web request to VPN check service is failed with http code %d", webRequest.status_code);
         else:
-            Log.debug("VPN entry existing in database, using it.");
+            Log.debug("VPN ip entry existing in database, using it.");
             vpnType = existing[0][0];
         
         return vpnType;
+
+    def ProcessVpnClient(self, id, ip, vpnType):
+        blockable = self.config.GetValue("block", []);
+        if vpnType in blockable:
+            Log.debug("Kicking a player with id %s due to VPN block rules" % client.GetIp());
+            self._serverData.rcon.clientkick(id);
+        blacklist = self.config.cfg["blacklist"];
+        if ip in blacklist:
+            Log.debug("Kicking a player with id %s due to VPN blacklist rules" % client.GetIp());
+            self._serverData.rcon.clientkick(id);
 
     def OnClientDisconnect(self, client : client.Client, reason, data ) -> bool:
         return False;
