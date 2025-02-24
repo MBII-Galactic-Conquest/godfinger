@@ -61,7 +61,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > </br>
 >
-> #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII`
+> #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII\\`
+>
+> > Python on `Windows 11` systems can encounter opposite problems with dirpathing, so in this instance, any use of double backslashes `\\` must become forward slashes, `/`, and in the event of any spaces please use underscores `_`.
 >
 > </br>
 >
