@@ -29,5 +29,6 @@ def main():
     except Exception:
         print("OOf");
 
+    input("\nPress Enter to exit...");  # Keeps the script open until Enter is pressed
 
 main();
