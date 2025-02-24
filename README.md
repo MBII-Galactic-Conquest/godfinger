@@ -51,7 +51,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > [!NOTE]
 > This system was created initially for the [`MBII Supremacy Project`](https://community.moviebattles.org/threads/supremacy-release-tracker.10667/), now available for public use.</br>Originally created by [`ViceDice`](https://github.com/ViceDice) & [`ACHUTA`](https://github.com/mantlar), redistributed for a public MIT release.
 >
-> All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)</br>All pull requests are asked to be directed at the [`merge`](https://github.com/MBII-Galactic-Conquest/godfinger/tree/merge) branch before tested approval into upstream `dev` or `main` branches.</br>We will not accept custom plugins upstream, outside of crucial widespread plugins like `RTV`, designed for abstract server hosting.
+> All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)</br>All pull requests are asked to be directed at the [`merge`](https://github.com/MBII-Galactic-Conquest/godfinger/tree/merge) branch before tested approval into upstream `dev` or `main` branches.</br></br>We will not accept custom plugins upstream, outside of crucial widespread plugins like `RTV`, designed for abstract server hosting.
 
 </br>
 </br>
