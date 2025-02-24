@@ -593,6 +593,9 @@ class MBIIServer:
             Log.debug("Player with dcId %s disconnected ", str(dcId));
             self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( cl, None, isStartup = logMessage.isStartup ) );
             self._clientManager.RemoveClient(cl); # make sure its removed AFTER events are processed by plugins
+            if self._clientManager.GetClientCount() == 0:
+                Log.debug("All players have left the server");
+                self._pluginManager.Event( godfingerEvent.ServerEmptyEvent(isStartup = logMessage.isStartup));
         else:
             pass # player reconnected ( thats how server shits in logs for some reason)
 

@@ -17,6 +17,7 @@ GODFINGER_EVENT_TYPE_POST_INIT          = 12; # An event that is always fired wh
 GODFINGER_EVENT_TYPE_REAL_INIT          = 13; # gsess mallocd message indicating the INIT is REAL, the first.
 GODFINGER_EVENT_TYPE_PLAYER_SPAWN       = 14; # player spawned event, data : dict of vars
 GODFINGER_EVENT_TYPE_CLIENT_BEGIN       = 15; # just a client begin signal, called each time the client window is refreshed ( post connect, spawn, team switch, maybe something else )
+GODFINGER_EVENT_TYPE_SERVER_EMPTY       = 16; # A server empty signal, fired before last client is removed from client list due to disconnect, no specific data.
 
 class Event():
     def __init__(self, type : int, data : dict, isStartup = False):
@@ -93,3 +94,7 @@ class SmodSayEvent(Event):
         self.adminIP = adminIP
         self.message = message
         super().__init__(GODFINGER_EVENT_TYPE_SMSAY, {}, isStartup)
+
+class ServerEmptyEvent(Event):
+    def __init__(self, data : dict = {}, isStartup=False):
+        super().__init__(GODFINGER_EVENT_TYPE_SERVER_EMPTY, data, isStartup);
