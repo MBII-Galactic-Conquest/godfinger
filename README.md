@@ -37,9 +37,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > [!IMPORTANT]
 > [`** REQUIRES PYTHON 3.12.7+ **`](https://www.python.org/downloads/release/python-3127/)
 > 
-> Ensure your logfile is set to `server.log` in your `server.cfg`
+> Ensure your logfile is set to `server.log` in your `server.cfg.`
 > 
-> Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg`
+> Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg.`
 > 
 > Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startDebug.bat"` or `"start.bat".`
 
@@ -63,7 +63,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII\\`
 >
-> > Python on `Windows 11` systems can encounter opposite problems with dirpathing, so in this instance, any use of double backslashes `\\` must become forward slashes, `/`, and in the event of any spaces please use underscores `_`.
+> > Python on `Windows 11` systems can encounter opposite problems with dirpathing, so in this instance, any use of double backslashes `\\` must become forward slashes, `/`, and in the event of any spaces please use `_` underscores.
 >
 > </br>
 >
