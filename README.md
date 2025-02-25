@@ -6,7 +6,7 @@
 
 </br>
 
-#### A modular script system that allows streamlined rcon &amp; plugin interaction to simplify serverside processing for MBII in python. Aimed to better equip server owners to improve their own creative works, and have more expression over their game servers.
+#### A modular script extension system that allows streamlined rcon &amp; plugin interaction to simplify serverside processing for MBII in python. Aimed to better equip server owners to improve their own creative works, and have more expression over their game servers.
 
 ```
 The possibilities of this system allow for myriad of custom logfile implements, such as:
@@ -37,9 +37,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > [!IMPORTANT]
 > [`** REQUIRES PYTHON 3.12.7+ **`](https://www.python.org/downloads/release/python-3127/)
 > 
-> Ensure your logfile is set to `server.log` in your `server.cfg`
+> Ensure your logfile is set to `server.log` in your `server.cfg.`
 > 
-> Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg`
+> Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg.`
 > 
 > Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startDebug.bat"` or `"start.bat".`
 
@@ -51,9 +51,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > [!NOTE]
 > This system was created initially for the [`MBII Supremacy Project`](https://community.moviebattles.org/threads/supremacy-release-tracker.10667/), now available for public use.</br>Originally created by [`ViceDice`](https://github.com/ViceDice) & [`ACHUTA`](https://github.com/mantlar), redistributed for a public MIT release.
 >
-> All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)</br>We will not accept custom plugins upstream, outside of crucial widespread plugins like `RTV`, designed for abstract server hosting.
->
-> If you wish to dl & use `RTV` as a plugin, download the [release](https://github.com/MBII-Galactic-Conquest/godfinger/releases) for that branch, or you may view the branch [remotely.](https://github.com/MBII-Galactic-Conquest/godfinger/tree/plugins/rtv)
+> All bugfixes or optimizations may be reviewed and potentially accepted through method of [`pull requests.`](https://github.com/MBII-Galactic-Conquest/godfinger/pulls)</br>All pull requests are asked to be directed at the [`merge`](https://github.com/MBII-Galactic-Conquest/godfinger/tree/merge) branch before tested approval into upstream `dev` or `main` branches.</br></br>We will not accept custom plugins upstream, outside of crucial widespread plugins like `RTV`, designed for abstract server hosting.
 
 </br>
 </br>
@@ -63,7 +61,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > </br>
 >
-> #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII`
+> #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII\\`
+>
+> > Python on `Windows 11` systems can encounter opposite problems with dirpathing, so in this instance, any use of double backslashes `\\` must become forward slashes, `/`, and in the event of any spaces please use `_` underscores.
 >
 > </br>
 >
