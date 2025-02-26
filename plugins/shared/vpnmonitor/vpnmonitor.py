@@ -83,7 +83,7 @@ class VPNMonitor():
             splitted = statusStr.splitlines();
             l = len( splitted );
             if l > 10:
-                for i in range (10, l-1):
+                for i in range (10, l):
                     line = splitted[i];
                     playerSplit = line.split();
                     addr = playerSplit[-2];
