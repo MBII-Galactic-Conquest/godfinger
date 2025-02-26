@@ -86,11 +86,12 @@ class VPNMonitor():
                 for i in range (10, l):
                     line = splitted[i];
                     playerSplit = line.split();
-                    addr = playerSplit[-2];
-                    ip = addr[:addr.rfind(":")];
-                    id = int(playerSplit[0]);
-                    vpnType = self.GetIpVpnType(ip);
-                    self.ProcessVpnClient(id, ip, vpnType);
+                    if len(playerSplit) >= 6: # hardcode
+                        addr = playerSplit[-2];
+                        ip = addr[:addr.rfind(":")];
+                        id = int(playerSplit[0]);
+                        vpnType = self.GetIpVpnType(ip);
+                        self.ProcessVpnClient(id, ip, vpnType);
         if self._status == 0:
             return True;
         else:
@@ -205,10 +206,10 @@ def OnEvent(event) -> bool:
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
-        if event.isStartup:
-            return False; #Ignore startup messages
-        else:
-            return PluginInstance.OnClientConnect(event.client, event.data);
+        #if event.isStartup:
+        #    return False; #Ignore startup messages
+        #else:
+        return PluginInstance.OnClientConnect(event.client, event.data);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
