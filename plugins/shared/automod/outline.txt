@@ -14,5 +14,12 @@
     ]
 }
 
+    "blacklistedUserNames":
+    [
+        "slur1",
+        "slur2"
+    ]
+}
+
 3) Functionality for the automod script that searches for ALL special characters in the string provided:
 > To prevent people from abusing this system, and attempting to put special characters in the mix of the spelling, or spaces inbetween.

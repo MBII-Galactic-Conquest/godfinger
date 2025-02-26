@@ -3,6 +3,8 @@ lib/private/*
 plugins/private/*
 !plugins/private/.keep
 
+*.code-workspace
+
 *.env
 *.pyc
 __pycache__/*
