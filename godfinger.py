@@ -733,6 +733,7 @@ def InitLogger():
 
 def main():
     InitLogger();
+    Log.info("Godfinger entry point.");
     global Server;
     Server = MBIIServer();
     int_status = Server.GetStatus();
