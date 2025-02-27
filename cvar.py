@@ -1,4 +1,7 @@
 
+import lib.shared.rcon as rcon;
+import lib.shared.colors as colors;
+
 class Cvar():
 
     CVAR_NONE           = 0x00000000;
@@ -53,7 +56,8 @@ class Cvar():
         def __repr__(self):
             return self.__str__();
 
-    def __init__(self):
+    def __init__(self, manager : any):
+        self._manager = manager; # actually a CvarManager, imagine we're casting;
         self._flags = Cvar.Flags();
         self._name = "";
         self._val = "";
@@ -91,3 +95,44 @@ class Cvar():
 
     def __repr__(self):
         return self.__str__();
+
+
+class CvarManager():
+    def __init__(self, rc : rcon.Rcon):
+        self._cvars = dict[str, Cvar]();
+        self._rcon = rc;
+    
+    def Initialize(self) -> bool:
+        if self._rcon == None:
+            return False;
+        else:
+            self._FetchCvars();
+            return True;
+
+    def _FetchCvars(self):
+        cvars = self._rcon.cvarList();
+        if cvars != None:
+            cvarsStr = cvars.decode("UTF-8", "ignore");
+            if cvarsStr != "":
+                cvarsStr = colors.stripColorCodes(cvarsStr);
+                parsed = {};
+                splitted = cvarsStr.splitlines();
+                for line in splitted:
+                    cv = Cvar(self);
+                    cv.FromCvarlistString(line);
+                    parsed[cv.GetName()] = cv;
+                for name in parsed:
+                    if name not in self._cvars:
+                        self._cvars[name] = parsed[name];
+                    else:
+                        self._cvars[name].SetValue(parsed[name].GetValue());
+
+    def GetAllCvars(self) -> dict[str, Cvar]:
+        return self._cvars.copy();
+
+    def GetCvar(self, name : str) -> Cvar:
+        if name in self._cvars:
+            return self._cvars[name];
+        else:
+            return None;
+

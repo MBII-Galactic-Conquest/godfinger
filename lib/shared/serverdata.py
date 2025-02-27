@@ -6,8 +6,9 @@ import cvar;
 
 
 class ServerData():
-    def __init__(self, pk3mngr : pk3.Pk3Manager, API : godfingerAPI.API, rcon : rcon.Rcon, args):
+    def __init__(self, pk3mngr : pk3.Pk3Manager, cvarManager : cvar.CvarManager, API : godfingerAPI.API, rcon : rcon.Rcon, args):
         self.pk3Manager = pk3mngr;
+        self.cvarManager = cvarManager;
         self.API = API;
         self.args = args;
         self.lock = threading.Lock()
@@ -15,7 +16,6 @@ class ServerData():
         self.mapName = "";
         self.rcon = rcon;
         self.maxPlayers = 0;
-        self.svconfig = dict[str, cvar.Cvar](); # actual server cvars, loaded upon startup, should stay the same during runs.
 
     def GetServerVar(self, var) -> object:
         with self.lock:

@@ -111,6 +111,7 @@ CONFIG_FALLBACK = \
 
 class MBIIServer:
 
+    STATUS_SERVER_JUST_AN_ERROR = -6;
     STATUS_SERVER_NOT_RUNNING = -5;
     STATUS_PLUGIN_ERROR = -4;
     STATUS_RESOURCES_ERROR = -3;
@@ -177,6 +178,10 @@ class MBIIServer:
                             self._config.cfg["Remote"]["bindAddress"],
                             self._config.cfg["Remote"]["password"] )
         
+        # Cvars
+        # Init at Start
+        self._cvarManager = cvar.CvarManager(self._rcon);
+        
         self._logMessagesLock = threading.Lock();
         self._logMessagesQueue = queue.Queue();
         self._logReaderLock = threading.Lock();
@@ -201,7 +206,7 @@ class MBIIServer:
         exportAPI.AddDatabase       = self.API_AddDatabase;
         exportAPI.GetDatabase       = self.API_GetDatabase;
         exportAPI.GetPlugin         = self.API_GetPlugin;
-        self._serverData = serverdata.ServerData(self._pk3Manager, exportAPI, self._rcon, Args);
+        self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._rcon, Args);
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)));
 
         # Technical
@@ -275,22 +280,6 @@ class MBIIServer:
             Log.warning("Server status is unreachable, setting default values to status data.");
         pass;
     
-
-    # TODO move to separate class with all bells and whistles
-    def _FetchCvars(self):
-        cvars = self._rcon.cvarList();
-        if cvars != None:
-            cvarsStr = cvars.decode("UTF-8", "ignore");
-            if cvarsStr != "":
-                cvarsStr = colors.stripColorCodes(cvarsStr);
-                parsed = {};
-                splitted = cvarsStr.splitlines();
-                for line in splitted:
-                    cv = cvar.Cvar();
-                    cv.FromCvarlistString(line);
-                    parsed[cv.GetName()] = cv;
-                self._serverData.serverVars = parsed;
-
     def Start(self):
         try:
             # check for server process running first
@@ -329,12 +318,19 @@ class MBIIServer:
                 with self._logMessagesLock:
                     for i in range(len(prestartLines)):
                         self._logMessagesQueue.put(logMessage.LogMessage(prestartLines[i], True));
-            self._FetchCvars();
-            Log.debug("All cvars %s" % str(self._serverData.serverVars));
-            if "sv_fps" in self._serverData.serverVars:
-                self._rcon._frameTime = math.ceil(1000 / int(self._serverData.serverVars["sv_fps"].GetValue())) / 1000;
-                Log.info("Rcon rates set to %f due to %s" % (self._rcon._frameTime, self._serverData.serverVars["sv_fps"]));
+            
+            if not self._cvarManager.Initialize():
+                Log.error("Failed to initialize CvarManager, abort startup.");
+                self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR;
+                return;
+        
+            allCvars = self._cvarManager.GetAllCvars();
+            Log.debug("All cvars %s" % str(allCvars));
+            if "sv_fps" in allCvars:
+                self._rcon._frameTime = math.ceil(1000 / int(allCvars["sv_fps"].GetValue())) / 1000;
+                Log.info("Rcon rates set to %f due to %s" % (self._rcon._frameTime, allCvars["sv_fps"]));
             self._FetchStatus();
+
             if not self._pluginManager.Start():
                 return;
             self._logReaderThread.start();
