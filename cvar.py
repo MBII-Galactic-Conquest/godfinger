@@ -74,7 +74,9 @@ class Cvar():
     def SetValue(self, v : any):
         s = str(v);
         if s != None:
-            self._val = s;
+            if self._val != s:
+                self._val = s;
+                self._manager.OnCvarChange(self);
 
     def FromCvarlistString(self, cvarStr):
         splitvarname = cvarStr.split("\"");
@@ -131,8 +133,14 @@ class CvarManager():
         return self._cvars.copy();
 
     def GetCvar(self, name : str) -> Cvar:
-        if name in self._cvars:
+        if self.IsCvar(name):
             return self._cvars[name];
         else:
             return None;
+
+    def IsCvar(self, name : str) -> bool:
+        return name in self._cvars;
+
+    def OnCvarChange(self, cvar : Cvar):
+        self._rcon.setCvar(cvar.GetName(), cvar.GetValue());
 

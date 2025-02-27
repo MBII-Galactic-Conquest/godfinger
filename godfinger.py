@@ -329,6 +329,7 @@ class MBIIServer:
             if "sv_fps" in allCvars:
                 self._rcon._frameTime = math.ceil(1000 / int(allCvars["sv_fps"].GetValue())) / 1000;
                 Log.info("Rcon rates set to %f due to %s" % (self._rcon._frameTime, allCvars["sv_fps"]));
+            
             self._FetchStatus();
 
             if not self._pluginManager.Start():
