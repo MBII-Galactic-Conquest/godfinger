@@ -206,10 +206,10 @@ def OnEvent(event) -> bool:
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
-        #if event.isStartup:
-        #    return False; #Ignore startup messages
-        #else:
-        return PluginInstance.OnClientConnect(event.client, event.data);
+        if event.isStartup:
+            return False; #Ignore startup messages
+        else:
+            return PluginInstance.OnClientConnect(event.client, event.data);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:

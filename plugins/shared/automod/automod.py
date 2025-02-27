@@ -3,21 +3,70 @@ import logging;
 import godfingerEvent;
 import pluginExports;
 import lib.shared.serverdata as serverdata
+import lib.shared.config as config;
+import os;
+import lib.shared.client as client;
 
 SERVER_DATA = None;
+
+CONFIG_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "automodCfg.json");
+
+# > action 0 - mute
+# > action 1 - kick
+# > action 2 - tempban
+CONFIG_FALLBACK = \
+"""{
+    wordsBlacklist:
+    [
+
+    ],
+    namesBlacklist:
+    [
+
+    ],
+    action:1
+}
+"""
+
+global AutomodConfig;
+AutomodConfig = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
 
 # DISCLAIMER : DO NOT LOCK ANY OF THESE FUNCTIONS, IF YOU WANT MAKE INTERNAL LOOPS FOR PLUGINS - MAKE OWN THREADS AND MANAGE THEM, LET THESE FUNCTIONS GO.
 
 Log = logging.getLogger(__name__);
 
-def MyCoolFunction() -> int:
-    return 1337;
+PluginInstance = None;
 
-class MyVariables():
-    def __init__(self):
-        self.myCoolVariable = 0;
 
-MyCoolVariablesTable : MyVariables = MyVariables();
+class Automod():
+    def __init__(self, serverData : serverdata.ServerData):
+        self._serverData = serverData;
+        self.config = AutomodConfig;
+
+    def OnClientMessage(self, client : client.Client, message : str, teamId : int) -> bool:
+        if not self.FilterString(message):
+            pass; # todo
+        return False;
+
+    def OnClientConnect(self, client : client.Client) -> bool:
+        name = client.GetName();
+        if not self.FilterString(name):
+            pass; # todo
+        return False;
+
+    def OnClientChanged(self, client : client.Client, data : dict) -> bool:
+        newName = None;
+        if "n" in data:
+            newName = data["n"];
+        elif "name" in data:
+            newName = data["name"];
+        
+        if not self.FilterString(newName):
+            pass; # todo
+
+    def FilterString(self, string : str) -> bool:
+        return True;
+
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
@@ -35,57 +84,32 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
         format='%(asctime)s %(levelname)08s %(name)s %(message)s')
 
     global SERVER_DATA;
-    SERVER_DATA = serverData; # keep it stored
+    SERVER_DATA = serverData; 
+    global PluginInstance;
+    PluginInstance = Automod(serverData);
     if exports != None:
-        # e.g
-        exports.Add("MyCoolFunction", MyCoolFunction);
-        # Primitive variables are passed by assigment, not reference, so you'd better wrap your values in some kind of export data class to make it work.
-        exports.Add("MyCoolVariables", MyCoolVariablesTable, isFunc = False);
         pass;
-    return True; # indicate plugin load success
+    return True; 
 
-# Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
-    # You can get your cross plugin dependancies here, e.g
-    targetPlug = SERVER_DATA.API.GetPlugin("shared.test.testPlugin");
-    if targetPlug != None:
-        xprts = targetPlug.GetExports();
-        if xprts != None:
-            myCoolFunction = xprts.Get("MyCoolFunction").pointer;
-            myCoolVars : MyVariables = xprts.Get("MyCoolVariables").pointer;
-            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
-            myCoolVars.myCoolVariable = myCoolFunction(); # Execute it, if you want, or store for future use.
-            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
-            myCoolVars = xprts.Get("MyCoolVariables").pointer;
-            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
-        else:
-            Log.error("Failure at importing API from testPlugin.");
-            return False;
-    else:
-        Log.error("Failure in getting testPlugin.");
-        return False;
-    return True; # indicate plugin start success
+    return True; 
 
-# Called each loop tick from the system, TODO? maybe add a return timeout for next call
 def OnLoop():
     pass
-    #print("Calling Loop function from plugin!");
 
-# Called before plugin is unloaded by the system, finalize and free everything here
 def OnFinish():
     pass;
 
-# Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
-    #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
+    global PluginInstance;
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
-        return False;
+        return PluginInstance.OnClientMessage(event.client, event.message, event.teamId);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
-        return False;
+        return PluginInstance.OnClientConnect(event.client);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
-        return False;
+        return PluginInstance.OnClientChanged(event.client, event.data);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
