@@ -63,7 +63,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII\\`
 >
-> > Python on `Windows 11` systems can encounter opposite problems with dirpathing, so in this instance, any use of double backslashes `\\` must become forward slashes, `/`, and in the event of any spaces please use `_` underscores.
 >
 > </br>
 >
@@ -72,12 +71,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > > The rcon messaging if rate is limiting will block calling thread until next timeframe, because we have to send/recieve rcon messaging in sync mode.
 > 
 > > So i.e, if you send 6 rcons within 20 miliseconds frame time, it will send 5 and then wait for 20 milliseconds and send the 6th rcon afterwards.
->
-> </br>
->
-> #3) Occasionally you will encounter script errors if you accidentally merge `__pycache__` folders from other servers, systems, or plugins.
->
-> > For good measure when moving godfinger installations, and fresh installs, run `cleanup.bat`, which removes cached python data that can cause conflicts. This often also happens when merging plugins others make, and is generally good practice to run the cleanup procedure.
 >
 </br>
 
