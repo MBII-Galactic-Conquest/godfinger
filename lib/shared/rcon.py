@@ -270,3 +270,9 @@ class Rcon(object):
       id = bytes(str(id), "UTF-8") 
     res = self._Send(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self.rcon_pwd, id))
     return res
+  
+  def cvarList(self) -> str:
+    res = self._Send(b"\xff\xff\xff\xffrcon %b cvarlist" % (self.rcon_pwd))
+    if len(res) == 0:
+      return None;
+    return res

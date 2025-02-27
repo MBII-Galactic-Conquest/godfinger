@@ -2,7 +2,7 @@ import threading
 import lib.shared.pk3 as pk3;
 import godfingerAPI;
 import lib.shared.rcon as rcon;
-
+import cvar;
 
 
 class ServerData():
@@ -15,6 +15,7 @@ class ServerData():
         self.mapName = "";
         self.rcon = rcon;
         self.maxPlayers = 0;
+        self.svconfig = dict[str, cvar.Cvar](); # actual server cvars, loaded upon startup, should stay the same during runs.
 
     def GetServerVar(self, var) -> object:
         with self.lock:

@@ -47,7 +47,7 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     # You can get your cross plugin dependancies here, e.g
-    targetPlug = SERVER_DATA.API.GetPlugin("shared.test.testPlugin");
+    targetPlug = SERVER_DATA.API.GetPlugin("plugins.shared.test.testPlugin");
     if targetPlug != None:
         xprts = targetPlug.GetExports();
         if xprts != None:

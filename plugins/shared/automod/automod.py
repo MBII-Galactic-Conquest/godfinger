@@ -6,6 +6,7 @@ import lib.shared.serverdata as serverdata
 import lib.shared.config as config;
 import os;
 import lib.shared.client as client;
+import re;
 
 SERVER_DATA = None;
 
@@ -14,29 +15,27 @@ CONFIG_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "automodCfg.json")
 # > action 0 - mute
 # > action 1 - kick
 # > action 2 - tempban
+
 CONFIG_FALLBACK = \
 """{
-    wordsBlacklist:
+    "wordsBlacklist":
     [
 
     ],
-    namesBlacklist:
+    "namesBlacklist":
     [
 
     ],
-    action:1
+    "action":1
 }
 """
 
 global AutomodConfig;
 AutomodConfig = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
 
-# DISCLAIMER : DO NOT LOCK ANY OF THESE FUNCTIONS, IF YOU WANT MAKE INTERNAL LOOPS FOR PLUGINS - MAKE OWN THREADS AND MANAGE THEM, LET THESE FUNCTIONS GO.
-
 Log = logging.getLogger(__name__);
 
 PluginInstance = None;
-
 
 class Automod():
     def __init__(self, serverData : serverdata.ServerData):
@@ -60,6 +59,8 @@ class Automod():
             newName = data["n"];
         elif "name" in data:
             newName = data["name"];
+        else:
+            return False;
         
         if not self.FilterString(newName):
             pass; # todo

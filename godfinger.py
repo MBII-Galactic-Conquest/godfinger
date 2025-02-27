@@ -62,7 +62,9 @@ import database;
 import plugin;
 import lib.shared.teams as teams;
 import logMessage;
-
+import math;
+import lib.shared.colors as colors;
+import cvar;
 
 INVALID_ID = -1;
 USERINFO_LEN = len("userinfo: ");
@@ -272,6 +274,22 @@ class MBIIServer:
             self._serverData.maxPlayers = 32;
             Log.warning("Server status is unreachable, setting default values to status data.");
         pass;
+    
+
+    # TODO move to separate class with all bells and whistles
+    def _FetchCvars(self):
+        cvars = self._rcon.cvarList();
+        if cvars != None:
+            cvarsStr = cvars.decode("UTF-8", "ignore");
+            if cvarsStr != "":
+                cvarsStr = colors.stripColorCodes(cvarsStr);
+                parsed = {};
+                splitted = cvarsStr.splitlines();
+                for line in splitted:
+                    cv = cvar.Cvar();
+                    cv.FromCvarlistString(line);
+                    parsed[cv.GetName()] = cv;
+                self._serverData.serverVars = parsed;
 
     def Start(self):
         try:
@@ -311,6 +329,11 @@ class MBIIServer:
                 with self._logMessagesLock:
                     for i in range(len(prestartLines)):
                         self._logMessagesQueue.put(logMessage.LogMessage(prestartLines[i], True));
+            self._FetchCvars();
+            Log.debug("All cvars %s" % str(self._serverData.serverVars));
+            if "sv_fps" in self._serverData.serverVars:
+                self._rcon._frameTime = math.ceil(1000 / int(self._serverData.serverVars["sv_fps"].GetValue())) / 1000;
+                Log.info("Rcon rates set to %f due to %s" % (self._rcon._frameTime, self._serverData.serverVars["sv_fps"]));
             self._FetchStatus();
             if not self._pluginManager.Start():
                 return;
