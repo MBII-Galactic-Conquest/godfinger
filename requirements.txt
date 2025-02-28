@@ -2,3 +2,5 @@ file-read-backwards
 psutil
 asyncio
 python-dotenv
+gitpython
+watchdog

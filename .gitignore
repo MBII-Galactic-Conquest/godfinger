@@ -5,6 +5,7 @@ plugins/private/*
 
 *.code-workspace
 
+*.cfg
 *.env
 *.pyc
 __pycache__/*
