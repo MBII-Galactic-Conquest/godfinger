@@ -8,14 +8,13 @@ from watchdog.events import FileSystemEventHandler
 # Set repository paths and remote URL
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"  # Replace with the actual repo URL
 REPO_PATH = "../"  # Local path to store the repository
-SYNC_PATH = "../"  # Optional: Where to copy updated files
 BRANCH_NAME = "update"  # Branch you want to sync
 CFG_FILE_PATH = "commit.cfg"  # Path to the .cfg file
 
 # Initialize repo (clone if not already present)
 if not os.path.exists(REPO_PATH):
     print(f"[INFO] Cloning repository from {REPO_URL} to {REPO_PATH}...")
-    git.Repo.clone_from(REPO_URL, REPO_PATH)
+    repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
 else:
     repo = git.Repo(REPO_PATH)
 
@@ -128,7 +127,7 @@ def wait_for_exit():
 # Main loop to check for new files periodically
 if __name__ == "__main__":
     sync_repo()
-    
+
     # Get initial commit hash and write to .cfg if not present
     try:
         initial_commit = repo.head.commit.hexsha
@@ -143,8 +142,6 @@ if __name__ == "__main__":
     new_files = get_new_files()
     if new_files:
         print(f"[INFO] New files detected: {new_files}")
-        if SYNC_PATH:
-            os.system(f"rsync -av --delete {REPO_PATH}/ {SYNC_PATH}/")
 
     # Start watcher and exit listener in separate threads
     exit_thread = threading.Thread(target=wait_for_exit, daemon=True)
