@@ -19,7 +19,7 @@ if not os.path.exists(REPO_PATH):
 else:
     repo = git.Repo(REPO_PATH)
 
-stop_flag = False  # Flag to signal stopping the script
+stop_flag = threading.Event()  # Flag to signal stopping the script
 
 # Function to sync the repo with a specific branch
 def sync_repo():
@@ -104,6 +104,7 @@ def initialize_cfg():
         print("[INFO] .cfg file not found, initializing...")
         # Get the initial commit hash from the repo
         initial_commit = repo.head.commit.hexsha
+        print(f"[INFO] Initial commit hash: {initial_commit}")
         write_commit_to_cfg(initial_commit)
 
 # Watchdog event handler for file changes
@@ -122,7 +123,7 @@ def start_watcher():
     observer.start()
 
     try:
-        while not stop_flag:
+        while not stop_flag.is_set():
             time.sleep(10)
     except KeyboardInterrupt:
         pass
@@ -133,8 +134,9 @@ def start_watcher():
 # Function to wait for user input to stop the script
 def wait_for_exit():
     global stop_flag
-    input("\nPress Enter to exit...\n")
-    stop_flag = True
+    print("\nPress any key to exit...")
+    input()  # This will break the loop instantly when any key is pressed
+    stop_flag.set()  # Signal to stop the script
 
 # Main loop to check for new files periodically
 if __name__ == "__main__":
