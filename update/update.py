@@ -11,6 +11,12 @@ REPO_PATH = "../"  # Local path to store the repository
 BRANCH_NAME = "update"  # Branch you want to sync
 CFG_FILE_PATH = "commit.cfg"  # Path to the .cfg file
 
+# Prompt user for update
+user_choice = input("Do you want to update the repository? (Y/N): ").strip().lower()
+if user_choice != 'y':
+    print("[INFO] Update aborted by user. Exiting script.")
+    exit(0)  # Exit if the user does not want to update
+
 # Initialize repo (clone if not already present)
 if not os.path.exists(REPO_PATH):
     print(f"[INFO] Cloning repository from {REPO_URL} to {REPO_PATH}...")
