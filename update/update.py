@@ -68,8 +68,14 @@ def sync_repo():
 
     print(f"[INFO] Repository is up to date with {BRANCH_NAME}.")
 
-    # Write the latest commit to the .cfg file
-    write_commit_to_cfg(new_commit)
+# Function to write commit hash to .cfg file
+def write_commit_to_cfg(commit_hash):
+    try:
+        with open(CFG_FILE_PATH, "w") as cfg_file:
+            cfg_file.write(f"commit_hash={commit_hash}\n")
+        print(f"[INFO] Written commit hash {commit_hash} to {CFG_FILE_PATH}.")
+    except Exception as e:
+        print(f"[ERROR] Failed to write to {CFG_FILE_PATH}: {e}")
 
 # Function to check for new files
 def get_new_files():
@@ -89,24 +95,6 @@ def get_new_files():
 
     return new_files
 
-# Function to write the commit hash to the .cfg file (overwrites with latest)
-def write_commit_to_cfg(commit_hash):
-    # Open the .cfg file in write mode to overwrite any previous data
-    with open(CFG_FILE_PATH, "w") as cfg_file:
-        cfg_file.write(f"[Commit]\n")
-        cfg_file.write(f"latest_commit={commit_hash}\n")
-    print(f"[INFO] Latest commit hash written to {CFG_FILE_PATH}")
-
-# Function to initialize the .cfg file if it doesn't exist
-def initialize_cfg():
-    # If the config file doesn't exist, write the initial commit hash
-    if not os.path.exists(CFG_FILE_PATH):
-        print("[INFO] .cfg file not found, initializing...")
-        # Get the initial commit hash from the repo
-        initial_commit = repo.head.commit.hexsha
-        print(f"[INFO] Initial commit hash: {initial_commit}")
-        write_commit_to_cfg(initial_commit)
-
 # Watchdog event handler for file changes
 class RepoEventHandler(FileSystemEventHandler):
     def on_any_event(self, event):
@@ -124,7 +112,7 @@ def start_watcher():
 
     try:
         while not stop_flag.is_set():
-            time.sleep(10)
+            time.sleep(0.5)  # Adjust sleep time for quicker response to `stop_flag`
     except KeyboardInterrupt:
         pass
     finally:
@@ -134,14 +122,24 @@ def start_watcher():
 # Function to wait for user input to stop the script
 def wait_for_exit():
     global stop_flag
-    print("\nPress any key to exit...")
-    input()  # This will break the loop instantly when any key is pressed
-    stop_flag.set()  # Signal to stop the script
+    input("\nPress Enter to exit...\n")
+    stop_flag.set()
 
 # Main loop to check for new files periodically
 if __name__ == "__main__":
-    initialize_cfg()  # Initialize .cfg file with the first commit hash if necessary
     sync_repo()
+    
+    # Get initial commit hash and write to .cfg if not present
+    try:
+        initial_commit = repo.head.commit.hexsha
+        if os.path.exists(CFG_FILE_PATH):
+            print(f"[INFO] Found existing {CFG_FILE_PATH}.")
+        else:
+            print(f"[INFO] No {CFG_FILE_PATH} file found. Creating a new one.")
+            write_commit_to_cfg(initial_commit)
+    except ValueError:
+        print(f"[ERROR] No commits found in the repository. Unable to determine initial commit.")
+
     new_files = get_new_files()
     if new_files:
         print(f"[INFO] New files detected: {new_files}")
