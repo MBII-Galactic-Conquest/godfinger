@@ -5,13 +5,20 @@ import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Set repository paths
-REPO_PATH = "https://github.com/MBII-Galactic-Conquest/godfinger"
+# Set repository paths and remote URL
+REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"  # Replace with the actual repo URL
+REPO_PATH = "../"  # Local path to store the repository
 SYNC_PATH = "../"  # Optional: Where to copy updated files
-BRANCH_NAME = "dev"  # Change this to the branch you want to sync
+BRANCH_NAME = "update"  # Branch you want to sync
+CFG_FILE_PATH = "commit.cfg"  # Path to the .cfg file
 
-# Initialize repo
-repo = git.Repo(REPO_PATH)
+# Initialize repo (clone if not already present)
+if not os.path.exists(REPO_PATH):
+    print(f"[INFO] Cloning repository from {REPO_URL} to {REPO_PATH}...")
+    git.Repo.clone_from(REPO_URL, REPO_PATH)
+else:
+    repo = git.Repo(REPO_PATH)
+
 stop_flag = False  # Flag to signal stopping the script
 
 # Function to sync the repo with a specific branch
@@ -32,9 +39,13 @@ def sync_repo():
         print(f"[WARNING] No commits found in {BRANCH_NAME}. Proceeding with initial setup.")
         current_commit = None
 
-    # Checkout and pull from the specified branch
+    # Force checkout to discard any local changes and switch to the target branch
     print(f"[INFO] Checking out branch {BRANCH_NAME}...")
-    repo.git.checkout(BRANCH_NAME)
+    try:
+        repo.git.checkout(BRANCH_NAME, force=True)  # Force the checkout
+    except git.exc.GitCommandError as e:
+        print(f"[ERROR] Failed to checkout branch {BRANCH_NAME}: {e}")
+        return
 
     print(f"[INFO] Pulling latest changes from {BRANCH_NAME} on origin...")
     origin.pull(BRANCH_NAME)
@@ -57,6 +68,9 @@ def sync_repo():
 
     print(f"[INFO] Repository is up to date with {BRANCH_NAME}.")
 
+    # Write the latest commit to the .cfg file
+    write_commit_to_cfg(new_commit)
+
 # Function to check for new files
 def get_new_files():
     repo.git.fetch()
@@ -75,6 +89,23 @@ def get_new_files():
 
     return new_files
 
+# Function to write the commit hash to the .cfg file (overwrites with latest)
+def write_commit_to_cfg(commit_hash):
+    # Open the .cfg file in write mode to overwrite any previous data
+    with open(CFG_FILE_PATH, "w") as cfg_file:
+        cfg_file.write(f"[Commit]\n")
+        cfg_file.write(f"latest_commit={commit_hash}\n")
+    print(f"[INFO] Latest commit hash written to {CFG_FILE_PATH}")
+
+# Function to initialize the .cfg file if it doesn't exist
+def initialize_cfg():
+    # If the config file doesn't exist, write the initial commit hash
+    if not os.path.exists(CFG_FILE_PATH):
+        print("[INFO] .cfg file not found, initializing...")
+        # Get the initial commit hash from the repo
+        initial_commit = repo.head.commit.hexsha
+        write_commit_to_cfg(initial_commit)
+
 # Watchdog event handler for file changes
 class RepoEventHandler(FileSystemEventHandler):
     def on_any_event(self, event):
@@ -89,7 +120,7 @@ def start_watcher():
     observer = Observer()
     observer.schedule(event_handler, REPO_PATH, recursive=True)
     observer.start()
-    
+
     try:
         while not stop_flag:
             time.sleep(10)
@@ -107,6 +138,7 @@ def wait_for_exit():
 
 # Main loop to check for new files periodically
 if __name__ == "__main__":
+    initialize_cfg()  # Initialize .cfg file with the first commit hash if necessary
     sync_repo()
     new_files = get_new_files()
     if new_files:
@@ -117,7 +149,7 @@ if __name__ == "__main__":
     # Start watcher and exit listener in separate threads
     exit_thread = threading.Thread(target=wait_for_exit, daemon=True)
     exit_thread.start()
-    
+
     start_watcher()
 
     print("[INFO] Exiting script.")
