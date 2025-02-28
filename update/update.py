@@ -8,7 +8,7 @@ from watchdog.events import FileSystemEventHandler
 # Set repository paths and remote URL
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"  # Replace with the actual repo URL
 REPO_PATH = "../"  # Local path to store the repository
-BRANCH_NAME = "update"  # Branch you want to sync
+BRANCH_NAME = "dev"  # Branch you want to sync
 CFG_FILE_PATH = "commit.cfg"  # Path to the .cfg file
 
 # Prompt user for update
