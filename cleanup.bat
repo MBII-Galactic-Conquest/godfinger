@@ -29,5 +29,5 @@ echo Cleanup complete.
 
 :end
 endlocal
-echo Press enter to exit
+echo Press enter to continue...
 set /p input=
