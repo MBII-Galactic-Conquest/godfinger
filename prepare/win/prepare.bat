@@ -14,7 +14,7 @@ if %errorlevel% neq 0 (
 )
 
 :: Run the prepare.py script
-echo Running prepare.py...
+echo Running ANSI-WIN1252 file-read-backwards patch...
 START /WAIT python ./prepare.py
 if %errorlevel% neq 0 (
     echo Error running prepare.py. Press Enter to exit.
