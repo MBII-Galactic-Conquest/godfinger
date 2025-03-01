@@ -23,9 +23,6 @@ else
     # Install dependencies
     echo "Installing dependencies..."
     $PIP_CMD install -U -r requirements.txt --break-system-packages
-
-    # Run prepare.py
-    $PYTHON_CMD ./prepare_unix.py
 fi
 
 # Wait for user input before exiting
