@@ -772,25 +772,33 @@ def main():
         while runAgain:
             try:
                 runAgain = False;
-                Server.Start(); # it will exit the Start on user shutdown
+                Server.Start();  # it will exit the Start on user shutdown
             except Exception as e:
                 Log.error(f"ERROR occurred: Type: {type(e)}; Reason: {e}; Traceback: {traceback.format_exc()}")
-                print("CRASH DETECTED, CHECK LOGS")
+                try:
+                    with open('lib/other/gf.txt', 'r') as file:
+                        gf = file.read()
+                        print("\n\n" + gf)
+                        file.close()
+                except Exception as e:
+                    Log.error(f"ERROR occurred: No fucking god finger.txt");
+                print("\n\nCRASH DETECTED, CHECK LOGS");
                 Server.Finish()
                 if Server.restartOnCrash:
                     runAgain = True;
                     Server = MBIIServer();
                     if int_status == MBIIServer.STATUS_INIT:
-                        continue        # start new server instance
+                        continue  # start new server instance
                     else:
                         break
         int_status = Server.GetStatus();
         if int_status == MBIIServer.STATUS_SERVER_NOT_RUNNING:
             print("Unable to start with not running server for safety measures, abort init.");
-        Server.Finish(); 
+        Server.Finish();
         Server = None;
     else:
         Log.info("Godfinger initialize error %s" % (MBIIServer.StatusString(int_status)));
+    
     Log.info("The final gunshot was an exclamation mark on everything that had led to this point. I released my finger from the trigger, and it was over.");
 
 
