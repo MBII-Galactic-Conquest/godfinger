@@ -14,7 +14,6 @@ CFG_FILE_PATH = "commit.cfg"  # Path to the .cfg file
 # Prompt user for update
 user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
 if user_choice != 'y':
-    print("[GITHUB] Update process refused, proceeding...")
     exit(0)  # Exit if the user does not want to update
 
 # Initialize repo (clone if not already present)
@@ -127,7 +126,7 @@ def start_watcher():
 # Function to wait for user input to stop the script
 def wait_for_exit():
     global stop_flag
-    input("\nPress Enter to exit update procedure...\n")
+    input("\nPress Enter to continue...\n")
     stop_flag.set()
 
 # Main loop to check for new files periodically
