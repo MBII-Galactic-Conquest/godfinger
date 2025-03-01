@@ -19,8 +19,8 @@ fi
 echo "Deleting __pycache__ folders..."
 find . -type d -name "__pycache__" -exec rm -rf {} +
 
-echo "__pycache__ folders should be regularly emptied after each session."
 echo "Pycache cleanup complete."
+echo "__pycache__ folders should be regularly emptied after each session."
 
 # Pause before exiting
 read -p "Press enter to continue..."

@@ -25,8 +25,8 @@ for /d /r %%d in (__pycache__) do (
     )
 )
 
-echo __pycache__ folders should be regularly emptied after each session.
 echo Pycache cleanup complete.
+echo __pycache__ folders should be regularly emptied after each session.
 
 :end
 endlocal
