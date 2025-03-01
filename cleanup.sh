@@ -22,4 +22,4 @@ find . -type d -name "__pycache__" -exec rm -rf {} +
 echo "Cleanup complete."
 
 # Pause before exiting
-read -p "Press enter to exit"
+read -p "Press enter to continue..."
