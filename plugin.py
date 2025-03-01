@@ -145,7 +145,7 @@ class PluginManager():
                             missing.append(dep);
                     if len(missing) > 0:
                         Log.debug("Trying to install dependancies for %s" % name);
-                        subprocess.check_call([sys.executable, "-m", "pip", "install", ' '.join(missing)])
+                        subprocess.check_call([sys.executable, "-m", "pip", "install",] + missing)
             else:
                 Log.debug("Requirements file is not found, assuming no specific dependancies."); 
             
