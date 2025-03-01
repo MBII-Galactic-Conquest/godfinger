@@ -1,6 +1,14 @@
 @echo off
-echo Searching for .db files to delete...
 
+:: DO NOT USE UNLESS YOU INTEND TO MASS PURGE DATABASE FILES ! ::
+
+set /p confirm="Do you wish to clear all recursive directories of all *.db files? (Y/N): "
+if /i "%confirm%" neq "Y" (
+    echo Operation cancelled. No database files were deleted.
+    exit /b
+)
+
+echo Searching for .db files to delete...
 set db_found=false
 
 for /r %%f in (*.db) do (
