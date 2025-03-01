@@ -4,8 +4,8 @@ REM Check Python version using `python --version`
 for /f "tokens=2 delims= " %%i in ('python --version 2^>^&1') do set python_version=%%i
 echo Detected Python version: %python_version%
 
-REM Check if the version is 3.12+
-echo %python_version% | findstr /R "^3\.12" > nul
+REM Check if the version is 3.12 or higher (but not 3.11 or lower)
+echo %python_version% | findstr /R "^3\.[1-9][2-9]" > nul
 if %errorlevel% neq 0 (
     echo Error: Python 3.12+ is required but not found.
     echo Please install Python 3.12 or higher and try again.
