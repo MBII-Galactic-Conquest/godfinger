@@ -12,6 +12,9 @@ else
     if command -v python3 &>/dev/null; then
         PYTHON_CMD="python3"
         PIP_CMD="pip3"
+    elif command -v python2 &>/dev/null; then
+        PYTHON_CMD="python2"
+        PIP_CMD="pip2"
     elif command -v python &>/dev/null; then
         PYTHON_CMD="python"
         PIP_CMD="pip"
