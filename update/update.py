@@ -1,13 +1,15 @@
 import os
 import time
-import git
 import threading
 import zipfile
 import requests
 import subprocess
 import platform
+import shutil
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = "../venv/GIT/bin/git.exe"
 
 # Set repository paths and remote URL
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"  # Replace with the actual repo URL
@@ -18,30 +20,34 @@ CFG_FILE_PATH = "commit.cfg"  # Path to the .cfg file
 # Directory for extracting 7z files (relative to root working directory)
 EXTRACT_DIR = "../temp"  # This is the folder where the 7z archive will be extracted
 SEVEN_ZIP_EXECUTABLE = os.path.join(EXTRACT_DIR, '7-ZipPortable', 'App', '7-Zip', '7z.exe')  # Path to 7z.exe
-SEVEN_ZIP_ARCHIVE = "7z_portable.zip"  # The bundled portable 7-Zip archive
-SEVEN_ZIP_URL = "https://github.com/MBII-Galactic-Conquest/godfinger/raw/portablegit/lib/other/win/7z_portable.zip"
+SEVEN_ZIP_ARCHIVE = "../lib/other/win/7z_portable.zip"  # The bundled portable 7-Zip archive
 GIT_ARCHIVE = "PortableGit-2.48.1-64-bit.7z.exe"
 GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.windows.1/PortableGit-2.48.1-64-bit.7z.exe"
 
 # Function to check if Git is installed
 def check_git_installed():
-    try:
-        subprocess.run(["git", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("[INFO] Git is installed.")
-        return True
-    except subprocess.CalledProcessError:
+    # Check if Git is in the system PATH using shutil
+    if shutil.which("git"):
+        try:
+            subprocess.run(["git", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print("[INFO] Git is installed.")
+            return True
+        except subprocess.CalledProcessError:
+            print("[ERROR] Git version check failed.")
+            return False
+    else:
+        print("[ERROR] Git is not installed.")
+        
         if platform.system() == "Linux" or platform.system() == "Darwin":  # Unix-based systems
-            print("[ERROR] Git is not installed.")
             print("You will have to install Git manually on UNIX. Visit: https://git-scm.com/downloads")
             input("Press Enter to exit...")  # Prompt user to press Enter to exit
             exit(0)
         else:
-            print("[ERROR] Git is not installed.")
             install_choice = input("Do you wish to install Git manually? (Y/N): ").strip().lower()
             if install_choice == 'y':
-                return False
+                return False  # Return False if the user chooses to manually install
             else:
-                exit(0)
+                exit(0)  # Exit the program if the user doesn't want to install Git
 
 # Function to download the Git archive (PortableGit)
 def download_git():
@@ -59,15 +65,17 @@ def download_git():
 
 # Function to extract the PortableGit archive using 7-Zip
 def extract_git(git_archive_path):
-    print(f"[EXTRACT] Extracting {GIT_ARCHIVE} to ../venv/GIT...")
+    print(f"[EXTRACT] Extracting {git_archive_path} to ../venv/GIT...\nPlease wait as this is being configured...")
     extract_dir = "../venv/GIT"
     os.makedirs(extract_dir, exist_ok=True)  # Create the GIT extraction directory if it doesn't exist
     
     try:
-        subprocess.run([SEVEN_ZIP_EXECUTABLE, "x", git_archive_path, f"-o{extract_dir}"], check=True)
+        # Run 7z.exe to extract the archive and mute the output
+        subprocess.run([SEVEN_ZIP_EXECUTABLE, "x", git_archive_path, f"-o{extract_dir}"], 
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"[EXTRACT] Extraction complete to {extract_dir}")
     except subprocess.CalledProcessError as e:
-        print(f"[ERROR] Failed to extract {GIT_ARCHIVE}: {e}")
+        print(f"[ERROR] Failed to extract {git_archive_path}: {e}")
         return False
     return True
 
@@ -75,17 +83,6 @@ def extract_git(git_archive_path):
 user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
 if user_choice != 'y':
     exit(0)  # Exit if the user does not want to update
-
-# Function to download the 7z_portable.zip file
-def download_7z():
-    print("[DOWNLOAD] Downloading 7z_portable.zip...")
-    response = requests.get(SEVEN_ZIP_URL)
-    if response.status_code == 200:
-        with open(SEVEN_ZIP_ARCHIVE, 'wb') as f:
-            f.write(response.content)
-        print(f"[DOWNLOAD] Successfully downloaded {SEVEN_ZIP_ARCHIVE}")
-    else:
-        print(f"[ERROR] Failed to download {SEVEN_ZIP_ARCHIVE} from {SEVEN_ZIP_URL}")
 
 # Function to extract 7z_portable.zip into the EXTRACT_DIR folder
 def extract_7z():
@@ -95,18 +92,23 @@ def extract_7z():
         zip_ref.extractall(EXTRACT_DIR)
     print(f"[EXTRACT] Extraction complete to {EXTRACT_DIR}")
 
-# Initialize repo (clone if not already present)
-if not os.path.exists(REPO_PATH):
-    print(f"[GITHUB] Cloning repository from {REPO_URL} to {REPO_PATH}...")
-    repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
-else:
-    repo = git.Repo(REPO_PATH)
+# Function to clone the repo if it doesn't exist
+def clone_repo_if_needed():
+    if not os.path.exists(REPO_PATH):
+        print(f"[GITHUB] Cloning repository from {REPO_URL} to {REPO_PATH}...")
+        import git
+        repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
+        return repo
+    else:
+        import git
+        return git.Repo(REPO_PATH)
 
 stop_flag = threading.Event()  # Flag to signal stopping the script
 
 # Function to sync the repo with a specific branch
 def sync_repo():
     global repo
+    import git
     origin = repo.remotes.origin
     upstream = repo.remotes.upstream if "upstream" in repo.remotes else None
 
@@ -178,6 +180,26 @@ def get_new_files():
 
     return new_files
 
+# Function to delete temporary files and folders
+def remove_temp_files():
+    # List of paths to remove (files and directories)
+    paths_to_remove = [EXTRACT_DIR]
+
+    for path in paths_to_remove:
+        # Check if the path exists before trying to delete
+        if os.path.exists(path):
+            try:
+                if os.path.isfile(path):
+                    os.remove(path)  # Delete file
+                    print(f"[CLEANUP] File {path} has been deleted.")
+                elif os.path.isdir(path):
+                    shutil.rmtree(path)  # Delete directory and its contents
+                    print(f"[CLEANUP] Directory {path} and its contents have been deleted.")
+            except Exception as e:
+                print(f"[ERROR] Failed to delete {path}. Reason: {e}")
+        else:
+            print(f"[WARNING] {path} does not exist.")
+
 # Watchdog event handler for file changes
 class RepoEventHandler(FileSystemEventHandler):
     def on_any_event(self, event):
@@ -212,10 +234,11 @@ def wait_for_exit():
 if __name__ == "__main__":
     # Check if Git is installed or if the user is on Windows without Git
     if check_git_installed():
+        import git
+        repo = clone_repo_if_needed()
         sync_repo()
     elif platform.system() == "Windows":
         print("[INFO] Windows detected, Git not found. Using 7-Zip as an alternative.")
-        download_7z()
         extract_7z()
 
         # Download Git if not installed
@@ -224,8 +247,10 @@ if __name__ == "__main__":
             extract_git(git_archive_path)
 
         # Proceed as if Git was installed
+        import git
         repo = git.Repo.clone_from(REPO_URL, REPO_PATH)  # Cloning repository in case Git isn't present
         sync_repo()
+        remove_temp_files()
     else:
         print("[ERROR] Git is not installed and this script cannot proceed on this platform.")
 
