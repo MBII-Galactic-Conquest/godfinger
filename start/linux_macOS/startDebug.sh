@@ -14,7 +14,7 @@ check_python_version() {
     echo "Required Python version: $REQUIRED_VERSION"
 
     if [ "$(printf '%s\n' "$INSTALLED_VERSION" "$REQUIRED_VERSION" | sort -V | tail -n1)" = "$INSTALLED_VERSION" ]; then
-        echo "Using $1 ($INSTALLED_VERSION)"
+        echo "Using $1 ($INSTALLED_VERSION) as it is compatible (3.12.0 or newer)"
         return 0
     else
         echo "Python version too old: $INSTALLED_VERSION (requires $REQUIRED_VERSION or newer)"

@@ -12,7 +12,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo Python version is acceptable (%python_version%)
+echo Python version is acceptable (3.12.0 or newer)
 
 REM Navigate to the project directory
 cd ../../
