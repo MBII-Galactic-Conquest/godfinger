@@ -1,10 +1,19 @@
 #!/bin/bash
 cd ../../
+
 check_python_version() {
     REQUIRED_VERSION="3.12.0"
-    INSTALLED_VERSION=$($1 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))")
+    INSTALLED_VERSION=$($1 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null)
 
-    if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$INSTALLED_VERSION" | sort -V | head -n1)" = "$REQUIRED_VERSION" ]; then
+    if [ -z "$INSTALLED_VERSION" ]; then
+        echo "Error: Unable to check Python version with $1 (possibly missing or permission denied)"
+        return 1
+    fi
+
+    echo "Installed Python version: $INSTALLED_VERSION"
+    echo "Required Python version: $REQUIRED_VERSION"
+
+    if [ "$(printf '%s\n' "$INSTALLED_VERSION" "$REQUIRED_VERSION" | sort -V | tail -n1)" = "$INSTALLED_VERSION" ]; then
         echo "Using $1 ($INSTALLED_VERSION)"
         return 0
     else
@@ -23,17 +32,20 @@ else
     exit 1
 fi
 
+# Ensure scripts have execute permissions before running them
+chmod +x ./cleanup.sh
+chmod +x ./update/update.py
+chmod +x ./godfinger.py
+
 if test -f venv/Scripts/activate; then
     source venv/Scripts/activate
     cd ./update
-    $PYTHON_CMD	./update.py
+    $PYTHON_CMD ./update.py
     cd ../
     ./cleanup.sh
     $PYTHON_CMD ./godfinger.py
     read -p "Press Enter to continue..."
 else
-    echo on
-    echo Virtual environment does not exist or was created improperly, please run prepare.bat in prepare dir, aborting.
-    echo "Press enter to exit..."
-    read input
+    echo "Virtual environment does not exist or was created improperly, please run prepare.bat in the prepare directory. Aborting."
+    read -p "Press enter to exit..."
 fi

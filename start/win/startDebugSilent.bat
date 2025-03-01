@@ -1,24 +1,61 @@
+@echo off
 
-REM Check Python version
-python -c "import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)"
-IF %ERRORLEVEL% NEQ 0 (
+REM Check Python version using `python --version`
+for /f "tokens=2 delims= " %%i in ('python --version 2^>^&1') do set python_version=%%i
+echo Detected Python version: %python_version%
+
+REM Check if the version is 3.12+
+echo %python_version% | findstr /R "^3\.12" > nul
+if %errorlevel% neq 0 (
     echo Error: Python 3.12+ is required but not found.
     echo Please install Python 3.12 or higher and try again.
     exit /b 1
 )
-echo off
-CD ../../
+
+echo Python version is acceptable (%python_version%)
+
+REM Navigate to the project directory
+cd ../../
+
+REM Set the virtual environment path
 set "venvp=./venv/Scripts/activate.bat"
+
+REM Check if the virtual environment exists
 if exist "%venvp%" (
+    REM Activate the virtual environment
     call venv/Scripts/activate.bat
-    CD ./update
+    cd ./update
+
+    REM Run update script
     python ./update.py
-    CD ../
-    CALL ./cleanup.bat
+    if %errorlevel% neq 0 (
+        echo Error running update.py. Press Enter to exit.
+        pause
+        exit /b
+    )
+
+    REM Go back to root directory
+    cd ../
+
+    REM Run cleanup script
+    call ./cleanup.bat
+    if %errorlevel% neq 0 (
+        echo Error running cleanup.bat. Press Enter to exit.
+        pause
+        exit /b
+    )
+
+    REM Run godfinger script
     python ./godfinger.py --debug -lf "./bigdata.log"
-    PAUSE
+    if %errorlevel% neq 0 (
+        echo Error running godfinger.py. Press Enter to exit.
+        pause
+        exit /b
+    )
+
+    pause
 ) else (
-    echo on
+    REM If the virtual environment doesn't exist
     echo Virtual environment does not exist or was created improperly, please run prepare.bat in root dir, aborting.
-    PAUSE
+    pause
 )

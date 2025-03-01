@@ -10,7 +10,9 @@ if ! cd ./bin; then
     exit 1
 fi
 
+echo Configuring virtual environment, please wait...
 
+# Check if virtual environment exists, create it if not
 if ! test -f ../../venv/Scripts/activate; then
     python -m venv ../../venv
 fi
@@ -23,8 +25,19 @@ check_python_version() {
     REQUIRED_VERSION="3.12.0"
     INSTALLED_VERSION=$($1 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))")
 
-    # Use sort to compare versions
-    if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$INSTALLED_VERSION" | sort -V | head -n1)" = "$REQUIRED_VERSION" ]; then
+    if [ -z "$INSTALLED_VERSION" ]; then
+        echo "Error: Unable to check Python version with $1 (possibly missing or permission denied)"
+        return 1
+    fi
+
+    echo "Installed Python version: $INSTALLED_VERSION"
+    echo "Required Python version: $REQUIRED_VERSION"
+
+    # Compare versions directly (e.g., 3.12.1 > 3.12.0)
+    INSTALLED_VERSION_NUM=$(echo "$INSTALLED_VERSION" | tr -d '.')
+    REQUIRED_VERSION_NUM=$(echo "$REQUIRED_VERSION" | tr -d '.')
+
+    if [ "$INSTALLED_VERSION_NUM" -ge "$REQUIRED_VERSION_NUM" ]; then
         echo "Using $1 (Python $INSTALLED_VERSION)"
         return 0
     else

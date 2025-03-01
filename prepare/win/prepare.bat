@@ -1,3 +1,4 @@
+echo Configuring virtual environment, please wait...
 @echo off
 
 :: Navigate to the parent directory and then to ./bin
