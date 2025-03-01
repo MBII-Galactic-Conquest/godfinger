@@ -3,42 +3,6 @@ import os
 import sys
 import site
 
-def modify_godfinger():
-    try:
-        # Find the relative path to godfinger.py
-        godfinger_path = os.path.join(os.path.dirname(__file__), '../../godfinger.py')
-        
-        # Check if the file exists
-        if os.path.isfile(godfinger_path):
-            print(f"Found godfinger.py at: {godfinger_path}")
-
-            # Open the godfinger.py file and read its contents
-            with open(godfinger_path, "r") as f:
-                contents = f.read()
-
-            # Search for the line to replace
-            old_line = 'FileReadBackwards(self._logPath, encoding="ansi")'
-            new_line = 'FileReadBackwards(self._logPath, encoding="utf-8")'
-
-            if old_line in contents:
-                print("Found the line to change. Modifying...")
-                
-                # Replace the line with the new encoding
-                modified_contents = contents.replace(old_line, new_line)
-                
-                # Write the modified contents back to the file
-                with open(godfinger_path, "w") as f:
-                    f.write(modified_contents)
-                
-                print("Modification complete.")
-            else:
-                print("No matching line found to modify.")
-        else:
-            print(f"godfinger.py not found at: {godfinger_path}")
-    
-    except Exception as e:
-        print(f"Error occurred: {e}")
-
 def main():
     # Check if OS is Linux or macOS
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
@@ -95,8 +59,5 @@ def main():
             break  # Exit the loop and proceed with the program
         else:
             print("Invalid input. Please press Enter or type 'continue' to proceed.")
-
-    # Call the function to modify godfinger.py
-    modify_godfinger()
 
 main()
