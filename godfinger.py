@@ -13,6 +13,11 @@ import signal;
 import sys;
 
 
+IsVenv = sys.prefix != sys.base_prefix;
+if not IsVenv:
+    print("ERROR : Running outside of virtual environment, run prepare.bat on windows or prepare.sh on unix, then come back");
+    sys.exit();
+
 Server = None;
 
 def Sighandler(signum, frame):

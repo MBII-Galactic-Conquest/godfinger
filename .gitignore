@@ -19,3 +19,4 @@ automodCfg.json
 *.db
 *.DB
 ignored/
+venv/

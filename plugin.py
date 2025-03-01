@@ -1,8 +1,12 @@
+import importlib.util
 import pluginExports;
 import logging;
 import importlib;
 import time;
 import traceback;
+import os;
+import subprocess;
+import sys;
 
 Log = logging.getLogger(__name__);
 
@@ -113,17 +117,49 @@ class PluginManager():
     def LoadPlugin(self, name, data : any):
         Log.info("Loading plugin %s...", name);
         plugin = None;
-        mod = importlib.import_module(name, package=None);
-        if mod != None:
-            newPlug = Plugin(mod);
-            startTime = time.time();
-            rslt = newPlug.Inititalize(data);
-            if rslt:
-                Log.info("Plugin %s has been Loaded and Initialized in %.2f seconds." % (mod.__name__, time.time() - startTime));
-                plugin = newPlug;
+        plugSpec = importlib.util.find_spec(name);
+        if plugSpec == None:
+            Log.error("Unable to locate plugin %s" % name);
+            return None;
         else:
-            Log.error("Plugin %s was unable to load." % (name));
-        return plugin;
+            plugPath = plugSpec.origin;
+            Log.debug("Full path to target module %s" % plugPath);
+            dirPath = os.path.dirname(plugPath);
+            rqsPath = os.path.join(dirPath, "requirements.txt");
+            if os.path.exists(rqsPath):
+                fr = open(rqsPath, "r");
+                if fr != None:
+                    lines = fr.readlines();
+                    fr.close();
+                    Log.debug("requirements content : %s "  % lines);
+                    missing = [];
+                    for dep in lines:
+                        try:
+                            dep = dep.replace('\n', '');
+                            depSpec = importlib.util.find_spec(dep);
+                            if depSpec == None:
+                                Log.debug("Required module %s is not found in current environment install" % dep);
+                                missing.append(dep);
+                        except ModuleNotFoundError:
+                            Log.debug("Required module %s is not found in current environment install" % dep);
+                            missing.append(dep);
+                    if len(missing) > 0:
+                        Log.debug("Trying to install dependancies for %s" % name);
+                        subprocess.check_call([sys.executable, "-m", "pip", "install", ' '.join(missing)])
+            else:
+                Log.debug("Requirements file is not found, assuming no specific dependancies."); 
+            
+            mod = importlib.import_module(name, package=None);
+            if mod != None:
+                newPlug = Plugin(mod);
+                startTime = time.time();
+                rslt = newPlug.Inititalize(data);
+                if rslt:
+                    Log.info("Plugin %s has been Loaded and Initialized in %.2f seconds." % (mod.__name__, time.time() - startTime));
+                    plugin = newPlug;
+            else:
+                Log.error("Plugin %s was unable to load." % (name));
+            return plugin;
 
     def Finish(self):
         if not self._isFinished:

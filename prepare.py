@@ -1,5 +1,6 @@
 import file_read_backwards;
 import os;
+import lib.shared.config as config;
 
 def main():
     fullpath = file_read_backwards.__file__;
