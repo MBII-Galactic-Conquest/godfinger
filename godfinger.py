@@ -293,7 +293,12 @@ class MBIIServer:
                     Log.debug("Running in debug mode and server is offline, consider server data invalid.");
             # FileReadBackwards package doesnt "support" ansi encoding in stock, change it yourself
             prestartLines = [];
-            with FileReadBackwards(self._logPath, encoding="ansi") as logFile:
+            logFile = None;
+            try:
+                if IsUnix:
+                    logFile = FileReadBackwards(self._logPath, encoding = "utf-8");
+                else:
+                    logFile = FileReadBackwards(self._logPath, encoding="ansi");
                 for line in logFile:
                     line = line[7:];
                     if line.startswith("InitGame"):
@@ -312,7 +317,12 @@ class MBIIServer:
                             continue;
                     
                     prestartLines.append(line);
-                    
+            
+            except FileNotFoundError:
+                Log.error("Unable to open log file at path %s to read, abort startup." % self._logPath);
+                self._status = MBIIServer.STATUS_RESOURCES_ERROR;
+                return;
+        
             if len(prestartLines) > 0:
                 prestartLines.reverse();
                 with self._logMessagesLock:
