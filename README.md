@@ -74,10 +74,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > 
 > > So i.e, if you send 6 rcons within 20 miliseconds frame time, it will send 5 and then wait for 20 milliseconds and send the 6th rcon afterwards.
 >
-> </br>
->
-> #3) Python dependencies for this codebase in certain `UNIX` distributions may require you to use [`--break-system-packages.`](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-break-system-packages)</br>If you do not wish to do so, **DO NOT** use the `godfinger script extension system` on your operating system.
->
 
 </br>
 
