@@ -23,33 +23,38 @@ GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.wind
 
 # Check if the system is Windows
 if os.name == 'nt':  # Windows
-    GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
-    GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
+    GIT_PATH = shutil.which("git")
+
+    if GIT_PATH is None:
+        # If Git is not found, check a fallback directory
+        GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
+        GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
+    else:
+        GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
+
     PYTHON_CMD = "python"  # On Windows, just use 'python'
-    
-    # Set the environment variables for Windows
-    os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-    os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
-    print(f"Git executable set to: {GIT_EXECUTABLE}")
+
+    # Set the environment variables for Windows if Git was found
+    if GIT_EXECUTABLE:
+        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+        print(f"Git executable set to: {GIT_EXECUTABLE}")
+    else:
+        print("Git executable could not be set. Ensure Git is installed.")
+
 else:  # Non-Windows (Linux, macOS)
     # Get the default Git executable path
     GIT_EXECUTABLE = shutil.which("git")
     PYTHON_CMD = "python3" if shutil.which("python3") else "python"
-    
+
     if GIT_EXECUTABLE:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
         print(f"Git executable set to default path: {GIT_EXECUTABLE}")
     else:
         print("Git executable not found on the system.")
 
-if os.name == 'nt':  # Windows
-    PYTHON_CMD = "python"  # On Windows, just use 'python'
-else:  # Unix-like systems (Linux, macOS)
-    # Check if 'python3' is available, otherwise fallback to 'python'
-    PYTHON_CMD = "python3" if shutil.which("python3") else "python"
-
 # Function to check if Git is installed
 def check_git_installed():
+    global GIT_EXECUTABLE
     if shutil.which("git") or os.path.exists(GIT_EXECUTABLE):
         try:
             subprocess.run([GIT_EXECUTABLE, "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -67,6 +72,12 @@ def check_git_installed():
             exit(0)
         else:
             install_choice = input("Do you wish to install Git Portable in your virtual environment? (400mb~) (Y/N): ").strip().lower()
+            if install_choice == 'y':
+                GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
+                GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
+                os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+                os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
+            return False
             if install_choice != 'y':
                 print("You will have to install Git manually. Visit: https://git-scm.com/downloads")
                 input("Press Enter to exit...")
@@ -110,10 +121,11 @@ def extract_7z():
         zip_ref.extractall(EXTRACT_DIR)
     print("[EXTRACT] Extraction complete.")
 
-# Prompt user for update
-user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
-if user_choice != 'y':
-    exit(0)  # Exit if the user does not want to update
+def start():
+	# Prompt user for update
+	user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
+	if user_choice != 'y':
+		exit(0)  # Exit if the user does not want to update
 
 def fetch_deploy():
     print(f"[DEPLOY] Checking for deployment keys in deployments.env...")
@@ -161,6 +173,7 @@ def remove_temp_files():
 
 # Main script execution
 if __name__ == "__main__":
+    start()
     if check_git_installed():
         clone_repo_if_needed()
         sync_repo()

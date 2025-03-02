@@ -4,6 +4,7 @@ plugins/private/*
 !plugins/private/.keep
 
 update/deploy/*
+update/key/*
 
 *.code-workspace
 
@@ -22,3 +23,5 @@ automodCfg.json
 *.DB
 ignored/
 venv/
+
+/*[!.]
