@@ -9,8 +9,8 @@ import shutil
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-GIT_EXECUTABLE = os.path.join("..", "venv", "GIT", "bin", "git.exe")
-os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = os.path.join("..", "venv", "GIT", "bin", "git.exe")
+GIT_EXECUTABLE = os.path.join("..", "venv", "Bin", "GIT", "bin", "git.exe")
+os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = os.path.join("..", "venv", "Bin", "GIT", "bin", "git.exe")
 os.environ["PATH"] = GIT_EXECUTABLE + ";" + os.environ["PATH"]
 
 # Set repository paths and remote URL
