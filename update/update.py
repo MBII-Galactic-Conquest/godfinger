@@ -17,7 +17,7 @@ os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
 REPO_PATH = "../"
-BRANCH_NAME = "dev"
+BRANCH_NAME = "deployments"
 CFG_FILE_PATH = "commit.cfg"
 
 # Directory for extracting 7z files
