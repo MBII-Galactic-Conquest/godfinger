@@ -133,6 +133,7 @@ def fetch_deploy():
     try:
         subprocess.run([PYTHON_CMD, deployment], check=True)
         print("Deployments script executed successfully.")
+        sys.exit()
     except subprocess.CalledProcessError as e:
         print(f"Error fetching deployments.py: {e}")
 
@@ -187,8 +188,8 @@ if __name__ == "__main__":
 
         clone_repo_if_needed()
         sync_repo()
-        fetch_deploy()
         remove_temp_files()
+        fetch_deploy()
 
     input("Press Enter to exit...");
     exit(0);
