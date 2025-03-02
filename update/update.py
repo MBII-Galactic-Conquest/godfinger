@@ -11,7 +11,7 @@ import sys
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
 REPO_PATH = "../"
-BRANCH_NAME = "deployments"
+BRANCH_NAME = "dev"
 CFG_FILE_PATH = "commit.cfg"
 
 # Directory for extracting 7z files
