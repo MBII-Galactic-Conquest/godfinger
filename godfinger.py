@@ -110,7 +110,11 @@ CONFIG_FALLBACK = \
         {
             "path":"plugins.shared.test.testPlugin"
         }
-    ]
+    ],
+    "Debug":
+    {
+        "TestRetrospect":false
+    }
 }
 """
 
@@ -304,6 +308,7 @@ class MBIIServer:
                     logFile = FileReadBackwards(self._logPath, encoding = "utf-8");
                 else:
                     logFile = FileReadBackwards(self._logPath, encoding="ansi");
+                testRetro = self._config.GetValue("Debug", None)["TestRetrospect"];
                 for line in logFile:
                     line = line[7:];
                     if line.startswith("InitGame"):
@@ -313,13 +318,14 @@ class MBIIServer:
                     # filter out player retrospect player messages.
                     lineParse = line.split()
                     l = len(lineParse);
-                    if l > 1:   
-                        if lineParse[0].startswith("SMOD"):
-                            continue
-                        elif lineParse[1].startswith("say"):
-                            continue;
-                        elif lineParse[1].startswith("sayteam"):
-                            continue;
+                    if l > 1:
+                        if not testRetro:
+                            if lineParse[0].startswith("SMOD"):
+                                continue
+                            elif lineParse[1].startswith("say"):
+                                continue;
+                            elif lineParse[1].startswith("sayteam"):
+                                continue;
                     
                     prestartLines.append(line);
             
