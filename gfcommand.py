@@ -36,7 +36,8 @@ class CommandArgs():
         self._args = None;
 
 class Command():
-    def __init__(self, name : str):
+    def __init__(self, prefix : str, name : str):
+        self._prefix = prefix;
         self._name = name;
         self._optionalParams : dict[str, CommandParam] = {};
         self._positionalParams = [];
@@ -70,6 +71,10 @@ class Command():
     def IsParameterless(self) -> bool:
         return len(self._positionalParams) == 0;
 
+    
+    def IsPrefix(self, pref : str) -> bool:
+        return self._prefix.startswith(pref);
+
     def Invoke(self):
         if self._func != None:
             self._func();
@@ -102,9 +107,9 @@ def TestHelpFunc():
 
 if __name__ == "__main__":
     cmdManager = CommandManager();
-    cmdManager.AddCommand(Command("--help").Func(TestHelpFunc));
+    cmdManager.AddCommand(Command("!","--help").Func(TestHelpFunc));
     cmdManager.GetCommand("--help").Invoke();
-    cmdManager.AddCommand(Command("test").Param(ptype = CommandParam.TYPE_INTEGER)\
+    cmdManager.AddCommand(Command("!","test").Param(ptype = CommandParam.TYPE_INTEGER)\
                                          .Param(ptype = CommandParam.TYPE_STRING)\
                                          .Param(ptype = CommandParam.TYPE_BOOL)\
                                          .Param(ptype = CommandParam.TYPE_FLOAT)\

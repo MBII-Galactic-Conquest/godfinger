@@ -510,7 +510,7 @@ class MBIIServer:
         senderId = int(lineParse[0].strip(":"))
         senderClient = self._clientManager.GetClientById(senderId);
         message : str = messageRaw.split("\"")[1] 
-        Log.debug("Team chat meassge %s, with teamId %s", messageRaw, senderClient.GetTeamId);
+        Log.debug("Team chat meassge %s, with teamId %s", messageRaw, senderClient.GetTeamId());
         self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) );
     
     
