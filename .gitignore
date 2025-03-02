@@ -3,6 +3,8 @@ lib/private/*
 plugins/private/*
 !plugins/private/.keep
 
+update/deploy/*
+
 *.code-workspace
 
 *.cfg

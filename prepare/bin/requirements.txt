@@ -4,4 +4,3 @@ asyncio
 requests
 python-dotenv
 gitpython
-watchdog

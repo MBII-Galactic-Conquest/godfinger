@@ -6,13 +6,13 @@ import requests
 import subprocess
 import platform
 import shutil
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+import sys
 
 # Define Git executable path inside virtual environment
+GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
 GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
 os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-os.environ["PATH"] = os.path.dirname(GIT_EXECUTABLE) + ";" + os.environ["PATH"]
+os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
 
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
@@ -26,6 +26,12 @@ SEVEN_ZIP_EXECUTABLE = os.path.join(EXTRACT_DIR, '7-ZipPortable', 'App', '7-Zip'
 SEVEN_ZIP_ARCHIVE = "../lib/other/win/7z_portable.zip"
 GIT_ARCHIVE = "PortableGit-2.48.1-64-bit.7z.exe"
 GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.windows.1/PortableGit-2.48.1-64-bit.7z.exe"
+
+if os.name == 'nt':  # Windows
+    PYTHON_CMD = "python"  # On Windows, just use 'python'
+else:  # Unix-like systems (Linux, macOS)
+    # Check if 'python3' is available, otherwise fallback to 'python'
+    PYTHON_CMD = "python3" if shutil.which("python3") else "python"
 
 # Function to check if Git is installed
 def check_git_installed():
@@ -94,6 +100,15 @@ user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip
 if user_choice != 'y':
     exit(0)  # Exit if the user does not want to update
 
+def fetch_deploy():
+    print(f"[DEPLOY] Checking for deployment keys in deployments.env...")
+    deployment = os.path.abspath("./deployments.py")
+    try:
+        subprocess.run([PYTHON_CMD, deployment], check=True)
+        print("Deployments script executed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error fetching deployments.py: {e}")
+
 # Function to clone the repository if it doesn't exist
 def clone_repo_if_needed():
     if os.path.isdir(os.path.join(REPO_PATH, ".git")):
@@ -129,31 +144,12 @@ def remove_temp_files():
         shutil.rmtree(EXTRACT_DIR, ignore_errors=True)
         print("[CLEANUP] Temporary files removed.")
 
-# Watchdog event handler for file changes
-class RepoEventHandler(FileSystemEventHandler):
-    def on_any_event(self, event):
-        if event.event_type in ["created", "modified", "moved"]:
-            print(f"[UPDATE] Detected change: {event.src_path}")
-            sync_repo()
-
-# Start file watcher
-def start_watcher():
-    event_handler = RepoEventHandler()
-    observer = Observer()
-    observer.schedule(event_handler, REPO_PATH, recursive=True)
-    observer.start()
-    try:
-        while True:
-            time.sleep(0.5)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
-
 # Main script execution
 if __name__ == "__main__":
     if check_git_installed():
         clone_repo_if_needed()
         sync_repo()
+        fetch_deploy()
     else:
         print("[INFO] Using 7-Zip Portable to extract Git...")
         extract_7z()
@@ -163,6 +159,7 @@ if __name__ == "__main__":
 
         clone_repo_if_needed()
         sync_repo()
+        fetch_deploy()
         remove_temp_files()
 
     input("Press Enter to exit...");
