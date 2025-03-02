@@ -21,7 +21,6 @@ find . -type d -name "__pycache__" -exec rm -rf {} +
 
 echo
 echo "Pycache cleanup complete."
-echo
 echo "__pycache__ folders should be regularly emptied after each session."
 
 # Pause before exiting
