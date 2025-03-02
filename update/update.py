@@ -17,7 +17,7 @@ os.environ["PATH"] = os.path.dirname(GIT_EXECUTABLE) + ";" + os.environ["PATH"]
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
 REPO_PATH = "../"
-BRANCH_NAME = "dev"
+BRANCH_NAME = "portablegit"
 CFG_FILE_PATH = "commit.cfg"
 
 # Directory for extracting 7z files
@@ -45,7 +45,7 @@ def check_git_installed():
             input("Press Enter to exit...")
             exit(0)
         else:
-            install_choice = input("Do you wish to install Git Portable in your virtual environment? (Y/N): ").strip().lower()
+            install_choice = input("Do you wish to install Git Portable in your virtual environment? (400mb~) (Y/N): ").strip().lower()
             if install_choice != 'y':
                 print("You will have to install Git manually. Visit: https://git-scm.com/downloads")
                 input("Press Enter to exit...")
@@ -81,16 +81,6 @@ def extract_git(git_archive_path):
         return False
     return True
 
-def erase_git_credentials():
-    if not os.path.exists(GIT_EXECUTABLE):
-        print("[ERROR] Git not found in specified VENV PATH.")
-        return
-    try:
-        subprocess.run([GIT_EXECUTABLE, "credential-manager-core", "erase"], check=True)
-        print("[INFO] Git credentials have been erased.")
-    except subprocess.CalledProcessError as e:
-        print(f"[ERROR] Failed to erase Git credentials: {e}")
-
 # Extract 7z Portable
 def extract_7z():
     print(f"[EXTRACT] Extracting {SEVEN_ZIP_ARCHIVE}...")
@@ -106,45 +96,22 @@ if user_choice != 'y':
 
 # Function to clone the repository if it doesn't exist
 def clone_repo_if_needed():
-    import git
     if os.path.isdir(os.path.join(REPO_PATH, ".git")):
-        print("[GITHUB] Repo exists. Pulling latest changes...")
-        repo = git.Repo(REPO_PATH)
-        repo.remotes.origin.pull()
-        return repo
-    else:
-        print("[GITHUB] Cloning repository...")
-        return git.Repo.clone_from(REPO_URL, REPO_PATH)
+        print("[GITHUB] Repo exists.")
+        return
+    print("[GITHUB] Cloning repository...")
+    subprocess.run([GIT_EXECUTABLE, "clone", "--branch", BRANCH_NAME, REPO_URL, REPO_PATH], check=True)
 
-# Sync repository
+# Sync repository (force update to latest commit)
 def sync_repo():
-    import git
-    origin = repo.remotes.origin
     print("[GITHUB] Fetching latest changes...")
-    origin.fetch()
-    
     try:
-        current_commit = repo.head.commit.hexsha
-    except ValueError:
-        current_commit = None
-
-    print(f"[GITHUB] Checking out branch {BRANCH_NAME}...")
-    try:
-        repo.git.checkout(BRANCH_NAME, force=True)
-    except git.exc.GitCommandError as e:
-        print(f"[ERROR] Failed to checkout branch {BRANCH_NAME}: {e}")
-        return
-
-    print("[GITHUB] Pulling latest changes...")
-    origin.pull(BRANCH_NAME)
-
-    new_commit = repo.head.commit.hexsha if repo.head.commit else None
-
-    if current_commit and new_commit and current_commit == new_commit:
-        print("[GITHUB] No changes detected.")
-        return
-
-    print("[GITHUB] Repository is up to date.")
+        subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], check=True)
+        subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{BRANCH_NAME}"], check=True)
+        subprocess.run([GIT_EXECUTABLE, "pull", "origin", BRANCH_NAME], check=True)
+        print("[GITHUB] Repository is now up to date.")
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] Git sync failed: {e}")
 
 # Function to delete temporary files
 def remove_temp_files():
@@ -175,20 +142,18 @@ def start_watcher():
 # Main script execution
 if __name__ == "__main__":
     if check_git_installed():
-        import git
-        repo = clone_repo_if_needed()
+        clone_repo_if_needed()
         sync_repo()
     else:
-        print("[INFO] Using 7-Zip to extract Git...")
+        print("[INFO] Using 7-Zip Portable to extract Git...")
         extract_7z()
         git_archive_path = download_git()
         if git_archive_path:
             extract_git(git_archive_path)
 
-        erase_git_credentials()
-        repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
+        clone_repo_if_needed()
         sync_repo()
         remove_temp_files()
 
-    # Start file watcher
-    start_watcher()
+    input("Press Enter to exit...");
+    exit(0);
