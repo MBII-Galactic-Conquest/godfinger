@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 
 # Define file paths
 ENV_FILE = "deployments.env"
-CFG_FILE = "deployments.cfg"
 DEPLOY_DIR = "./deploy"
 KEY_DIR = "./key"
 
@@ -108,11 +107,6 @@ for repo_branch, deploy_key in deployments.items():
 
     except subprocess.CalledProcessError as e:
         print(f"Error processing {repo_branch}: {e}")
-
-# Update deployments.cfg with latest commit hashes
-with open(CFG_FILE, "w") as f:
-    for repo_branch, commit_hash in latest_commits.items():
-        f.write(f"{repo_branch}={commit_hash}\n")
 
 print("Deployment process completed.")
 input("Press Enter to exit...")
