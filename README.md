@@ -127,4 +127,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "pluginfile" : name of your custom plugin file, do not add .py extension
 > ```
 >
+> > Ensure you place the `requirements.txt` with required dependencies for your plugins in your `plugin` folder.
+>
 > [Example of test plugin integration](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/plugins/shared/test/testPlugin.py)
