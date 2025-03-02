@@ -1,7 +1,6 @@
 import os
 import subprocess
 import shutil
-import git
 from dotenv import load_dotenv
 
 # Define file paths
@@ -95,13 +94,13 @@ for repo_branch, deploy_key in deployments.items():
         # Build the GitHub URL for cloning with /tree/{branch}
         repo_url = f"git@github.com:{account}/{repo}.git"
         if os.path.exists(os.path.join(repo_dir, ".git")):
-            subprocess.run(["git", "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
-            subprocess.run(["git", "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
         else:
-            subprocess.run(["git", "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
 
         # Get latest commit hash
-        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True, check=True)
+        result = subprocess.run([GIT_EXECUTABLE, "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True, check=True)
         latest_commits[repo_branch] = result.stdout.strip()
 
         print(f"Updated {repo_branch} -> {repo_dir}")
