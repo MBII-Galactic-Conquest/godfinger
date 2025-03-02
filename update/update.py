@@ -69,7 +69,7 @@ def download_git():
 
 # Function to extract the PortableGit archive using 7-Zip
 def extract_git(git_archive_path):
-    print(f"[EXTRACT] Extracting {git_archive_path} to ../venv/GIT...\nPlease wait as this is being configured...")
+    print(f"[EXTRACT] Extracting {git_archive_path} to ../venv/Bin/GIT...\nPlease wait as this is being configured...")
     extract_dir = "../venv/GIT"
     os.makedirs(extract_dir, exist_ok=True)  # Create the GIT extraction directory if it doesn't exist
     
