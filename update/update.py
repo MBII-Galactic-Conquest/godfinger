@@ -9,7 +9,9 @@ import shutil
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = "../venv/GIT/bin/git.exe"
+GIT_EXECUTABLE = os.path.join("..", "venv", "GIT", "bin", "git.exe")
+os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = os.path.join("..", "venv", "GIT", "bin", "git.exe")
+os.environ["PATH"] = GIT_EXECUTABLE + ";" + os.environ["PATH"]
 
 # Set repository paths and remote URL
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"  # Replace with the actual repo URL
@@ -43,10 +45,12 @@ def check_git_installed():
             input("Press Enter to exit...")  # Prompt user to press Enter to exit
             exit(0)
         else:
-            install_choice = input("Do you wish to install Git manually? (Y/N): ").strip().lower()
+            install_choice = input("Do you wish to install Git Portable in your virtual environment? (400MB~) (Y/N): ").strip().lower()
             if install_choice == 'y':
                 return False  # Return False if the user chooses to manually install
             else:
+                print("You will have to install Git manually on Windows. Visit: https://git-scm.com/downloads")
+                input("Press Enter to exit...")  # Prompt user to press Enter to exit
                 exit(0)  # Exit the program if the user doesn't want to install Git
 
 # Function to download the Git archive (PortableGit)
@@ -71,13 +75,29 @@ def extract_git(git_archive_path):
     
     try:
         # Run 7z.exe to extract the archive and mute the output
-        subprocess.run([SEVEN_ZIP_EXECUTABLE, "x", git_archive_path, f"-o{extract_dir}"], 
+        subprocess.run([SEVEN_ZIP_EXECUTABLE, "x", git_archive_path, f"-o{extract_dir}", "-aoa"], 
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"[EXTRACT] Extraction complete to {extract_dir}")
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Failed to extract {git_archive_path}: {e}")
         return False
     return True
+
+def erase_git_credentials():
+    # Check if git is in PATH
+    GIT_EXECUTABLE = shutil.which("git.exe")
+    import git
+    
+    if GIT_EXECUTABLE is None:
+        print("[ERROR] Git not found in specified VENV PATH.")
+        return
+    
+    try:
+        # Run the 'git credential-manager-core erase' command using the full path to git
+        subprocess.run([GIT_EXECUTABLE, "credential-manager-core", "erase"], check=True)
+        print("[INFO] Git credentials have been erased.")
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] Failed to erase Git credentials: {e}")
 
 # Prompt user for update
 user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
@@ -92,16 +112,25 @@ def extract_7z():
         zip_ref.extractall(EXTRACT_DIR)
     print(f"[EXTRACT] Extraction complete to {EXTRACT_DIR}")
 
-# Function to clone the repo if it doesn't exist
+# Function to clone the repo if it doesn't exist or if the repo directory is not empty
 def clone_repo_if_needed():
-    if not os.path.exists(REPO_PATH):
+    import git
+    if os.path.exists(REPO_PATH) and os.path.isdir(REPO_PATH):
+        # Check if it's a valid Git repository by looking for the .git directory
+        if os.path.isdir(os.path.join(REPO_PATH, ".git")):
+            # If the directory is a valid Git repository, pull the latest changes
+            print(f"[GITHUB] Repository already exists at {REPO_PATH}. Pulling latest changes...")
+            repo = git.Repo(REPO_PATH)
+            repo.remotes.origin.pull()  # Pull latest changes
+            return repo
+        else:
+            print(f"[ERROR] {REPO_PATH} exists but is not a valid Git repository.")
+            return None
+    else:
+        # If the directory doesn't exist, clone the repository
         print(f"[GITHUB] Cloning repository from {REPO_URL} to {REPO_PATH}...")
-        import git
         repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
         return repo
-    else:
-        import git
-        return git.Repo(REPO_PATH)
 
 stop_flag = threading.Event()  # Flag to signal stopping the script
 
@@ -238,7 +267,7 @@ if __name__ == "__main__":
         repo = clone_repo_if_needed()
         sync_repo()
     elif platform.system() == "Windows":
-        print("[INFO] Windows detected, Git not found. Using 7-Zip as an alternative.")
+        print("[INFO] Using 7-Zip FM as a temporary service.")
         extract_7z()
 
         # Download Git if not installed
@@ -247,7 +276,7 @@ if __name__ == "__main__":
             extract_git(git_archive_path)
 
         # Proceed as if Git was installed
-        import git
+        erase_git_credentials()
         repo = git.Repo.clone_from(REPO_URL, REPO_PATH)  # Cloning repository in case Git isn't present
         sync_repo()
         remove_temp_files()
