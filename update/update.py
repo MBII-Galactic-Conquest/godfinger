@@ -99,6 +99,11 @@ def extract_7z():
         zip_ref.extractall(EXTRACT_DIR)
     print("[EXTRACT] Extraction complete.")
 
+# Prompt user for update
+user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
+if user_choice != 'y':
+    exit(0)  # Exit if the user does not want to update
+
 # Function to clone the repository if it doesn't exist
 def clone_repo_if_needed():
     import git
