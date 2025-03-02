@@ -8,12 +8,6 @@ import platform
 import shutil
 import sys
 
-# Define Git executable path inside virtual environment
-GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
-GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
-os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
-
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
 REPO_PATH = "../"
@@ -26,6 +20,27 @@ SEVEN_ZIP_EXECUTABLE = os.path.join(EXTRACT_DIR, '7-ZipPortable', 'App', '7-Zip'
 SEVEN_ZIP_ARCHIVE = "../lib/other/win/7z_portable.zip"
 GIT_ARCHIVE = "PortableGit-2.48.1-64-bit.7z.exe"
 GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.windows.1/PortableGit-2.48.1-64-bit.7z.exe"
+
+# Check if the system is Windows
+if os.name == 'nt':  # Windows
+    GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
+    GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
+    PYTHON_CMD = "python"  # On Windows, just use 'python'
+    
+    # Set the environment variables for Windows
+    os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+    os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
+    print(f"Git executable set to: {GIT_EXECUTABLE}")
+else:  # Non-Windows (Linux, macOS)
+    # Get the default Git executable path
+    GIT_EXECUTABLE = shutil.which("git")
+    PYTHON_CMD = "python3" if shutil.which("python3") else "python"
+    
+    if GIT_EXECUTABLE:
+        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+        print(f"Git executable set to default path: {GIT_EXECUTABLE}")
+    else:
+        print("Git executable not found on the system.")
 
 if os.name == 'nt':  # Windows
     PYTHON_CMD = "python"  # On Windows, just use 'python'

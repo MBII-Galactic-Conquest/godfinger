@@ -8,11 +8,26 @@ ENV_FILE = "deployments.env"
 CFG_FILE = "deployments.cfg"
 DEPLOY_DIR = "./deploy"
 
-# Define Git executable path inside virtual environment
-GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
-GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
-os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
+# Check if the system is Windows
+if os.name == 'nt':  # Windows
+    GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
+    GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
+    PYTHON_CMD = "python"  # On Windows, just use 'python'
+    
+    # Set the environment variables for Windows
+    os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+    os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
+    print(f"Git executable set to: {GIT_EXECUTABLE}")
+else:  # Non-Windows (Linux, macOS)
+    # Get the default Git executable path
+    GIT_EXECUTABLE = shutil.which("git")
+    PYTHON_CMD = "python3" if shutil.which("python3") else "python"
+    
+    if GIT_EXECUTABLE:
+        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+        print(f"Git executable set to default path: {GIT_EXECUTABLE}")
+    else:
+        print("Git executable not found on the system.")
 
 # Create default .env if it doesn't exist
 if not os.path.exists(ENV_FILE):
