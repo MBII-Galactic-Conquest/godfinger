@@ -110,6 +110,16 @@ def sync_repo():
         subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{BRANCH_NAME}"], check=True)
         subprocess.run([GIT_EXECUTABLE, "pull", "origin", BRANCH_NAME], check=True)
         print("[GITHUB] Repository is now up to date.")
+		
+        # Get the latest commit hash
+        commit_hash = subprocess.run(
+            [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
+        ).stdout.strip()
+
+        # Write commit hash to commit.cfg
+        with open(CFG_FILE_PATH, "w") as f:
+            f.write(commit_hash)
+
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Git sync failed: {e}")
 
