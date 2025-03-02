@@ -138,7 +138,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > [!IMPORTANT]
 > ### **Deploying Private Codebases**
 >
-> You may deploy your own codebases, using [deploy keys](https://gist.github.com/zhujunsan/a0becf82ade50ed06115), a feature of the Godfinger update system.
+> You may deploy your own codebases, using [deploy keys](https://docs.gitlab.com/user/project/deploy_keys/), a feature of the Godfinger update system.
 > 
 > > Once running the `update` process, you will check automatically for deployments.</br>You may edit `deployments.env` once generated, to specify paths to your public SSH key.</br></br>e.g: `{user}/{repo}/{branch}=./key/{key}`</br></br>Anything other than placeholder generates a folder in `./update/deploy/<foldername>.`</br>This allows multiple deployments to be updated at the same time, so long as the SSH keys are valid.
 >
@@ -148,6 +148,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >     "paths":
 >    [
 >        ".\\",
->        "<path>/<to>/<update>/<deploy>/<folder>",
+>        "<path>\\<to>\\<update>\\<deploy>\\<folder>\\"
 >    ],
 > ```
