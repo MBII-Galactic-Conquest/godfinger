@@ -30,6 +30,7 @@ if os.name == 'nt':  # Windows
 
 else:  # Non-Windows (Linux, macOS)
     # Get the default Git executable path
+    import git
     GIT_EXECUTABLE = shutil.which("git")
     PYTHON_CMD = "python3" if shutil.which("python3") else "python"
 
