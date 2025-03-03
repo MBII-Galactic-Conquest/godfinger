@@ -29,7 +29,6 @@ if os.name == 'nt':  # Windows
 
 else:  # Non-Windows (Linux, macOS)
     # Get the default Git executable path
-    import git
     GIT_EXECUTABLE = shutil.which("git")
     PYTHON_CMD = "python3" if shutil.which("python3") else "python"
 
@@ -86,27 +85,38 @@ for repo_branch, deploy_key in deployments.items():
     if not os.path.exists(repo_dir):
         os.makedirs(repo_dir)
 
-    # Set up SSH command
-    ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
-    git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
+    # If repo exists, don't set the GIT_SSH_COMMAND unless cloning
+    if not os.path.exists(os.path.join(repo_dir, ".git")):
+        # Set up SSH command for cloning
+        ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
+        git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
-    try:
         # Build the GitHub URL for cloning with /tree/{branch}
         repo_url = f"git@github.com:{account}/{repo}.git"
-        if os.path.exists(os.path.join(repo_dir, ".git")):
+        try:
+            subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
+        except subprocess.CalledProcessError as e:
+            print(f"Error cloning {repo_branch}: {e}")
+            continue
+    else:
+        # If the repo already exists, fetch and reset
+        ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
+        git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
+
+        try:
             subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
             subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
-        else:
-            subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
+        except subprocess.CalledProcessError as e:
+            print(f"Error updating {repo_branch}: {e}")
+            continue
 
-        # Get latest commit hash
+    # Get latest commit hash
+    try:
         result = subprocess.run([GIT_EXECUTABLE, "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True, check=True)
         latest_commits[repo_branch] = result.stdout.strip()
-
         print(f"Updated {repo_branch} -> {repo_dir}")
-
     except subprocess.CalledProcessError as e:
-        print(f"Error processing {repo_branch}: {e}")
+        print(f"Error getting latest commit hash for {repo_branch}: {e}")
 
 print("Deployment process completed.")
 input("Press Enter to exit...")
