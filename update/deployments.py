@@ -1,7 +1,6 @@
 import os
 import subprocess
 import shutil
-import paramiko
 from dotenv import load_dotenv
 
 # Define file paths
@@ -9,29 +8,11 @@ ENV_FILE = "deployments.env"
 DEPLOY_DIR = "./deploy"
 KEY_DIR = "./key"
 
-# Function to add SSH key using paramiko
-def add_ssh_key(key_path):
-    try:
-        # Create a paramiko SSH client
-        ssh = paramiko.SSHClient()
-        
-        # Automatically add host keys if missing
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        # Load the private key (no passphrase)
-        private_key = paramiko.RSAKey.from_private_key_file(key_path)
-        
-        # Add the key to the client
-        ssh.get_transport().connect(username='git', pkey=private_key)
-        print(f"Successfully added SSH key: {key_path}")
-    except Exception as e:
-        print(f"Error adding SSH key with paramiko: {e}")
-
-# Initialize Git executable and environment for Windows or non-Windows systems
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
 
     if GIT_PATH is None:
+        # If Git is not found, check a fallback directory
         GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
         GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
     else:
@@ -39,6 +20,7 @@ if os.name == 'nt':  # Windows
 
     PYTHON_CMD = "python"  # On Windows, just use 'python'
 
+    # Set the environment variables for Windows if Git was found
     if GIT_EXECUTABLE:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
         print(f"Git executable set to: {GIT_EXECUTABLE}")
@@ -46,6 +28,8 @@ if os.name == 'nt':  # Windows
         print("Git executable could not be set. Ensure Git is installed.")
 
 else:  # Non-Windows (Linux, macOS)
+    # Get the default Git executable path
+    import git
     GIT_EXECUTABLE = shutil.which("git")
     PYTHON_CMD = "python3" if shutil.which("python3") else "python"
 
@@ -102,20 +86,18 @@ for repo_branch, deploy_key in deployments.items():
     if not os.path.exists(repo_dir):
         os.makedirs(repo_dir)
 
-    # Set up SSH key and command
-    abs_deploy_key = os.path.abspath(deploy_key)
-    add_ssh_key(abs_deploy_key)  # Add the SSH key to the SSH client
+    # Set up SSH command
+    ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
+    git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
     try:
         # Build the GitHub URL for cloning with /tree/{branch}
         repo_url = f"git@github.com:{account}/{repo}.git"
         if os.path.exists(os.path.join(repo_dir, ".git")):
-            subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True)
-            subprocess.run([GIT_EXECUTABLE, "clean", "-fd"], cwd=repo_dir, check=True)
-            subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True)
-            subprocess.run([GIT_EXECUTABLE, "pull", "--rebase", "--force", "--no-ff"], cwd=repo_dir, check=True)
+            subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
         else:
-            subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True)
+            subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
 
         # Get latest commit hash
         result = subprocess.run([GIT_EXECUTABLE, "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True, check=True)
