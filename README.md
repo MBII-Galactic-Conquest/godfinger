@@ -104,6 +104,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
 > - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
+> - "Debug": TestRetrospect true|false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
 > ```
 
 </br>
@@ -140,7 +141,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > You may deploy your own codebases, using [deploy keys](https://docs.gitlab.com/user/project/deploy_keys/), a feature of the Godfinger update system.
 > 
-> > Once running the `update` process, you will check automatically for deployments.</br>You may edit `deployments.env` once generated, to specify paths to your public SSH key.</br></br>e.g: `{user}/{repo}/{branch}=./key/{key}`</br></br>Anything other than placeholder generates a folder in `./update/deploy/<foldername>.`</br>This allows multiple deployments to be updated at the same time, so long as the SSH keys are valid.
+> > Once running the `update` process, you will check automatically for deployments.</br>You may edit `deployments.env` once generated, to specify paths to your public SSH key.</br></br>e.g: `{user}/{repo}/{branch}=./key/{key}`</br></br>Anything other than placeholder generates a folder in `./update/deploy/<foldername>.`</br>This allows multiple deployments to be updated at the same time, so long as the SSH keys are valid.</br></br> It is generally good practice to safeguard config textassets from being overwritten.</br>By properly modifying a `.gitignore` in your private repository.
 >
 > You will have to integrate your changes within the paths in `godfingerCfg.json`, featuring:
 >
@@ -151,3 +152,4 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >        "<path>\\<to>\\<update>\\<deploy>\\<folder>\\"
 >    ],
 > ```
+>
