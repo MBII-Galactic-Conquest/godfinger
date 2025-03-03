@@ -140,7 +140,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > You may deploy your own codebases, using [deploy keys](https://docs.gitlab.com/user/project/deploy_keys/), a feature of the Godfinger update system.
 > 
-> > Once running the `update` process, you will check automatically for deployments.</br>You may edit `deployments.env` once generated, to specify paths to your public SSH key.</br></br>e.g: `{user}/{repo}/{branch}=./key/{key}`</br></br>Anything other than placeholder generates a folder in `./update/deploy/<foldername>.`</br>This allows multiple deployments to be updated at the same time, so long as the SSH keys are valid.</br>It is generally good practice to safeguard config textassets from being overwritten, by properly modifying a `.gitignore` in your private repository.
+> > Once running the `update` process, you will check automatically for deployments.</br>You may edit `deployments.env` once generated, to specify paths to your public SSH key.</br></br>e.g: `{user}/{repo}/{branch}=./key/{key}`</br></br>Anything other than placeholder generates a folder in `./update/deploy/<foldername>.`</br>This allows multiple deployments to be updated at the same time, so long as the SSH keys are valid.</br></br> It is generally good practice to safeguard config textassets from being overwritten.</br>By properly modifying a `.gitignore` in your private repository.
 >
 > You will have to integrate your changes within the paths in `godfingerCfg.json`, featuring:
 >
@@ -151,3 +151,4 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >        "<path>\\<to>\\<update>\\<deploy>\\<folder>\\"
 >    ],
 > ```
+>
