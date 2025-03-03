@@ -106,8 +106,9 @@ for repo_branch, deploy_key in deployments.items():
 
     # Test SSH connection manually
     try:
-        subprocess.run([GIT_EXECUTABLE, "ls-remote", "git@github.com", "--exit-code"], check=True, env=git_env)
-        print("SSH authentication with GitHub successful.")
+        repo_url = f"git@github.com:{account}/{repo}.git"  # Use full repository URL
+        subprocess.run([GIT_EXECUTABLE, "ls-remote", repo_url, "--exit-code"], check=True, env=git_env)
+        print(f"SSH authentication with {repo_url} successful.")
     except subprocess.CalledProcessError as e:
         print(f"Error with SSH authentication to GitHub: {e}")
         continue
@@ -115,7 +116,6 @@ for repo_branch, deploy_key in deployments.items():
     # If repo does not exist, clone it
     if not os.path.exists(os.path.join(repo_dir, ".git")):
         # Build the GitHub URL for cloning with /tree/{branch}
-        repo_url = f"git@github.com:{account}/{repo}.git"
         try:
             subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
         except subprocess.CalledProcessError as e:
