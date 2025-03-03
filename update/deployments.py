@@ -85,8 +85,8 @@ for repo_branch, deploy_key in deployments.items():
     if not os.path.exists(repo_dir):
         os.makedirs(repo_dir)
 
-    # Set up SSH command (to be used for all Git operations)
-    ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
+    # Set up SSH command with debugging output
+    ssh_command = f"ssh -v -i {deploy_key} -o StrictHostKeyChecking=no"
     git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
     # If repo does not exist, clone it
@@ -101,6 +101,8 @@ for repo_branch, deploy_key in deployments.items():
     else:
         # If the repo already exists, fetch and reset
         try:
+            # Explicitly ensure SSH key usage with fetch and reset
+            print(f"Running fetch with SSH key for {repo_branch}")
             subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
             subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
         except subprocess.CalledProcessError as e:
