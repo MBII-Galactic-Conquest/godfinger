@@ -7,6 +7,7 @@ import traceback;
 import os;
 import subprocess;
 import sys;
+import lib.shared.util as util;
 
 Log = logging.getLogger(__name__);
 

@@ -308,7 +308,13 @@ class MBIIServer:
                     logFile = FileReadBackwards(self._logPath, encoding = "utf-8");
                 else:
                     logFile = FileReadBackwards(self._logPath, encoding="ansi");
-                testRetro = self._config.GetValue("Debug", None)["TestRetrospect"];
+                
+                testRetro = False;
+                dbg = self._config.GetValue("Debug", None);
+                if dbg != None:
+                    if "TestRetrospect" in dbg:
+                        testRetro = dbg["TestRetrospect"];
+                
                 for line in logFile:
                     line = line[7:];
                     if line.startswith("InitGame"):
