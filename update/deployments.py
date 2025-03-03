@@ -8,6 +8,7 @@ ENV_FILE = "deployments.env"
 DEPLOY_DIR = "./deploy"
 KEY_DIR = "./key"
 
+# Determine GIT_EXECUTABLE path based on OS
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
 
@@ -86,8 +87,11 @@ for repo_branch, deploy_key in deployments.items():
 
     # Set up SSH command with debugging output (absolute path to the key)
     absolute_key_path = os.path.abspath(deploy_key)  # Get absolute path to the key
-    print(f"Using SSH key: {absolute_key_path}")  # Debugging the key path
-    ssh_command = f"ssh -v -i {absolute_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    quoted_key_path = f"\"{absolute_key_path}\""  # Wrap path in quotes for spaces handling
+    print(f"Using SSH key: {quoted_key_path}")  # Debugging the key path
+
+    # Ensure SSH command is correctly quoted
+    ssh_command = f"ssh -v -i {quoted_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
     # If repo does not exist, clone it
@@ -119,5 +123,4 @@ for repo_branch, deploy_key in deployments.items():
         print(f"Error getting latest commit hash for {repo_branch}: {e}")
 
 print("Deployment process completed.")
-input("Press Enter to exit...")
-exit(0)
+input("Press Enter to exit...
