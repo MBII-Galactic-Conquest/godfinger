@@ -2,6 +2,7 @@ import os
 import subprocess
 import shutil
 from dotenv import load_dotenv
+import stat
 
 # Define file paths
 ENV_FILE = "deployments.env"
@@ -90,9 +91,26 @@ for repo_branch, deploy_key in deployments.items():
     quoted_key_path = f"\"{absolute_key_path}\""  # Wrap path in quotes for spaces handling
     print(f"Using SSH key: {quoted_key_path}")  # Debugging the key path
 
+    # Ensure the private key has the correct permissions (only readable by the owner)
+    try:
+        key_stat = os.stat(absolute_key_path)
+        if key_stat.st_mode & stat.S_IRWXO:  # Check for world-readable permissions
+            print(f"Fixing permissions for {absolute_key_path}")
+            os.chmod(absolute_key_path, 0o600)  # Set to read/write only for the user
+    except Exception as e:
+        print(f"Error checking or setting permissions for {absolute_key_path}: {e}")
+
     # Ensure SSH command is correctly quoted
     ssh_command = f"ssh -v -i {quoted_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
+
+    # Test SSH connection manually
+    try:
+        subprocess.run([GIT_EXECUTABLE, "ls-remote", "git@github.com", "--exit-code"], check=True, env=git_env)
+        print("SSH authentication with GitHub successful.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error with SSH authentication to GitHub: {e}")
+        continue
 
     # If repo does not exist, clone it
     if not os.path.exists(os.path.join(repo_dir, ".git")):
