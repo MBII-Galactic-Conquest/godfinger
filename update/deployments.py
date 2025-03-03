@@ -95,8 +95,9 @@ for repo_branch, deploy_key in deployments.items():
         repo_url = f"git@github.com:{account}/{repo}.git"
         if os.path.exists(os.path.join(repo_dir, ".git")):
             subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "clean", "-fd"], cwd=repo_dir, check=True, env=git_env)
             subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
-            subprocess.run([GIT_EXECUTABLE, "pull", "--rebase", "--force"], cwd=repo_dir, check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "pull", "--rebase", "--force", "--no-ff"], cwd=repo_dir, check=True, env=git_env)
         else:
             subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
 
