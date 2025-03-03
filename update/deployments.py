@@ -94,8 +94,8 @@ for repo_branch, deploy_key in deployments.items():
         # Build the GitHub URL for cloning with /tree/{branch}
         repo_url = f"git@github.com:{account}/{repo}.git"
         if os.path.exists(os.path.join(repo_dir, ".git")):
-            subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
-            subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "checkout", branch], cwd=repo_dir, check=True, env=git_env)
+            subprocess.run([GIT_EXECUTABLE, "pull", "--force", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
         else:
             subprocess.run([GIT_EXECUTABLE, "clone", "-b", branch, repo_url, repo_dir], check=True, env=git_env)
 
