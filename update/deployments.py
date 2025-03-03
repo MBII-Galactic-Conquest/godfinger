@@ -87,7 +87,7 @@ for repo_branch, deploy_key in deployments.items():
     # Set up SSH command with debugging output (absolute path to the key)
     absolute_key_path = os.path.abspath(deploy_key)  # Get absolute path to the key
     print(f"Using SSH key: {absolute_key_path}")  # Debugging the key path
-    ssh_command = f"ssh -v -i {absolute_key_path} -o StrictHostKeyChecking=no"
+    ssh_command = f"ssh -v -i {absolute_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
     # If repo does not exist, clone it
@@ -100,9 +100,9 @@ for repo_branch, deploy_key in deployments.items():
             print(f"Error cloning {repo_branch}: {e}")
             continue
     else:
-        # If the repo already exists, fetch and reset
+        # If the repo already exists, fetch and reset with the specified key
         try:
-            # Explicitly ensure SSH key usage with fetch and reset
+            # Explicitly set the SSH key for fetch and reset
             print(f"Running fetch with SSH key for {repo_branch}")
             subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
             subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
