@@ -8,6 +8,24 @@ ENV_FILE = "deployments.env"
 DEPLOY_DIR = "./deploy"
 KEY_DIR = "./key"
 
+# Start SSH agent and capture the environment variables
+def start_ssh_agent():
+    result = subprocess.run(['ssh-agent', '-s'], capture_output=True, text=True, shell=True)
+    ssh_agent_env = {}
+    for line in result.stdout.splitlines():
+        if line.startswith("SSH_AUTH_SOCK") or line.startswith("SSH_AGENT_PID"):
+            key, value = line.split("=", 1)
+            ssh_agent_env[key] = value.strip(";")
+    # Set the environment variables in the current Python session
+    os.environ.update(ssh_agent_env)
+
+# Add the SSH key to the agent
+def add_ssh_key(key_path):
+    subprocess.run(['ssh-add', key_path], check=True)
+
+# Initialize the SSH agent
+start_ssh_agent()
+
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
 
@@ -87,7 +105,9 @@ for repo_branch, deploy_key in deployments.items():
         os.makedirs(repo_dir)
 
     # Set up SSH command
-    ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
+    abs_deploy_key = os.path.abspath(deploy_key)
+    add_ssh_key(abs_deploy_key)  # Add the SSH key to the agent
+    ssh_command = f"ssh -i {abs_deploy_key} -o StrictHostKeyChecking=no"
     git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
     try:
