@@ -85,12 +85,12 @@ for repo_branch, deploy_key in deployments.items():
     if not os.path.exists(repo_dir):
         os.makedirs(repo_dir)
 
-    # If repo exists, don't set the GIT_SSH_COMMAND unless cloning
-    if not os.path.exists(os.path.join(repo_dir, ".git")):
-        # Set up SSH command for cloning
-        ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
-        git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
+    # Set up SSH command (to be used for all Git operations)
+    ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
+    git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
+    # If repo does not exist, clone it
+    if not os.path.exists(os.path.join(repo_dir, ".git")):
         # Build the GitHub URL for cloning with /tree/{branch}
         repo_url = f"git@github.com:{account}/{repo}.git"
         try:
@@ -100,9 +100,6 @@ for repo_branch, deploy_key in deployments.items():
             continue
     else:
         # If the repo already exists, fetch and reset
-        ssh_command = f"ssh -i {deploy_key} -o StrictHostKeyChecking=no"
-        git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
-
         try:
             subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], cwd=repo_dir, check=True, env=git_env)
             subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{branch}"], cwd=repo_dir, check=True, env=git_env)
