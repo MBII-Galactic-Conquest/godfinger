@@ -104,6 +104,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
 > - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
+> - "Debug": TestRetrospect true|false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
 > ```
 
 </br>
