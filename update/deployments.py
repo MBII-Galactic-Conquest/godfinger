@@ -26,7 +26,6 @@ if os.name == 'nt':  # Windows
         print(f"Git executable set to: {GIT_EXECUTABLE}")
     else:
         print("Git executable could not be set. Ensure Git is installed.")
-
 else:  # Non-Windows (Linux, macOS)
     # Get the default Git executable path
     GIT_EXECUTABLE = shutil.which("git")
@@ -85,8 +84,10 @@ for repo_branch, deploy_key in deployments.items():
     if not os.path.exists(repo_dir):
         os.makedirs(repo_dir)
 
-    # Set up SSH command with debugging output
-    ssh_command = f"ssh -v -i {deploy_key} -o StrictHostKeyChecking=no"
+    # Set up SSH command with debugging output (absolute path to the key)
+    absolute_key_path = os.path.abspath(deploy_key)  # Get absolute path to the key
+    print(f"Using SSH key: {absolute_key_path}")  # Debugging the key path
+    ssh_command = f"ssh -v -i {absolute_key_path} -o StrictHostKeyChecking=no"
     git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
     # If repo does not exist, clone it
