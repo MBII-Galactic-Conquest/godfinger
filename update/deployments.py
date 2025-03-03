@@ -101,7 +101,7 @@ for repo_branch, deploy_key in deployments.items():
         print(f"Error checking or setting permissions for {absolute_key_path}: {e}")
 
     # Ensure SSH command is correctly quoted
-    ssh_command = f"ssh -v -i {quoted_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    ssh_command = f"ssh -i {quoted_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     git_env = {**os.environ, "GIT_SSH_COMMAND": ssh_command}
 
     # Test SSH connection manually
