@@ -23,5 +23,3 @@ automodCfg.json
 *.DB
 ignored/
 venv/
-
-/*[!.]
