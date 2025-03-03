@@ -123,4 +123,4 @@ for repo_branch, deploy_key in deployments.items():
         print(f"Error getting latest commit hash for {repo_branch}: {e}")
 
 print("Deployment process completed.")
-input("Press Enter to exit...
+input("Press Enter to exit...")
