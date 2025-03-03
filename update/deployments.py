@@ -11,20 +11,44 @@ KEY_DIR = "./key"
 # Start SSH agent and capture the environment variables
 def start_ssh_agent():
     result = subprocess.run(['ssh-agent', '-s'], capture_output=True, text=True, shell=True)
+    if result.returncode != 0:
+        print("Failed to start SSH agent.")
+        return None
+    
     ssh_agent_env = {}
     for line in result.stdout.splitlines():
         if line.startswith("SSH_AUTH_SOCK") or line.startswith("SSH_AGENT_PID"):
             key, value = line.split("=", 1)
             ssh_agent_env[key] = value.strip(";")
+    
+    # Debugging: Print out SSH agent variables
+    print(f"SSH agent environment: {ssh_agent_env}")
+    
+    if "SSH_AUTH_SOCK" not in ssh_agent_env or "SSH_AGENT_PID" not in ssh_agent_env:
+        print("SSH agent environment variables are not set properly.")
+        return None
+    
     # Set the environment variables in the current Python session
     os.environ.update(ssh_agent_env)
+    return ssh_agent_env
 
 # Add the SSH key to the agent
 def add_ssh_key(key_path):
-    subprocess.run(['ssh-add', key_path], check=True)
+    try:
+        result = subprocess.run(['ssh-add', key_path], check=True, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Failed to add SSH key: {result.stderr}")
+        else:
+            print(f"Successfully added SSH key: {key_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error adding SSH key: {e}")
 
 # Initialize the SSH agent
-start_ssh_agent()
+ssh_agent_env = start_ssh_agent()
+
+if ssh_agent_env is None:
+    print("Exiting due to SSH agent initialization failure.")
+    exit(1)
 
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
@@ -47,7 +71,6 @@ if os.name == 'nt':  # Windows
 
 else:  # Non-Windows (Linux, macOS)
     # Get the default Git executable path
-    import git
     GIT_EXECUTABLE = shutil.which("git")
     PYTHON_CMD = "python3" if shutil.which("python3") else "python"
 
