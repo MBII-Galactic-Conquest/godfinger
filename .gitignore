@@ -3,12 +3,23 @@ lib/private/*
 plugins/private/*
 !plugins/private/.keep
 
+update/deploy/*
+update/key/*
+
+*.code-workspace
+
+*.cfg
 *.env
 *.pyc
 __pycache__/*
 *.log
 
 godfingerCfg.json
+automessageCfg.json
+vpnmonitorCfg.json
+automodCfg.json
 
 *.db
 *.DB
+ignored/
+venv/

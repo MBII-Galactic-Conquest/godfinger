@@ -1,0 +1,25 @@
+1) A config json that allows the following:
+> action (0 - 1 - 2) or (1 - 2 - 3)
+> action 0 - mute
+> action 1 - kick
+> action 2 - tempban
+> adjustable action duration, case applicable to mute time and tempban
+
+2) Provided array of strings,
+
+    "blacklistedWords":
+    [
+        "slur1",
+        "slur2"
+    ]
+}
+
+    "blacklistedUserNames":
+    [
+        "slur1",
+        "slur2"
+    ]
+}
+
+3) Functionality for the automod script that searches for ALL special characters in the string provided:
+> To prevent people from abusing this system, and attempting to put special characters in the mix of the spelling, or spaces inbetween.

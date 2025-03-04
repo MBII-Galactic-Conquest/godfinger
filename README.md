@@ -41,7 +41,9 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > 
 > Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg.`
 > 
-> Execute `"prepare.bat"` to install dependancy modules, sufficiently fill out `config jsons`, then just start the `"startDebug.bat"` or `"start.bat".`
+> Execute `"prepare"` script based on platform in  `./prepare/os` to install dependancy modules, run the `"start"` or `"startDebug"` script based on platform in `./start/os`, then sufficiently fill out the generated `godfingerCfg.json` in root directory.
+>
+> You may now `start` the godfinger system normally.
 
 
 </br>
@@ -63,7 +65,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > #1) Python has issues sometimes with dirpathing in json files, so double backslashes `\\` may be necessary.</br>e.g: `C:\\Program Files (x86)\\SteamCMD\\JKA\\Gamedata\\MBII\\`
 >
-> > Python on `Windows 11` systems can encounter opposite problems with dirpathing, so in this instance, any use of double backslashes `\\` must become forward slashes, `/`, and in the event of any spaces please use `_` underscores.
 >
 > </br>
 >
@@ -73,12 +74,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > 
 > > So i.e, if you send 6 rcons within 20 miliseconds frame time, it will send 5 and then wait for 20 milliseconds and send the 6th rcon afterwards.
 >
-> </br>
->
-> #3) Occasionally you will encounter script errors if you accidentally merge `__pycache__` folders from other servers, systems, or plugins.
->
-> > For good measure when moving godfinger installations, and fresh installs, run `cleanup.bat`, which removes cached python data that can cause conflicts. This often also happens when merging plugins others make, and is generally good practice to run the cleanup procedure.
->
+
 </br>
 
 </br>
@@ -108,6 +104,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
 > - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
+> - "Debug": TestRetrospect true|false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
 > ```
 
 </br>
@@ -131,4 +128,28 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "pluginfile" : name of your custom plugin file, do not add .py extension
 > ```
 >
+> > Ensure you place the `requirements.txt` with required dependencies alongside your plugins.
+>
 > [Example of test plugin integration](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/plugins/shared/test/testPlugin.py)
+
+</br>
+
+</br>
+
+> [!IMPORTANT]
+> ### **Deploying Private Codebases**
+>
+> You may deploy your own codebases, using [deploy keys](https://docs.gitlab.com/user/project/deploy_keys/), a feature of the Godfinger update system.
+> 
+> > Once running the `update` process, you will check automatically for deployments.</br>You may edit `deployments.env` once generated, to specify paths to your public SSH key.</br></br>e.g: `{user}/{repo}/{branch}=./key/{key}`</br></br>Anything other than placeholder generates a folder in `./update/deploy/<foldername>.`</br>This allows multiple deployments to be updated at the same time, so long as the SSH keys are valid.</br></br> It is generally good practice to safeguard config textassets from being overwritten.</br>By properly modifying a `.gitignore` in your private repository.
+>
+> You will have to integrate your changes within the paths in `godfingerCfg.json`, featuring:
+>
+> ```
+>     "paths":
+>    [
+>        ".\\",
+>        "<path>\\<to>\\<update>\\<deploy>\\<folder>\\"
+>    ],
+> ```
+>
