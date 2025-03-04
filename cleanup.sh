@@ -1,28 +1,28 @@
 #!/bin/bash
 
-# Initialize a flag to track if __pycache__ directories are found
-found=0
+# Prompt the user for confirmation
+read -p "Do you wish to do __pycache__ cleanup? This can prevent conflicts. (Y/N): " choice
 
-# Search for any __pycache__ directories
-while IFS= read -r -d '' dir; do
-    found=1
-done < <(find . -type d -name "__pycache__" -print0)
+# Convert input to lowercase
+choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
 
-# If no __pycache__ folders were found, print the message and exit
-if [ "$found" -eq 0 ]; then
-    echo "No __pycache__ folders detected for cleanup."
-    read -p "Press enter to exit"
+if [[ "$choice" != "y" ]]; then
+    echo "Pycache cleanup aborted."
     exit 0
 fi
 
-# If __pycache__ folders are found, proceed with deletion
-echo "Deleting __pycache__ folders..."
-find . -type d -name "__pycache__" -exec rm -rf {} +
+# Find and delete __pycache__ directories
+found=0
+while IFS= read -r -d '' dir; do
+    found=1
+    echo "Deleting: $dir"
+    rm -rf "$dir"
+done < <(find . -type d -name "__pycache__" -print0)
 
-echo
-echo "Pycache cleanup complete."
-echo "__pycache__ folders should be regularly emptied after each session."
-
-# Pause before exiting
-echo
-read -p "Press enter to continue..."
+# If no __pycache__ folders were found
+if [[ $found -eq 0 ]]; then
+    echo "No __pycache__ folders detected for cleanup."
+else
+    echo "Pycache cleanup complete."
+    echo "__pycache__ folders should be regularly emptied after each session."
+fi
