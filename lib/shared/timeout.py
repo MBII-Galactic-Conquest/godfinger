@@ -24,6 +24,8 @@ class Timeout:
         return self._startS;
 
     def Left(self):
+        if self._endS == 0:
+            return 0;
         return (self._endS - time.time());
 
     def LeftDHMS(self):
