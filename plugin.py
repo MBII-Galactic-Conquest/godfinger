@@ -95,15 +95,16 @@ class PluginManager():
         pass
 
     def Initialize(self, targetPlugins : list, data : any) -> bool:
-        Log.info("Loading plugins...");
-        totalLoaded = 0;
-        for targetPlug in targetPlugins:
-            plug = self.LoadPlugin(targetPlug["path"], data);
-            if plug != None:
-                self._plugins[targetPlug["path"]] = plug;
-                totalLoaded += 1;
-        Log.info("Loaded total %d plugins. "% (totalLoaded));
-        self._isInit = True;
+        if not self._isInit:
+            Log.info("Loading plugins...");
+            totalLoaded = 0;
+            for targetPlug in targetPlugins:
+                plug = self.LoadPlugin(targetPlug["path"], data);
+                if plug != None:
+                    self._plugins[targetPlug["path"]] = plug;
+                    totalLoaded += 1;
+            Log.info("Loaded total %d plugins. "% (totalLoaded));
+            self._isInit = True;
         return self._isInit;
 
     def Start(self) -> bool:
@@ -166,7 +167,9 @@ class PluginManager():
             Log.info("Finishing plugin manager...");
             for plugin in self._plugins:
                 self._plugins[plugin].Finish();
+            self._plugins.clear();
             self._isFinished = True;
+            self._isInit = False;
             Log.info("Finished plugin manager.");
 
     def Loop(self):
