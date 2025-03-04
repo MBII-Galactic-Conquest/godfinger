@@ -26,6 +26,3 @@ else
     echo "Pycache cleanup complete."
     echo "__pycache__ folders should be regularly emptied after each session."
 fi
-
-# Wait for user input before exiting
-read -p "Press enter to continue..."
