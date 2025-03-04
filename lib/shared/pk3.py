@@ -78,25 +78,28 @@ class Pk3():
 class Pk3Manager():
     def __init__(self):
         self._rootDir = None;
-        self._pks = {};
+        self._pks : dict[str, Pk3]= {};
         self._isInit = False;
     
     def Initialize(self, rootDir):
         if not self._isInit:
             print("Initializing pk3 manager...")
             if os.path.isdir(rootDir):
-                print(rootDir);
-                for file in os.listdir(rootDir):
-                    fileTup = os.path.splitext(file);
-                    if fileTup[1].lower() == ".pk3":
-                        filePath = os.path.join(rootDir,file);
-                        if Pk3.IsPk3(filePath):
-                            print(filePath);
-                            self.LoadPk3(filePath);
+                self.LoadDir(rootDir);
                 self._rootDir = rootDir;
+                for pk in self._pks:
+                    print(self._pks[pk].GetPath());
                 print("Cached %s pk3 archives." % (str(len(self._pks.keys()))));
                 print("Pk3 manager initialized.");
                 self._isInit = True;
+    
+    def Unload(self, filePath):
+        if filePath in self._pks:
+            self._pks[filePath].Unload();
+    
+    def UnloadAll(self):
+        for k in self._pks.keys:
+            self._pks[k].Unload();
 
     def LoadPk3(self, filePath) -> bool:
         newPk = Pk3();
@@ -104,6 +107,16 @@ class Pk3Manager():
             self._pks[filePath] = newPk;
             return True;
         return False;
+
+    def LoadDir(self, dir : str) -> bool:
+        if os.path.isdir(dir):
+            for file in os.listdir(dir):
+                fileTup = os.path.splitext(file);
+                if fileTup[1].lower() == ".pk3":
+                    filePath = os.path.join(dir,file);
+                    if Pk3.IsPk3(filePath):
+                        self.LoadPk3(filePath);
+        return True; # stub
 
     def GetPk3(self, filePath):
         if filePath in self._pks:
