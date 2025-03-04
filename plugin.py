@@ -135,15 +135,14 @@ class PluginManager():
                     Log.debug("requirements content : %s "  % lines);
                     missing = [];
                     for dep in lines:
+                        dep = dep.replace('\n', '');
                         try:
-                            dep = dep.replace('\n', '');
-                            depSpec = importlib.util.find_spec(dep);
-                            if depSpec == None:
-                                Log.debug("Required module %s is not found in current environment install" % dep);
+                            subprocess.check_call([sys.executable, "-m", "pip", "show", "--quiet", dep]);
+                        except subprocess.CalledProcessError as ex:
+                            if ex.returncode == 1:
                                 missing.append(dep);
-                        except ModuleNotFoundError:
-                            Log.debug("Required module %s is not found in current environment install" % dep);
-                            missing.append(dep);
+                            else:
+                                Log.error("Unhandled exception on getting pip show of dependancy %s" % dep);
                     if len(missing) > 0:
                         Log.debug("Trying to install dependancies for %s" % name);
                         subprocess.check_call([sys.executable, "-m", "pip", "install",] + missing)
