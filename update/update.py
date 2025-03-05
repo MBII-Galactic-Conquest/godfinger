@@ -7,12 +7,13 @@ import subprocess
 import platform
 import shutil
 import sys
+import json
 
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
 REPO_PATH = "../"
-BRANCH_NAME = "main"
 CFG_FILE_PATH = "commit.cfg"
+UPDATE_CFG_FILE = "updateCfg.json"
 
 # Directory for extracting 7z files
 EXTRACT_DIR = "../temp"
@@ -20,6 +21,42 @@ SEVEN_ZIP_EXECUTABLE = os.path.join(EXTRACT_DIR, '7-ZipPortable', 'App', '7-Zip'
 SEVEN_ZIP_ARCHIVE = "../lib/other/win/7z_portable.zip"
 GIT_ARCHIVE = "PortableGit-2.48.1-64-bit.7z.exe"
 GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.windows.1/PortableGit-2.48.1-64-bit.7z.exe"
+
+# Get branch name from updateCfg.json (create file with default 'main' if not present)
+def get_branch_name():
+    if os.path.exists(UPDATE_CFG_FILE):
+        try:
+            with open(UPDATE_CFG_FILE, 'r') as file:
+                config = json.load(file)
+                # Ensure the 'branch_name' key is in the JSON
+                if "branch_name" in config:
+                    return config["branch_name"]
+                else:
+                    print(f"[INFO] 'branch_name' not found in {UPDATE_CFG_FILE}, setting to 'main'.")
+                    config["branch_name"] = "main"
+                    save_update_cfg(config)
+                    return "main"
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"[ERROR] Failed to read {UPDATE_CFG_FILE}. Error: {e}")
+            exit(1)
+    else:
+        print(f"[INFO] {UPDATE_CFG_FILE} not found, creating with 'main' as the default branch.")
+        config = {"branch_name": "main"}
+        save_update_cfg(config)
+        return "main"
+
+# Save the updated config to the JSON file
+def save_update_cfg(config):
+    try:
+        with open(UPDATE_CFG_FILE, 'w') as file:
+            json.dump(config, file, indent=4)
+            print(f"[INFO] {UPDATE_CFG_FILE} generated with branch_name: {config['branch_name']}")
+    except IOError as e:
+        print(f"[ERROR] Failed to save {UPDATE_CFG_FILE}: {e}")
+        exit(1)
+
+# Directory paths and settings
+BRANCH_NAME = get_branch_name()
 
 # Check if the system is Windows
 if os.name == 'nt':  # Windows
@@ -122,10 +159,10 @@ def extract_7z():
     print("[EXTRACT] Extraction complete.")
 
 def start():
-	# Prompt user for update
-	user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
-	if user_choice != 'y':
-		exit(0)  # Exit if the user does not want to update
+    # Prompt user for update
+    user_choice = input("Do you wish to check for Godfinger updates? (Y/N): ").strip().lower()
+    if user_choice != 'y':
+        exit(0)  # Exit if the user does not want to update
 
 def fetch_deploy():
     print(f"[DEPLOY] Checking for deployment keys in deployments.env...")
@@ -153,7 +190,7 @@ def sync_repo():
         subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{BRANCH_NAME}"], check=True)
         subprocess.run([GIT_EXECUTABLE, "pull", "origin", BRANCH_NAME], check=True)
         print("[GITHUB] Repository is now up to date.")
-		
+        
         # Get the latest commit hash
         commit_hash = subprocess.run(
             [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True

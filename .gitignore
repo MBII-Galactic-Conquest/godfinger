@@ -8,6 +8,7 @@ update/key/*
 
 *.code-workspace
 
+*.json
 *.cfg
 *.env
 *.pyc
