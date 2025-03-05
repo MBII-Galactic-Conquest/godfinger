@@ -159,6 +159,14 @@ class Rcon(object):
   def clientkick(self, player_id):
     return self._Send(b"\xff\xff\xff\xffrcon %b clientkick %i" % (self.rcon_pwd, player_id))
   
+  # untested
+  def clientban(self, player_ip):
+    return self._Send(b"\xff\xff\xff\xffrcon %b addip %s" % (self.rcon_pwd, player_ip))
+  
+  # untested
+  def clientunban(self, player_ip):
+    return self._Send(b"\xff\xff\xff\xffrcon %b removeip %s" % (self.rcon_pwd, player_ip))
+  
   def echo(self, msg):
     msg = bytes(msg, "UTF-8")
     return self._Send(b"\xff\xff\xff\xffrcon %b echo %b" % (self.rcon_pwd, msg))
@@ -261,4 +269,10 @@ class Rcon(object):
     if not type(id) == bytes:
       id = bytes(str(id), "UTF-8") 
     res = self._Send(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self.rcon_pwd, id))
+    return res
+  
+  def cvarList(self) -> str:
+    res = self._Send(b"\xff\xff\xff\xffrcon %b cvarlist" % (self.rcon_pwd))
+    if len(res) == 0:
+      return None;
     return res

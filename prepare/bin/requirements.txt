@@ -1,4 +1,6 @@
 file-read-backwards
 psutil
 asyncio
+requests
 python-dotenv
+gitpython

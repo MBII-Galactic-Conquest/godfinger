@@ -8,6 +8,7 @@ class Client(object):
         self._id = id;
         self._name = name;
         self._address = address;
+        self._ip = address[:address.rfind(":")];
         self._teamId = teams.TEAM_SPEC;
         self._jaguid = "";
         self._userinfo = {};
@@ -20,6 +21,9 @@ class Client(object):
 
     def GetAddress(self) -> str:
         return self._address
+    
+    def GetIp(self) -> str:
+        return self._ip;
     
     def GetTeamId(self) -> int:
         return self._teamId;
