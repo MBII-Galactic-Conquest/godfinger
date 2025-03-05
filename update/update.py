@@ -50,7 +50,7 @@ def save_update_cfg(config):
     try:
         with open(UPDATE_CFG_FILE, 'w') as file:
             json.dump(config, file, indent=4)
-            print(f"[INFO] {UPDATE_CFG_FILE} updated with branch_name: {config['branch_name']}")
+            print(f"[INFO] {UPDATE_CFG_FILE} generated with branch_name: {config['branch_name']}")
     except IOError as e:
         print(f"[ERROR] Failed to save {UPDATE_CFG_FILE}: {e}")
         exit(1)
