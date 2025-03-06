@@ -10,7 +10,7 @@ from datetime import datetime
 
 # Global variables
 SERVER_DATA = None
-BIGDATA_LOG = os.path.join("../", "../", "../", 'bigdata.log')
+BIGDATA_LOG = os.path.join("./", 'bigdata.log')
 last_position = 0  # Tracks the last read position of the log file
 last_sent_message = ""  # Store the last sent message to prevent re-sending
 
@@ -28,8 +28,8 @@ DISCORD_BOT_TOKEN = None
 DISCORD_GUILD_ID = None
 DISCORD_CHANNEL_ID = None
 DISCORD_THREAD_ID = None
+ADMIN_ROLE_ID = None
 USE_THREAD = False
-ADMIN_ROLE_ID = None  # The role ID to ping when admins are requested.
 
 # Load environment variables
 def load_env_variables():
