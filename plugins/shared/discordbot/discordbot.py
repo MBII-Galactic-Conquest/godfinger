@@ -42,6 +42,7 @@ def load_env_variables():
 DISCORD_GUILD_ID=your_guild_id_here
 DISCORD_CHANNEL_ID=your_channel_id_here
 DISCORD_THREAD_ID=your_thread_id_here  # Optional, used only if USE_THREAD is True
+ADMIN_ROLE_ID=your_admin_role_id_here # Optional, however will flag errors when !admin is used without.
 USE_THREAD=True  # Set this to True to use threads, or False to use channels
 """)
         print(f"{env_file} has been created!")
@@ -53,8 +54,8 @@ USE_THREAD=True  # Set this to True to use threads, or False to use channels
         DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID")
         DISCORD_CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID")
         DISCORD_THREAD_ID = os.getenv("DISCORD_THREAD_ID")
-        USE_THREAD = os.getenv("USE_THREAD", "False").lower() == "true"
         ADMIN_ROLE_ID = os.getenv("ADMIN_ROLE_ID")
+        USE_THREAD = os.getenv("USE_THREAD", "False").lower() == "true"
         print("Required environmental variables for Discord loaded successfully!")
     else:
         print("Unable to load environmental variables! Ensure discordbot.env exists!")
