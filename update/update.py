@@ -228,5 +228,6 @@ if __name__ == "__main__":
         remove_temp_files()
         fetch_deploy()
 
+    print("\n\n[IMPORTANT] IF you encounter errors after updates, check fallback configs internally in godfinger and all plugins...\n\n")
     input("Press Enter to exit...");
     exit(0);
