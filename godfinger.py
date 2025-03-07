@@ -11,6 +11,8 @@ import logging;
 import argparse;
 import signal;
 import sys;
+import subprocess;
+import tempfile;
 
 
 IsVenv = sys.prefix != sys.base_prefix;
@@ -28,7 +30,8 @@ def Sighandler(signum, frame):
             Server.Stop();
 
 # sys.platform() for more info
-IsUnix = (os.name == "posix");
+IsUnix      = (os.name == "posix");
+IsWindows   = (os.name == "nt");
 if IsUnix:
     signal.signal(signal.SIGINT, Sighandler);
     signal.signal(signal.SIGTERM, Sighandler);
@@ -46,6 +49,7 @@ Argparser = argparse.ArgumentParser(prog="Godfinger", description="The universal
 #                     action='store_true')  # on/off flag
 Argparser.add_argument("-d", "--debug", action="store_true");
 Argparser.add_argument("-lf", "--logfile");
+Argparser.add_argument("-mbiicmd");
 Args = Argparser.parse_args();
 
 Log = logging.getLogger(__name__);
@@ -70,6 +74,7 @@ import logMessage;
 import math;
 import lib.shared.colors as colors;
 import cvar;
+import godfingerinterface;
 
 INVALID_ID = -1;
 USERINFO_LEN = len("userinfo: ");
@@ -92,10 +97,12 @@ CONFIG_FALLBACK = \
 
     "MBIIPath": "your/path/here/",
     "logFilename":"server.log",
+    "serverPath":"your/path/here/",
     "serverFileName":"mbiided.x86.exe",
     "logicDelay":0.016,
     "logReadDelay":0.1,
     "restartOnCrash": false,
+    "interface":"pty",
 
     "paths":
     [
@@ -117,6 +124,9 @@ CONFIG_FALLBACK = \
     }
 }
 """
+
+if not IsUnix:
+    import winpty;
 
 class MBIIServer:
 
@@ -141,6 +151,71 @@ class MBIIServer:
             return "Status : Error at configuration load."
         else:
             return "Unknown status id."; # implement later
+    
+    def ValidateConfig(self, cfg : config.Config) -> bool:
+        if cfg == None:
+            return False;
+        curVar = cfg.GetValue("MBIIPath", None);
+        if curVar == None or curVar == "your/path/here/":
+            return False;
+        curVar = cfg.GetValue("serverFileName", None);
+        if curVar == None or curVar == "":
+            return False;
+        curVar = cfg.GetValue("serverPath", None);
+        if curVar == None or curVar == "your/path/here/":
+            return False;
+        curVar = cfg.GetValue("interface", None);
+        if curVar == None or ( curVar != "pty" and curVar != "rcon" ):
+            Log.error("O KURWA %s" % str(curVar));
+            return False;
+        return True;
+
+    # def _ThreadHandlePtyInput(self, control, frameTime):
+    #     input : str = "";
+    #     bsent = False;
+    #     while True:
+    #         timeStart = time.time();
+    #         with self._ptyThreadInputLock:
+    #             if control.stop:
+    #                 break;
+            
+    #         if not self._mbiipty.closed:
+    #             try:
+    #                 input += self._mbiipty.read();
+    #                 inputLines = input.splitlines();
+    #                 if len ( inputLines ) > 0:
+    #                     lastLine = inputLines[-1];
+    #                     if not lastLine.endswith("\n"):
+    #                         input = lastLine; # bufferize incomplete line for next frame
+    #                         inputLines.pop(-1);
+    #                     else:
+    #                         input = "";
+    #                     for line in inputLines:
+    #                         if len(line) > 1:
+    #                             Log.debug("[Server] : %s"% line);
+    #                             if line.startswith("Hitch warning:"):
+    #                                 if not bsent:
+    #                                     for i in range(100):
+    #                                         self._mbiipty.write("h%i\n"%i);
+    #                                         time.sleep(0.01);
+    #                                     self._mbiipty.write("quit\n");
+    #                                     time.sleep(0.01);
+    #                                     self._mbiipty.write("\x11");
+    #                                     bsent = True;
+                                        
+    #                 toSleep = frameTime - (time.time() - timeStart);
+    #                 if toSleep < 0:
+    #                     toSleep = 0;
+    #                 time.sleep(toSleep);
+    #             except EOFError as eofEx:
+    #                 Log.debug("Server pty was closed, terminating input thread.");
+    #                 self._mbiipty.close();
+    #                 break;
+    #         else:
+    #             Log.debug("MBII PTY closed.");
+    #             self._mbiipty.close();
+    #             break;
+
 
     def GetStatus(self):
         return self._status;
@@ -161,16 +236,77 @@ class MBIIServer:
             f.close()
             self._status = MBIIServer.STATUS_CONFIG_ERROR;
             return;
-
-        if os.name == "nt":
-            os.system("title " + self._config.cfg["Name"]);
-        
+    
+        if not self.ValidateConfig(self._config):
+            self._status = MBIIServer.STATUS_CONFIG_ERROR;
+            return;
+    
         if "paths" in self._config.cfg:
             for path in self._config.cfg["paths"]:
                 sys.path.append(os.path.normpath(path));
         
         Log.debug("System path total %s", str(sys.path));
+
+        self._svInterface = None;
+        cfgIface = self._config.GetValue("interface", "pty");
+        if cfgIface == "pty":
+            self._svInterface = godfingerinterface.PtyInterface(Log,\
+                                                                cwd=self._config.cfg["serverPath"],\
+                                                                args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["serverFileName"])]\
+                                                                + (Args.mbiicmd.split() if Args.mbiicmd else []));
+        else:
+            self._svInterface = None; # TODO RCON ??? I dont think so, but maybe.
         
+        if self._svInterface == None:
+            Log.error("Server interface was not initialized properly, Make sure you are using pty, rcon is currently invalid.");
+            self._status = MBIIServer.STATUS_CONFIG_ERROR;
+            return;
+
+        self._svInterface.Open();
+        while self._svInterface.IsOpened():
+            time.sleep(1);
+        os.abort();
+    
+        # # Black magic woman
+        # self._mbiiInputLinesLock    = threading.Lock();
+        # self._mbiiInputLinesQueue   : queue[str] = queue.Queue();
+
+        # self._ptyThreadInputLock    = threading.Lock();
+        # self._ptyThreadInputControl = threadcontrol.ThreadControl();
+        # self._ptyThreadInput        = threading.Thread(target=self._ThreadHandlePtyInput, daemon=True, args=(self._ptyThreadInputControl, 0.01));
+        # self._mbiipty = winpty.PtyProcess.spawn([os.path.join(self._config.cfg["serverPath"], self._config.cfg["serverFileName"]),\
+        #                                         Args.mbiicmd.split() if Args.mbiicmd else ""],\
+        #                                         cwd=self._config.cfg["serverPath"],\
+        #                                         dimensions=(10000, 10000));
+        # self._ptyThreadInput.start();
+
+
+
+        # while self._mbiiproc.returncode == None:
+        #     pass;
+            # with self._mbiiInputLinesLock:
+            #     while not self._mbiiInputLinesQueue.empty():
+            #         line = self._mbiiInputLinesQueue.get();
+            #         Log.debug("MBII LINE : %" % line);
+            # Log.debug(str(self.fwriterIn.tell()) + " : : " + str(self._mbiiproc.returncode));
+            # lines = self.freaderIn.read();
+            # self.clone.write(lines);
+            #self.fwriterIn.flush();
+            #self.fwriterIn.seek(0);
+            #self.fwriterIn.truncate();
+            #Log.debug(self._mbiipty.readline());
+            #time.sleep(1);
+            # for line in iter(self._mbiiproc.stderr.readline, b''):
+            #     print(">>> " + str(line).rstrip())
+            # self._mbiiproc.stderr.flush();
+            # erro = self._mbiiproc.stderr.readline();
+            # Log.info("Erro %s"%(erro));
+            # sys.stdout.flush();
+            # self._mbiiproc.stderr.flush();
+    
+        if IsWindows:
+            os.system("title " + self._config.cfg["Name"]);
+
         # Databases
         self._dbManager = database.DatabaseManager();
         r = self._dbManager.CreateDatabase("Godfinger.db", "Godfinger");
@@ -230,6 +366,7 @@ class MBIIServer:
         self._isFinished = False;
         self._isRunning = False;
         self.restartOnCrash = self._config.cfg["restartOnCrash"];
+            
 
         Log.info("The Godfinger initialized in %.2f seconds!\n" %(time.time() - startTime));
     
