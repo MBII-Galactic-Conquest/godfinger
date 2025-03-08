@@ -3,6 +3,10 @@ import logging;
 import time;
 import threading;
 import lib.shared.threadcontrol as threadcontrol;
+import lib.shared.remoteconsole as remoteconsole;
+import io;
+import queue;
+import logMessage;
 
 IsUnix      = (os.name == "posix");
 IsWindows   = (os.name == "nt");
@@ -19,7 +23,7 @@ class IServerInterface():
         pass;
 
     def Open(self) -> bool:
-        pass;
+        return False;
 
     def Close(self):
         pass;
@@ -36,13 +40,18 @@ class IServerInterface():
     def SendRequest(self, cmdStr : str) -> bool:
         return True;
 
+    def GetNewLines(self) -> queue.Queue:
+        return None;
+
 class AServerInterface(IServerInterface):
-    def __init__(self):
+    def __init__(self, logger : logging.Logger):
+        self._logger : logging.Logger = logger;
         self._isOpened = False;
     
     def Open(self) -> bool:
         if self._isOpened:
             self.Close();
+        return True;
 
     def Close(self):
         if self._isOpened:
@@ -52,10 +61,76 @@ class AServerInterface(IServerInterface):
         return self._isOpened;
 
 
+class RconInterface(AServerInterface):
+    def __init__(self, logger : logging.Logger, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01):
+        super().__init__(logger);
+        self._logReaderLock                     = threading.Lock();
+        self._logReaderThreadControl            = threadcontrol.ThreadControl();
+        self._logReaderTime                     = readDelay;
+        self._logReaderThread                   = threading.Thread(target=self.ParseLogThreadHandler, daemon=True,\
+                                                                   args=(self._logReaderThreadControl, self._logReaderTime));
+        self._logPath                           = logPath;
+        self._rcon: remoteconsole.RCON          = remoteconsole.RCON( ( ipAddress, port ), bindAddr, password );
+        self._queueLock : threading.Lock        = threading.Lock();
+        self._linesQueueSwap : queue.Queue      = queue.Queue();
+        self._workingLinesQueue : queue.Queue   = queue.Queue();
+    
+    def __del__(self):
+        self.Close();
+
+    def ParseLogThreadHandler(self, control, sleepTime):
+        with open(self._logPath, "r") as log:
+            log.seek(0, io.SEEK_END)
+            while True:
+                stop = False;
+                with self._logReaderLock:
+                    stop = control.stop;
+                if not stop:
+                    # Parse server log line
+                    lines = log.readlines();
+                    if len(lines) > 0:
+                        with self._queueLock:
+                            for line in lines:
+                                if len(line) > 0:
+                                    line = line[7:];
+                                    self._workingLinesQueue.put(logMessage.LogMessage(line));
+                                    #self._logger.debug("Woohoo : %s"%line);
+                    else:
+                        time.sleep(sleepTime)
+                else:
+                    break;
+            log.close();
+
+    def Open(self) -> bool:
+        if not super().Open():
+            return False;
+        self._logReaderThreadControl.stop = False;
+        self._logReaderThread.start();
+        self._isOpened = True;
+        return True;
+
+    def Close(self):
+        with self._logReaderLock:
+            self._logReaderThreadControl.stop = True;
+        self._logReaderThread.join();
+        self._rcon.Close();
+        self._linesQueueSwap.queue.clear();
+        self._workingLinesQueue.queue.clear();
+        super().Close();
+
+    # Only to be called from godfinger, for now
+    def GetNewLines(self) -> queue.Queue:
+        with self._queueLock:
+            tmp = self._workingLinesQueue;
+            self._workingLinesQueue = self._linesQueueSwap;
+            self._workingLinesQueue.queue.clear();
+            self._linesQueueSwap = tmp;
+            return self._linesQueueSwap; # should not be used until next GetNewLines;
+
+
 class PtyInterface(AServerInterface):
     def __init__(self, logger : logging.Logger, inputDelay = 0.1, outputDelay = 0.1, cwd = os.getcwd(), args : list[str] = None):
-        super().__init__();
-        self._logger = logger;
+        super().__init__(logger);
         self._isOpened = False;
 
         # read thread
@@ -73,6 +148,9 @@ class PtyInterface(AServerInterface):
         self._outputDelay = outputDelay;
         self._args : list[str] = args;
         self._cwd = cwd;
+    
+    def __del__(self):
+        self.Close();
     
     def _ThreadHandlePtyInput(self, control, frameTime):
         input : str = "";
@@ -144,8 +222,8 @@ class PtyInterface(AServerInterface):
                 break;
     
     def Open(self) -> bool:
-        if self._isOpened:
-            self.Close();
+        if not super().Open():
+            return False;
         
         self._ptyThreadInputControl.stop    = False;
         self._ptyThreadInput                = threading.Thread(target=self._ThreadHandlePtyInput, daemon=True, args=(self._ptyThreadInputControl, self._inputDelay));
@@ -173,6 +251,7 @@ class PtyInterface(AServerInterface):
             self._ptyThreadInput.join();
             self._ptyThreadOutput.join();
             self._isOpened = False;
+        super().Close();
     
     def IsOpened(self) -> bool:
         return self._isOpened and not self._ptyInstance.closed;

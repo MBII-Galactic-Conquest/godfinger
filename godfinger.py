@@ -208,10 +208,16 @@ class MBIIServer:
                                                                 args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["serverFileName"])]\
                                                                 + (Args.mbiicmd.split() if Args.mbiicmd else []));
         else:
-            self._svInterface = None; # TODO RCON ??? I dont think so, but maybe.
+            self._svInterface = godfingerinterface.RconInterface(   Log,\
+                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["ip"],\
+                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["port"],\
+                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["bindAddress"],\
+                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["password"],\
+                                                                    os.path.join(self._config.cfg["MBIIPath"], self._config.cfg["interfaces"]["rcon"]["logFilename"]),\
+                                                                    self._config.cfg["interfaces"]["rcon"]["logReadDelay"] );
         
         if self._svInterface == None:
-            Log.error("Server interface was not initialized properly, Make sure you are using pty, rcon is currently invalid.");
+            Log.error("Server interface was not initialized properly.");
             self._status = MBIIServer.STATUS_CONFIG_ERROR;
             return;
 
@@ -269,24 +275,24 @@ class MBIIServer:
 
         # Archives
         self._pk3Manager = pk3.Pk3Manager();
-        self._pk3Manager.Initialize(self._config.cfg["MBIIPath"]);
+        self._pk3Manager.Initialize([self._config.cfg["MBIIPath"]]);
 
-        # remote console connector
-        self._rcon: rcon.Rcon = rcon.Rcon( ( self._config.cfg["Remote"]["address"]["ip"], self._config.cfg["Remote"]["address"]["port"] ), 
-                            self._config.cfg["Remote"]["bindAddress"],
-                            self._config.cfg["Remote"]["password"] )
+        # # remote console connector
+        # self._rcon: rcon.Rcon = rcon.Rcon( ( self._config.cfg["Remote"]["address"]["ip"], self._config.cfg["Remote"]["address"]["port"] ), 
+        #                     self._config.cfg["Remote"]["bindAddress"],
+        #                     self._config.cfg["Remote"]["password"] )
         
         # Cvars
         # Init at Start
         self._cvarManager = cvar.CvarManager(self._rcon);
         
-        self._logMessagesLock = threading.Lock();
-        self._logMessagesQueue = queue.Queue();
-        self._logReaderLock = threading.Lock();
-        self._logReaderThreadControl = threadcontrol.ThreadControl();
-        self._logReaderTime = self._config.cfg["logReadDelay"];
-        self._logReaderThread = threading.Thread(target=self.ParseLogThreadHandler, daemon=True, args=(self._logReaderThreadControl, self._logReaderTime));
-        self._logPath = self._config.cfg["MBIIPath"] + self._config.cfg["logFilename"]
+        # self._logMessagesLock = threading.Lock();
+        # self._logMessagesQueue = queue.Queue();
+        # self._logReaderLock = threading.Lock();
+        # self._logReaderThreadControl = threadcontrol.ThreadControl();
+        # self._logReaderTime = self._config.cfg["logReadDelay"];
+        # self._logReaderThread = threading.Thread(target=self.ParseLogThreadHandler, daemon=True, args=(self._logReaderThreadControl, self._logReaderTime));
+        # self._logPath = self._config.cfg["MBIIPath"] + self._config.cfg["logFilename"]
 
         # Client management
         self._clientManager = clientmanager.ClientManager();
