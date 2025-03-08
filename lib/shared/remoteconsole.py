@@ -4,12 +4,14 @@ import sys;
 import time;
 import lib.shared.timeout as  timeout;
 import lib.shared.buffer as buffer;
+import threading;
 
 class RCON(object):
     def __init__(self, address, bindAddr, password):
         self._address = address;
         self._bindAddr = bindAddr;
         self._password = bytes(password, "UTF-8");
+        self._sockLock = threading.Lock();
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM);
         #self._sock.setblocking(False);
         self._isOpened = False;
@@ -33,10 +35,11 @@ class RCON(object):
     def Close(self):
         if self._isOpened:
             #self._sock.shutdown(socket.SHUT_RDWR);
-            self._sock.close();
+            with self._sockLock:
+                self._sock.close();
             self._isOpened = False;
 
-    def Send(self, payload : bytes):
+    def _Send(self, payload : bytes):
         if self._isOpened:
             l = len(payload);
             sent = 0;
@@ -44,7 +47,7 @@ class RCON(object):
                 sent += self._sock.send(payload[sent:l]);
             self._bytesSent += sent;
 
-    def Read(self, count = 1024) -> bytes:
+    def _Read(self, count = 1024) -> bytes:
         result = b'';
         if self._isOpened:
             while True:
@@ -55,7 +58,7 @@ class RCON(object):
         self._bytesRead += len(result);
         return result;
     
-    def ReadResponse(self, count = 1024, timeout = 1) -> bool:
+    def _ReadResponse(self, count = 1024, timeout = 1) -> bool:
         bb = b'';
         if self._isOpened:
             isFinished = False;
@@ -82,7 +85,7 @@ class RCON(object):
         self._inBuf.Write(bb);
         return True;
 
-    def GetResponse(self) -> bytes:
+    def _GetResponse(self) -> bytes:
         result = None;
         if self._inBuf.HasToRead():
             result = bytes(self._inBuf.Read(self._inBuf.GetEffective()));
@@ -97,18 +100,23 @@ class RCON(object):
 
     # waits for response, ensures delivery
     def Request(self, payload, responseSize = 1024 ) -> bytes:
-        result = b'';
-        startTime = time.time();
-        isOk = False;
-        while not isOk:
-            self.Send(payload);
-            if not self.ReadResponse(responseSize):
-                continue;
-            else:
-                result = self.GetResponse();
-                isOk = True;
-        print("Request time %f" % (time.time() - startTime));
+        if self.IsOpened():
+            result = b'';
+            startTime = time.time();
+            isOk = False;
+            with self._sockLock:
+                while not isOk:
+                    self._Send(payload);
+                    if not self._ReadResponse(responseSize):
+                        continue;
+                    else:
+                        result = self._GetResponse();
+                        isOk = True;
+            print("Request time %f" % (time.time() - startTime));
         return result;
+
+    def IsOpened(self)->bool:
+        return self._isOpened;
 
     def SvSay(self, msg):
         if not type(msg) == bytes:
@@ -236,4 +244,50 @@ class RCON(object):
         res = self.Request(b"\xff\xff\xff\xffrcon %b status notrunc" % (self._password))
         if len(res) == 0:
             return None;
+        res = res.decode("UTF-8", "ignore");
         return res
+    
+    def DumpUser(self, id) -> str:
+        if not type(id) == bytes:
+            id = bytes(str(id), "UTF-8") 
+            res = self.Request(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self._password, id));
+            res = res.decode("UTF-8", "ignore");
+            return res;
+  
+    def CvarList(self) -> str:
+        res = self.Request(b"\xff\xff\xff\xffrcon %b cvarlist" % (self._password))
+        if len(res) == 0:
+            return None;
+        res = res.decode("UTF-8", "ignore");
+        return res
+    
+    def TeamSay(self, players, team, vstrStorage, msg, sleepBetweenChunks=0):
+        # if not type(msg) == bytes:
+        #   msg = bytes(msg, "UTF-8")
+        toExecute = []
+        for p in players:
+            if p.GetTeamId() == team:
+                toExecute.append('svtell %s %s' % (p.GetId(), msg))
+        self.BatchExecute(vstrStorage, toExecute, sleepBetweenChunks)
+
+    def BatchExecute(self, vstrStorage, cmdList, sleepBetweenChunks=0, cleanUp=True):
+        """ Given a list of command strings (cmdList), executes each command at once by setting and then executing a server-side cvar """
+        n = 993 - (len(vstrStorage) + 6) if cleanUp else 993  # 993 is largest vstr size from testing
+        payload = ''
+        for cmd in cmdList:
+            cmd += ';'
+            if len(payload) + len(cmd) < n:
+                payload += cmd
+            else:
+                if cleanUp:
+                    payload += f'unset {vstrStorage}'
+            self.SetVstr(vstrStorage, payload)
+            self.ExecVstr(vstrStorage)
+            payload = cmd
+            if sleepBetweenChunks > 0:
+                time.sleep(sleepBetweenChunks)
+        if len(payload) > 0:
+            if cleanUp:
+                payload += f'unset {vstrStorage}'
+            self.SetVstr(vstrStorage, payload)
+            self.ExecVstr(vstrStorage)

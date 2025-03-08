@@ -54,8 +54,6 @@ Args = Argparser.parse_args();
 
 Log = logging.getLogger(__name__);
 
-from file_read_backwards import FileReadBackwards
-
 # custom imports
 import lib.shared.config as config;
 import lib.shared.rcon as rcon;
@@ -102,7 +100,31 @@ CONFIG_FALLBACK = \
     "logicDelay":0.016,
     "logReadDelay":0.1,
     "restartOnCrash": false,
+
+    "interfaces":
+    {
+        "pty":
+        {
+            
+        },
+        "rcon":
+        {
+            "Remote":
+            {
+                "address":
+                {
+                    "ip":"localhost",
+                    "port":29070
+                },
+                "bindAddress":"localhost",
+                "password":"fuckmylife"
+            },
+            "logFilename":"server.log",
+            "logReadDelay":0.1
+        }
+    },
     "interface":"pty",
+    
 
     "paths":
     [
@@ -205,9 +227,11 @@ class MBIIServer:
         if cfgIface == "pty":
             self._svInterface = godfingerinterface.PtyInterface(Log,\
                                                                 cwd=self._config.cfg["serverPath"],\
-                                                                args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["serverFileName"])]\
-                                                                + (Args.mbiicmd.split() if Args.mbiicmd else []));
-        else:
+                                                                args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["interfaces"]["pty"]["target"])]\
+                                                                + (Args.mbiicmd.split() if Args.mbiicmd else []),\
+                                                                inputDelay=self._config.cfg["interfaces"]["pty"]["inputDelay"],\
+                                                                outputDelay=self._config.cfg["interfaces"]["pty"]["outputDelay"]);
+        elif cfgIface == "rcon":
             self._svInterface = godfingerinterface.RconInterface(   Log,\
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["ip"],\
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["port"],\
@@ -221,10 +245,6 @@ class MBIIServer:
             self._status = MBIIServer.STATUS_CONFIG_ERROR;
             return;
 
-        self._svInterface.Open();
-        while self._svInterface.IsOpened():
-            time.sleep(1);
-        os.abort();
     
         # # Black magic woman
         # self._mbiiInputLinesLock    = threading.Lock();
@@ -282,9 +302,12 @@ class MBIIServer:
         #                     self._config.cfg["Remote"]["bindAddress"],
         #                     self._config.cfg["Remote"]["password"] )
         
+        self._svInterface.Open();
+        self._svInterface.WaitUntilReady();
+        
         # Cvars
         # Init at Start
-        self._cvarManager = cvar.CvarManager(self._rcon);
+        self._cvarManager = cvar.CvarManager(self._svInterface);
         
         # self._logMessagesLock = threading.Lock();
         # self._logMessagesQueue = queue.Queue();
@@ -310,8 +333,13 @@ class MBIIServer:
         exportAPI.AddDatabase       = self.API_AddDatabase;
         exportAPI.GetDatabase       = self.API_GetDatabase;
         exportAPI.GetPlugin         = self.API_GetPlugin;
-        self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._rcon, Args);
+        self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._svInterface, Args);
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)));
+
+        
+        # while self._svInterface.IsOpened():
+        #     time.sleep(1);
+        # os.abort();
 
         # Technical
         # Plugins
@@ -343,13 +371,9 @@ class MBIIServer:
     def __del__(self):
         self.Finish();
         del self._pluginManager;
-        del self._logReaderLock;
-        del self._logReaderThreadControl;
-        del self._logReaderThread;
+        del self._svInterface;
         self._pluginManager = None;
-        self._logReaderLock = None;
-        self._logReaderThreadControl = None;
-        self._logReaderThread = None;       
+        self._svInterface = None;   
 
 
     # status notrunc
@@ -364,16 +388,13 @@ class MBIIServer:
     # -- ----- ---- --------------- --------------------------------------- -----
 
     def _FetchStatus(self):
-        status = self._rcon.status();
-        if status != None:
-            statusStr = status.decode("UTF-8", "ignore");
+        statusStr = self._svInterface.SendCommand(["status"]);
+        if statusStr != None:
             Log.debug(statusStr);
             splitted = statusStr.splitlines();
             playersLine = splitted[6];
-            #Log.debug(playersLine);
             startIndex = playersLine.find("(");
             endIndex = playersLine.find(" max");
-            #Log.debug("%d %d " % (startIndex, endIndex));
             if startIndex != -1 and endIndex != -1:
                 self._serverData.maxPlayers = int(playersLine[startIndex+1:endIndex]);
                 Log.debug("Status players max count %d"%self._serverData.maxPlayers);
@@ -396,51 +417,6 @@ class MBIIServer:
                     return;
                 else:
                     Log.debug("Running in debug mode and server is offline, consider server data invalid.");
-            # FileReadBackwards package doesnt "support" ansi encoding in stock, change it yourself
-            prestartLines = [];
-            logFile = None;
-            try:
-                if IsUnix:
-                    logFile = FileReadBackwards(self._logPath, encoding = "utf-8");
-                else:
-                    logFile = FileReadBackwards(self._logPath, encoding="ansi");
-                
-                testRetro = False;
-                dbg = self._config.GetValue("Debug", None);
-                if dbg != None:
-                    if "TestRetrospect" in dbg:
-                        testRetro = dbg["TestRetrospect"];
-                
-                for line in logFile:
-                    line = line[7:];
-                    if line.startswith("InitGame"):
-                        prestartLines.append(line);
-                        break;
-                    
-                    # filter out player retrospect player messages.
-                    lineParse = line.split()
-                    l = len(lineParse);
-                    if l > 1:
-                        if not testRetro:
-                            if lineParse[0].startswith("SMOD"):
-                                continue
-                            elif lineParse[1].startswith("say"):
-                                continue;
-                            elif lineParse[1].startswith("sayteam"):
-                                continue;
-                    
-                    prestartLines.append(line);
-            
-            except FileNotFoundError:
-                Log.error("Unable to open log file at path %s to read, abort startup." % self._logPath);
-                self._status = MBIIServer.STATUS_RESOURCES_ERROR;
-                return;
-        
-            if len(prestartLines) > 0:
-                prestartLines.reverse();
-                with self._logMessagesLock:
-                    for i in range(len(prestartLines)):
-                        self._logMessagesQueue.put(logMessage.LogMessage(prestartLines[i], True));
             
             if not self._cvarManager.Initialize():
                 Log.error("Failed to initialize CvarManager, abort startup.");
@@ -449,18 +425,14 @@ class MBIIServer:
         
             allCvars = self._cvarManager.GetAllCvars();
             Log.debug("All cvars %s" % str(allCvars));
-            if "sv_fps" in allCvars:
-                self._rcon._frameTime = math.ceil(1000 / int(allCvars["sv_fps"].GetValue())) / 1000;
-                Log.info("Rcon rates set to %f due to %s" % (self._rcon._frameTime, allCvars["sv_fps"]));
             
             self._FetchStatus();
 
             if not self._pluginManager.Start():
                 return;
-            self._logReaderThread.start();
             self._isRunning = True;
             self._status = MBIIServer.STATUS_RUNNING;
-            self._rcon.svsay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]));
+            self._svInterface.SendCommand(["svsay", "^1 {text}.".format(text = self._config.cfg["prologueMessage"])]);
             while self._isRunning:
                 startTime = time.time();
                 self.Loop();
@@ -477,24 +449,19 @@ class MBIIServer:
     def Stop(self):
         if self._isRunning:
             Log.info("Stopping Godfinger...");
-            self._rcon.svsay("^1 {text}.".format(text = self._config.cfg["epilogueMessage"]));
+            self._svInterface.SendCommand(["svsay", "^1 {text}.".format(text = self._config.cfg["epilogueMessage"])]);
             self._status = MBIIServer.STATUS_STOPPING;
-            if self._logReaderThread != None:
-                if self._logReaderThread.is_alive():
-                    with self._logReaderLock:
-                        self._logReaderThreadControl.stop = True;
-                    Log.info("Awaiting for log reader thread to join.");
-                    self._logReaderThread.join();
+            self._svInterface.Close();
             self._isRunning = False;
             self._status = MBIIServer.STATUS_STOPPED;
             Log.info("Stopped."); 
 
     def Loop(self):
-        with self._logMessagesLock:
-            while not self._logMessagesQueue.empty():
-                message = self._logMessagesQueue.get();
-                self._ParseMessage(message);
-        self._pluginManager.Loop();
+        messages = self._svInterface.GetMessages();
+        while not messages.empty():
+            message = messages.get();
+            self._ParseMessage(message);
+        #self._pluginManager.Loop();
     
     def _GetClients(self):
         status = self._rcon.status()
@@ -540,8 +507,8 @@ class MBIIServer:
             skippedLine = line[idx + len(badLine):]
             # strip timestamp
             skippedLine = skippedLine[7:]
-            if len(skippedLine) > 0:
-                self._logMessagesQueue.queue.appendleft(logMessage.LogMessage(skippedLine, False));
+            #if len(skippedLine) > 0:
+            #    self._logMessagesQueue.queue.appendleft(logMessage.LogMessage(skippedLine, False));
         l = len(lineParse);
         # we shouldn't ever see blank lines in the server log if it isn't tampered with but just in case
         if l > 1:
@@ -575,27 +542,27 @@ class MBIIServer:
 
     # Make it read from bottom to first ServerInit: message, incase if we're started after someone connected, 
     # because rcon status notrunc doesnt provide team info on players
-    def ParseLogThreadHandler(self, control, sleepTime):
-        with open(self._logPath, "r") as log:
-            log.seek(0, io.SEEK_END)
-            while True:
-                stop = False;
-                with self._logReaderLock:
-                    stop = control.stop;
-                if not stop:
-                    # Parse server log line
-                    lines = log.readlines();
-                    if len(lines) > 0:
-                        with self._logMessagesLock:
-                            for line in lines:
-                                if len(line) > 0:
-                                    line = line[7:];
-                                    self._logMessagesQueue.put(logMessage.LogMessage(line));
-                    else:
-                        time.sleep(sleepTime)
-                else:
-                    break;
-            log.close();
+    # def ParseLogThreadHandler(self, control, sleepTime):
+    #     with open(self._logPath, "r") as log:
+    #         log.seek(0, io.SEEK_END)
+    #         while True:
+    #             stop = False;
+    #             with self._logReaderLock:
+    #                 stop = control.stop;
+    #             if not stop:
+    #                 # Parse server log line
+    #                 lines = log.readlines();
+    #                 if len(lines) > 0:
+    #                     with self._logMessagesLock:
+    #                         for line in lines:
+    #                             if len(line) > 0:
+    #                                 line = line[7:];
+    #                                 self._logMessagesQueue.put(logMessage.LogMessage(line));
+    #                 else:
+    #                     time.sleep(sleepTime)
+    #             else:
+    #                 break;
+    #         log.close();
     
     def OnChatMessage(self, logMessage : logMessage.LogMessage):
         messageRaw = logMessage.content;
@@ -677,22 +644,22 @@ class MBIIServer:
         textified = logMessage.content;
         textsplit = textified.split()
         Log.debug("Exit log entry %s", textified);
-        scoreLine = None
-        playerScores = {}
-        for m in self._logMessagesQueue.queue:
-            if m.startswith("red:"):
-                scoreLine = m
-            elif m.startswith("score:"):
-                scoreParse = m.split()
-                scorerName = ' '.join(scoreParse[6:])
-                scorerScore = scoreParse[1]
-                scorerPing = scoreParse[3]
-                scorerClientID = scoreParse[5]
-                playerScores[scorerClientID] = {"id" : scorerClientID, "name" : scorerName, "score" : scorerScore, "ping" : scorerPing}
-        scoreLine = scoreLine.strip()
-        teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
-        exitReason = ' '.join(textsplit[1:])
-        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = logMessage.isStartup ) );
+        # scoreLine = None
+        # playerScores = {}
+        # for m in self._logMessagesQueue.queue:
+        #     if m.startswith("red:"):
+        #         scoreLine = m
+        #     elif m.startswith("score:"):
+        #         scoreParse = m.split()
+        #         scorerName = ' '.join(scoreParse[6:])
+        #         scorerScore = scoreParse[1]
+        #         scorerPing = scoreParse[3]
+        #         scorerClientID = scoreParse[5]
+        #         playerScores[scorerClientID] = {"id" : scorerClientID, "name" : scorerName, "score" : scorerScore, "ping" : scorerPing}
+        # scoreLine = scoreLine.strip()
+        # teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
+        # exitReason = ' '.join(textsplit[1:])
+        # self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = logMessage.isStartup ) );
 
 
     def OnClientConnect(self, logMessage : logMessage.LogMessage):
@@ -723,6 +690,7 @@ class MBIIServer:
         clientId = int(lineParse[1]);
         client = self._clientManager.GetClientById(clientId);
         if client != None:
+            pass;
             #Log.debug("Client is not none, sending begin event to plugins.");
             self._pluginManager.Event( godfingerEvent.ClientBeginEvent( client, {}, isStartup = logMessage.isStartup ) );
     
@@ -772,7 +740,8 @@ class MBIIServer:
                     self.OnMapChange(vars["mapname"], self._serverData.mapName)
                 self._serverData.mapName = vars["mapname"];
         else:
-            self._serverData.mapName = self._rcon.getCurrentMap().decode("UTF-8");
+            pass;
+            #self._serverData.mapName = self._rcon.getCurrentMap().decode("UTF-8");
         
         Log.info("Current map name on init : %s", self._serverData.mapName);
         
@@ -786,7 +755,7 @@ class MBIIServer:
         #with self._clientManager._lock:
         for client in allClients:
             Log.debug("Shutdown pseudo-disconnecting client %s" %str(client));
-            self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( client, {}, godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN, isStartup = logMessage.isStartup ) );
+           # self._pluginManager.Event( godfingerEvent.ClientDisconnectEvent( client, {}, godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN, isStartup = logMessage.isStartup ) );
         
         self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN, None, isStartup = logMessage.isStartup ) );
     

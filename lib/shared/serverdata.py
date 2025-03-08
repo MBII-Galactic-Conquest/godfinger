@@ -6,6 +6,7 @@ import cvar;
 import godfingerinterface;
 
 class ServerData():
+
     def __init__(self, pk3mngr : pk3.Pk3Manager, cvarManager : cvar.CvarManager, API : godfingerAPI.API, iface : godfingerinterface.IServerInterface, args):
         self.pk3Manager = pk3mngr;
         self.cvarManager = cvarManager;
@@ -17,6 +18,9 @@ class ServerData():
         self.rcon = rcon;
         self.interface = iface;
         self.maxPlayers = 0;
+    
+    def GetInterfaceType(self):
+        return self.interface.GetType();
 
     def GetServerVar(self, var) -> object:
         with self.lock:

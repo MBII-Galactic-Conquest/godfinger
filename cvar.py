@@ -1,6 +1,7 @@
 
 import lib.shared.rcon as rcon;
 import lib.shared.colors as colors;
+import godfingerinterface;
 
 class Cvar():
 
@@ -100,34 +101,32 @@ class Cvar():
 
 
 class CvarManager():
-    def __init__(self, rc : rcon.Rcon):
+    def __init__(self, iface : godfingerinterface.IServerInterface):
         self._cvars = dict[str, Cvar]();
-        self._rcon = rc;
+        self._iface = iface;
     
     def Initialize(self) -> bool:
-        if self._rcon == None:
+        if self._iface == None:
             return False;
         else:
             self._FetchCvars();
             return True;
 
     def _FetchCvars(self):
-        cvars = self._rcon.cvarList();
-        if cvars != None:
-            cvarsStr = cvars.decode("UTF-8", "ignore");
-            if cvarsStr != "":
-                cvarsStr = colors.stripColorCodes(cvarsStr);
-                parsed = {};
-                splitted = cvarsStr.splitlines();
-                for line in splitted:
-                    cv = Cvar(self);
-                    cv.FromCvarlistString(line);
-                    parsed[cv.GetName()] = cv;
-                for name in parsed:
-                    if name not in self._cvars:
-                        self._cvars[name] = parsed[name];
-                    else:
-                        self._cvars[name].SetValue(parsed[name].GetValue());
+        cvarStr = self._iface.SendCommand(["cvarlist"]);
+        if cvarStr != "":
+            cvarsStr = colors.stripColorCodes(cvarStr);
+            parsed = {};
+            splitted = cvarsStr.splitlines();
+            for line in splitted:
+                cv = Cvar(self);
+                cv.FromCvarlistString(line);
+                parsed[cv.GetName()] = cv;
+            for name in parsed:
+                if name not in self._cvars:
+                    self._cvars[name] = parsed[name];
+                else:
+                    self._cvars[name].SetValue(parsed[name].GetValue());
 
     def GetAllCvars(self) -> dict[str, Cvar]:
         return self._cvars.copy();
@@ -142,5 +141,5 @@ class CvarManager():
         return name in self._cvars;
 
     def OnCvarChange(self, cvar : Cvar):
-        self._rcon.setCvar(cvar.GetName(), cvar.GetValue());
+        self._iface.SendCommand(["setcvar", cvar.GetName(), cvar.GetValue()]);
 
