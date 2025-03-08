@@ -33,6 +33,9 @@ class IServerInterface():
     def ReadResponse(self) -> str:
         return True;
 
+    def SendRequest(self, cmdStr : str) -> bool:
+        return True;
+
 class AServerInterface(IServerInterface):
     def __init__(self):
         self._isOpened = False;
@@ -47,12 +50,6 @@ class AServerInterface(IServerInterface):
     
     def IsOpened(self) -> bool:
         return self._isOpened;
-
-    def SendCommand(self, cmdstr : str, withResponse = False) -> bool:
-        return True;
-
-    def ReadResponse(self) -> str:
-        return True;
 
 
 class PtyInterface(AServerInterface):
@@ -92,8 +89,7 @@ class PtyInterface(AServerInterface):
                         if len ( inputLines ) > 0:
                             lastLine = inputLines[-1];
                             if not lastLine.endswith("\n"):
-                                input = lastLine; # bufferize incomplete line for next frame
-                                inputLines.pop(-1);
+                                input = inputLines.pop(-1); # bufferize incomplete line for next frame
                             else:
                                 input = "";
                             for line in inputLines:
@@ -118,7 +114,7 @@ class PtyInterface(AServerInterface):
                     self._ptyInstance.close();
                     break;
             except EOFError as eofEx:
-                self._logger.debug("Server pty was closed, terminating input thread.");
+                self._logger.debug("Server pty was closed, terminating Input thread.");
                 self._ptyInstance.close();
                 break;
             except Exception as ex:
@@ -139,7 +135,7 @@ class PtyInterface(AServerInterface):
                         toSleep = 0;
                     time.sleep(toSleep);
                 except EOFError as eofEx:
-                    self._logger.debug("Server pty was closed, terminating input thread.");
+                    self._logger.debug("Server pty was closed, terminating Output thread.");
                     self._ptyInstance.close();
                     break;
             else:
@@ -155,7 +151,7 @@ class PtyInterface(AServerInterface):
         self._ptyThreadInput                = threading.Thread(target=self._ThreadHandlePtyInput, daemon=True, args=(self._ptyThreadInputControl, self._inputDelay));
         self._ptyThreadOutputControl.stop   = False;
         self._ptyThreadOutput               = threading.Thread(target=self._ThreadHandlePtyOutput, daemon=True, args=(self._ptyThreadOutputControl, self._inputDelay, self._outputDelay));
-        self._logger.debug("AHH %s"%str(self._args));
+        self._logger.debug("Arguments for child process : %s"%str(self._args));
         self._ptyInstance = ptym.PtyProcess.spawn(self._args if self._args != None else [],\
                                                 cwd=self._cwd,\
                                                 dimensions=(10000, 10000));

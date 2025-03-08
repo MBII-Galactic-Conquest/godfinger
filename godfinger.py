@@ -148,7 +148,7 @@ class MBIIServer:
         if statusId == MBIIServer.STATUS_INIT:
             return "Status : Initialized Ok.";
         elif statusId == MBIIServer.STATUS_CONFIG_ERROR:
-            return "Status : Error at configuration load."
+            return "Status : Error at configuration load.";
         else:
             return "Unknown status id."; # implement later
     
@@ -166,55 +166,8 @@ class MBIIServer:
             return False;
         curVar = cfg.GetValue("interface", None);
         if curVar == None or ( curVar != "pty" and curVar != "rcon" ):
-            Log.error("O KURWA %s" % str(curVar));
             return False;
         return True;
-
-    # def _ThreadHandlePtyInput(self, control, frameTime):
-    #     input : str = "";
-    #     bsent = False;
-    #     while True:
-    #         timeStart = time.time();
-    #         with self._ptyThreadInputLock:
-    #             if control.stop:
-    #                 break;
-            
-    #         if not self._mbiipty.closed:
-    #             try:
-    #                 input += self._mbiipty.read();
-    #                 inputLines = input.splitlines();
-    #                 if len ( inputLines ) > 0:
-    #                     lastLine = inputLines[-1];
-    #                     if not lastLine.endswith("\n"):
-    #                         input = lastLine; # bufferize incomplete line for next frame
-    #                         inputLines.pop(-1);
-    #                     else:
-    #                         input = "";
-    #                     for line in inputLines:
-    #                         if len(line) > 1:
-    #                             Log.debug("[Server] : %s"% line);
-    #                             if line.startswith("Hitch warning:"):
-    #                                 if not bsent:
-    #                                     for i in range(100):
-    #                                         self._mbiipty.write("h%i\n"%i);
-    #                                         time.sleep(0.01);
-    #                                     self._mbiipty.write("quit\n");
-    #                                     time.sleep(0.01);
-    #                                     self._mbiipty.write("\x11");
-    #                                     bsent = True;
-                                        
-    #                 toSleep = frameTime - (time.time() - timeStart);
-    #                 if toSleep < 0:
-    #                     toSleep = 0;
-    #                 time.sleep(toSleep);
-    #             except EOFError as eofEx:
-    #                 Log.debug("Server pty was closed, terminating input thread.");
-    #                 self._mbiipty.close();
-    #                 break;
-    #         else:
-    #             Log.debug("MBII PTY closed.");
-    #             self._mbiipty.close();
-    #             break;
 
 
     def GetStatus(self):
