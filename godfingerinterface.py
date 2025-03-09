@@ -280,7 +280,7 @@ class PtyInterface(AServerInterface):
         
         def GetResponse(self) -> str:
             if self.IsReady():
-                return "".join(self._linesResponse);
+                return "\n".join(self._linesResponse);
             else:
                 return None; # wait
 
@@ -375,7 +375,6 @@ class PtyInterface(AServerInterface):
                         self._currentCommandProc = self._commandProcQueue.get();
             try:
                 if not self._ptyInstance.closed:
-                        
                         input += self._ptyInstance.read();
                         #print("Read %i from stream -> %s : %s"%(len(input), input, input.encode()));
                         inputLines = input.splitlines();
