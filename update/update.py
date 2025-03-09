@@ -169,7 +169,7 @@ def fetch_deploy():
     deployment = os.path.abspath("./deployments.py")
     try:
         subprocess.run([PYTHON_CMD, deployment], check=True)
-        print("Deployments script executed successfully.")
+        print("\n\n[IMPORTANT] IF you encounter errors after updates, check fallback configs internally in godfinger and all plugins...\n\n")
         sys.exit()
     except subprocess.CalledProcessError as e:
         print(f"Error fetching deployments.py: {e}")
