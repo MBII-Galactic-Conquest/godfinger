@@ -230,7 +230,7 @@ class MBIIServer:
                                                                 args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["interfaces"]["pty"]["target"])]\
                                                                 + (Args.mbiicmd.split() if Args.mbiicmd else []),\
                                                                 inputDelay=self._config.cfg["interfaces"]["pty"]["inputDelay"],\
-                                                                outputDelay=self._config.cfg["interfaces"]["pty"]["outputDelay"]);
+                                                                );
         elif cfgIface == "rcon":
             self._svInterface = godfingerinterface.RconInterface(   Log,\
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["ip"],\
@@ -461,7 +461,7 @@ class MBIIServer:
         while not messages.empty():
             message = messages.get();
             self._ParseMessage(message);
-        #self._pluginManager.Loop();
+        self._pluginManager.Loop();
     
     def _GetClients(self):
         status = self._rcon.status()
@@ -644,22 +644,22 @@ class MBIIServer:
         textified = logMessage.content;
         textsplit = textified.split()
         Log.debug("Exit log entry %s", textified);
-        # scoreLine = None
-        # playerScores = {}
-        # for m in self._logMessagesQueue.queue:
-        #     if m.startswith("red:"):
-        #         scoreLine = m
-        #     elif m.startswith("score:"):
-        #         scoreParse = m.split()
-        #         scorerName = ' '.join(scoreParse[6:])
-        #         scorerScore = scoreParse[1]
-        #         scorerPing = scoreParse[3]
-        #         scorerClientID = scoreParse[5]
-        #         playerScores[scorerClientID] = {"id" : scorerClientID, "name" : scorerName, "score" : scorerScore, "ping" : scorerPing}
-        # scoreLine = scoreLine.strip()
-        # teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
-        # exitReason = ' '.join(textsplit[1:])
-        # self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = logMessage.isStartup ) );
+        scoreLine = None
+        playerScores = {}
+        for m in self._logMessagesQueue.queue:
+            if m.startswith("red:"):
+                scoreLine = m
+            elif m.startswith("score:"):
+                scoreParse = m.split()
+                scorerName = ' '.join(scoreParse[6:])
+                scorerScore = scoreParse[1]
+                scorerPing = scoreParse[3]
+                scorerClientID = scoreParse[5]
+                playerScores[scorerClientID] = {"id" : scorerClientID, "name" : scorerName, "score" : scorerScore, "ping" : scorerPing}
+        scoreLine = scoreLine.strip()
+        teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
+        exitReason = ' '.join(textsplit[1:])
+        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = logMessage.isStartup ) );
 
 
     def OnClientConnect(self, logMessage : logMessage.LogMessage):
@@ -740,8 +740,7 @@ class MBIIServer:
                     self.OnMapChange(vars["mapname"], self._serverData.mapName)
                 self._serverData.mapName = vars["mapname"];
         else:
-            pass;
-            #self._serverData.mapName = self._rcon.getCurrentMap().decode("UTF-8");
+            self._serverData.mapName = self._svInterface.SendCommand(["getcurrentmap"]);
         
         Log.info("Current map name on init : %s", self._serverData.mapName);
         

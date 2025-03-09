@@ -106,12 +106,16 @@ class RCON(object):
             isOk = False;
             with self._sockLock:
                 while not isOk:
-                    self._Send(payload);
-                    if not self._ReadResponse(responseSize):
-                        continue;
-                    else:
-                        result = self._GetResponse();
-                        isOk = True;
+                    try:
+                        self._Send(payload);
+                        if not self._ReadResponse(responseSize):
+                            continue;
+                        else:
+                            result = self._GetResponse();
+                            isOk = True;
+                    except Exception as ex:
+                        print("Exception at Request in rcon %s" %str(ex));
+                        break;
             print("Request time %f" % (time.time() - startTime));
         return result;
 
@@ -233,6 +237,7 @@ class RCON(object):
         response = self.Request(b"\xff\xff\xff\xffrcon %b mapname" % (self._password))
         response = response.removeprefix(b'\xff\xff\xff\xffprint\n^9Cvar ^7mapname = ^9"^7')
         mapName = response.removesuffix(b'^9"^7\n')
+        mapName = mapName.decode("UTF-8", "ignore");
         return mapName
 
     def ChangeTeams(self, team1, team2, mapName):

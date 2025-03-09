@@ -8,6 +8,9 @@ import io;
 import queue;
 import logMessage;
 from file_read_backwards import FileReadBackwards
+from typing import Any, Self;
+import re;
+import lib.shared.colors as colors;
 
 IsUnix      = (os.name == "posix");
 IsWindows   = (os.name == "nt");
@@ -36,14 +39,10 @@ class IServerInterface():
     def IsOpened(self) -> bool:
         return False
 
-    def SendCommand(self, cmdstr : str) -> str:
+    # str are server response, can be None or ""
+    def SendCommand(self, args : list[str], force : bool = False) -> str:
         return "True";
 
-    def ReadResponse(self) -> str:
-        return True;
-
-    def SendRequest(self, cmdStr : str) -> bool:
-        return True;
 
     def GetMessages(self) -> queue.Queue:
         return None;
@@ -119,8 +118,8 @@ class RconInterface(AServerInterface):
     def __del__(self):
         self.Close();
     
-    def SendCommand(self, args : list[str]) -> str:
-        self._logger.debug("Sending command %s"%str(args));
+    def SendCommand(self, args : list[str], force : bool = False) -> str:
+        self._logger.debug("Sending rcon command %s"%str(args));
         if len (args) > 0:
             if self.IsOpened():
                 cmd = args[0];
@@ -209,7 +208,6 @@ class RconInterface(AServerInterface):
             else:
                 logFile = FileReadBackwards(self._logPath, encoding="ansi");
             
-            
             for line in logFile:
                 line = line[7:];
                 if line.startswith("InitGame"):
@@ -259,7 +257,67 @@ class RconInterface(AServerInterface):
 
 
 class PtyInterface(AServerInterface):
-    def __init__(self, logger : logging.Logger, inputDelay = 0.1, outputDelay = 0.1, cwd = os.getcwd(), args : list[str] = None):
+
+    class CommandProcessor():
+        def __init__(self, cmd : str):
+            self.cmdStr = cmd;
+            self._linesResponse : list[str] = [];
+            self._lock = threading.Lock();
+            self._isReady = False;
+        
+        def _SetReady(self):
+            with self._lock:
+                self._isReady = True;
+
+        def IsReady(self) -> bool:
+            with self._lock:
+                return self._isReady;
+    
+        def Wait(self) -> Self:
+            while not self.IsReady():
+                time.sleep(0.001);
+            return self;
+        
+        def GetResponse(self) -> str:
+            if self.IsReady():
+                return "".join(self._linesResponse);
+            else:
+                return None; # wait
+
+        # return True if finished processing
+        # return False if not finished, used to keep reading from log instead of global feed
+        # First line is always cmdStr, should be
+        def ParseLine(self, line : str) -> bool:
+            self._linesResponse.append(line);
+            return True;
+    
+    # Technical
+    class ReadyProcessor(CommandProcessor):
+        def __init__(self, cmd, ptyInst):
+            super().__init__(cmd)
+            self._ptyInst = ptyInst;
+
+        def ParseLine(self, line) -> bool:
+            #print("\"%s\""%line);
+            self._SetReady();
+            return True;
+
+    # Commands
+    class SvSayProcessor(CommandProcessor):
+        def __init__(self, cmd, message : str):
+            super().__init__(cmd);
+            self._message = colors.stripColorCodes(message);
+
+        def ParseLine(self, line) -> bool:
+            super().ParseLine(line);
+            print("%s versus %s"%(line.encode(), self._message.encode()));
+            if line.startswith("broadcast:"):
+                if line.find(self._message) != -1:
+                    self._SetReady();
+                    return True;
+
+
+    def __init__(self, logger : logging.Logger, inputDelay = 0.1, cwd = os.getcwd(), args : list[str] = None):
         super().__init__(logger);
 
         # read thread
@@ -268,27 +326,42 @@ class PtyInterface(AServerInterface):
         self._ptyThreadInput        = None;
 
         # write thread
-        self._ptyThreadOutputLock      = threading.Lock();
-        self._ptyThreadOutputControl   = threadcontrol.ThreadControl();
-        self._ptyThreadOutput          = None;
+        # self._ptyThreadOutputLock      = threading.Lock();
+        # self._ptyThreadOutputControl   = threadcontrol.ThreadControl();
+        # self._ptyThreadOutput          = None;
 
         self._ptyInstance = None;
         self._inputDelay = inputDelay;
-        self._outputDelay = outputDelay;
+        # self._outputDelay = outputDelay;
         self._args : list[str] = args;
         self._cwd = cwd;
-        self._oneTimeListeners = [self._ReadyListener];
+        self._commandProcQLock = threading.Lock();
+        self._commandProcQueue : queue.Queue = queue.Queue();
+        self._currentCommandProc : PtyInterface.CommandProcessor = None;
+        self._mode = 0; # 0 for regular read, 1 for command feed
+    
+        # 7-bit C1 ANSI sequences
+        self._re_ansi_escape = re.compile(r'''
+            \x1B  # ESC
+            (?:   # 7-bit C1 Fe (except CSI)
+                [@-Z\\-_]
+            |     # or [ for CSI, followed by a control sequence
+                \[
+                [0-?]*  # Parameter bytes
+                [ -/]*  # Intermediate bytes
+                [@-~]   # Final byte
+            )
+        ''', re.VERBOSE);
     
     def __del__(self):
         self.Close();
     
-    def _ReadyListener(self, line : str) -> bool:
-        if line.find("Common Initialization Complete") != -1:
-            self._isReady = True;
-            self._logger.info("pty listener is ready, server is up.");
-            return True;
+    # def _ReadyListener(self, line : str) -> bool:
+    #     if line.find("Common Initialization Complete") != -1:
+    #         self._isReady = True;
+    #         self._logger.info("pty listener is ready, server is up.");
+    #         return True;
 
-    
     def _ThreadHandlePtyInput(self, control, frameTime):
         input : str = "";
         bsent = False;
@@ -297,9 +370,14 @@ class PtyInterface(AServerInterface):
             with self._ptyThreadInputLock:
                 if control.stop:
                     break;
+                if self._currentCommandProc == None:
+                    if self._commandProcQueue.not_empty:
+                        self._currentCommandProc = self._commandProcQueue.get();
             try:
                 if not self._ptyInstance.closed:
+                        
                         input += self._ptyInstance.read();
+                        #print("Read %i from stream -> %s : %s"%(len(input), input, input.encode()));
                         inputLines = input.splitlines();
                         if len ( inputLines ) > 0:
                             lastLine = inputLines[-1];
@@ -308,12 +386,30 @@ class PtyInterface(AServerInterface):
                             else:
                                 input = "";
                             for line in inputLines:
+                                #print("line %s"%line.encode());
+                                line = self._re_ansi_escape.sub("", line);
                                 if len(line) > 1:
-                                    for otl in self._oneTimeListeners:
-                                        if otl(line):
-                                            self._oneTimeListeners.remove(otl);
-                                    self._logger.debug("[Server] : %s"% line);
-                                    self._workingMessageQueue.put(logMessage.LogMessage(line));
+                                    # Command mode
+                                    if self._mode == 1:
+                                        if self._currentCommandProc.ParseLine(line):
+                                            self._currentCommandProc = None;
+                                            self._mode = 0;
+                                            self._logger.debug("Setting mode to 0");
+                                    # Regular read mode
+                                    else: 
+                                        self._logger.debug("[Server] : \"%s\""% line);
+                                        if self._currentCommandProc != None:
+                                            print("Fuck ! \"%s\" : \"%s\""%(line, self._currentCommandProc.cmdStr));
+                                            if line == self._currentCommandProc.cmdStr:
+                                                if self._currentCommandProc.ParseLine(line):
+                                                    self._currentCommandProc = None;
+                                                else:
+                                                    self._logger.debug("Setting mode to 1");
+                                                    self._mode = 1;
+                                                continue;
+                                            # else:
+                                            #     self._logger.debug("asrgs %s :"%(line.encode()));
+                                        self._workingMessageQueue.put(logMessage.LogMessage(line));
                                     # if line.startswith("Hitch warning:"):
                                     #     if not bsent:
                                     #         for i in range(100):
@@ -323,7 +419,7 @@ class PtyInterface(AServerInterface):
                                     #         time.sleep(self._outputDealy);
                                     #         self._ptyInstance.write("\x11");
                                     #         bsent = True;
-                                            
+                        #self._logger.debug("Time taken %f"%(time.time() - timeStart));
                         toSleep = frameTime - (time.time() - timeStart);
                         if toSleep < 0:
                             toSleep = 0;
@@ -340,27 +436,31 @@ class PtyInterface(AServerInterface):
                 self._logger.debug("What the fuck %s" % str(ex));
                 self._ptyInstance.close();
                 break;
+    
+    def _EnqueueCommandProc(self, cmdProc):
+        with self._commandProcQLock:
+            self._commandProcQueue.put(cmdProc);
 
-    def _ThreadHandlePtyOutput(self, control, frameTime, outputDelay):
-        while True:
-            timeStart = time.time();
-            with self._ptyThreadOutputLock:
-                if control.stop:
-                    break;
-            if not self._ptyInstance.closed:
-                try:                       
-                    toSleep = frameTime - (time.time() - timeStart);
-                    if toSleep < 0:
-                        toSleep = 0;
-                    time.sleep(toSleep);
-                except EOFError as eofEx:
-                    self._logger.debug("Server pty was closed, terminating Output thread.");
-                    self._ptyInstance.close();
-                    break;
-            else:
-                self._logger.debug("MBII PTY closed.");
-                self._ptyInstance.close();
-                break;
+    # def _ThreadHandlePtyOutput(self, control, frameTime):
+    #     while True:
+    #         timeStart = time.time();
+    #         with self._ptyThreadOutputLock:
+    #             if control.stop:
+    #                 break;
+    #         if not self._ptyInstance.closed:
+    #             try:                       
+    #                 toSleep = frameTime - (time.time() - timeStart);
+    #                 if toSleep < 0:
+    #                     toSleep = 0;
+    #                 time.sleep(toSleep);
+    #             except EOFError as eofEx:
+    #                 self._logger.debug("Server pty was closed, terminating Output thread.");
+    #                 self._ptyInstance.close();
+    #                 break;
+    #         else:
+    #             self._logger.debug("MBII PTY closed.");
+    #             self._ptyInstance.close();
+    #             break;
     
     def Open(self) -> bool:
         if not super().Open():
@@ -368,37 +468,113 @@ class PtyInterface(AServerInterface):
         
         self._ptyThreadInputControl.stop    = False;
         self._ptyThreadInput                = threading.Thread(target=self._ThreadHandlePtyInput, daemon=True, args=(self._ptyThreadInputControl, self._inputDelay));
-        self._ptyThreadOutputControl.stop   = False;
-        self._ptyThreadOutput               = threading.Thread(target=self._ThreadHandlePtyOutput, daemon=True, args=(self._ptyThreadOutputControl, self._inputDelay, self._outputDelay));
+        # self._ptyThreadOutputControl.stop   = False;
+        # self._ptyThreadOutput               = threading.Thread(target=self._ThreadHandlePtyOutput, daemon=True, args=(self._ptyThreadOutputControl, self._inputDelay, self._outputDelay));
         self._logger.debug("Arguments for child process : %s"%str(self._args));
         self._ptyInstance = ptym.PtyProcess.spawn(self._args if self._args != None else [],\
                                                 cwd=self._cwd,\
                                                 dimensions=(1024, 1024));
         self._logger.debug("Instance %s"%str(self._ptyInstance));
+        initProc = PtyInterface.ReadyProcessor("------- Game Initialization -------", self);
+        self._EnqueueCommandProc(initProc);
         self._ptyThreadInput.start();
-        self._ptyThreadOutput.start();
         self._isOpened = True;
+        while not initProc.IsReady():
+            time.sleep(0.001);
+        # self._ptyThreadOutput.start();
+        self._isReady = True;
         return self.IsOpened();
 
     def Close(self):
         if self.IsOpened():
             if self._ptyInstance != None:
-                self.SendCommand("quit\n");
+                self.SendCommand(["quit"]);
                 time.sleep(1); # UGH
                 self._ptyInstance.close();
             if self._ptyThreadInput.is_alive:
                 with self._ptyThreadInputLock:
                     self._ptyThreadInputControl.stop = True;
-            if self._ptyThreadOutput.is_alive:
-                with self._ptyThreadOutputLock:
-                    self._ptyThreadOutputControl.stop = True;
+            # if self._ptyThreadOutput.is_alive:
+            #     with self._ptyThreadOutputLock:
+            #         self._ptyThreadOutputControl.stop = True;
             self._ptyThreadInput.join();
-            self._ptyThreadOutput.join();
+            # self._ptyThreadOutput.join();
             self._isOpened = False;
         super().Close();
     
     def IsOpened(self) -> bool:
         return self._isOpened and not self._ptyInstance.closed;
+
+    def SendCommand(self, args : list[str], force : bool = False) -> str:
+        self._logger.debug("Sending pty command %s"%str(args));
+        if len (args) > 0:
+            if self.IsOpened():
+                cmd = args[0];
+                if force:
+                    cmd = "".join(args);
+                else:
+                    proc = None;
+                    if cmd == "svsay":
+                        cmdStr = "svsay %s"%args[1];
+                        #self._logger.debug(cmdStr);
+                        #self._logger.debug("WHAT THE FUCK %s" % self._re_ansi_escape.sub("", cmdStr));
+                        proc = PtyInterface.SvSayProcessor(colors.stripColorCodes(cmdStr),args[1]);
+                        self._EnqueueCommandProc(proc);
+                        self._ptyInstance.write(cmdStr+"\n")
+                        return proc.Wait().GetResponse();
+                    elif cmd == "say":
+                        return self._rcon.Say(args[1]);
+                    elif cmd == "svtell":
+                        return self._rcon.SvTell(args[1],args[2]);
+                    elif cmd == "mbmode":
+                        return self._rcon.MbMode(args[1]);
+                    elif cmd == "clientmute":
+                        return self._rcon.ClientMute(args[1]);
+                    elif cmd == "clientunmute":
+                        return self._rcon.ClientUnmute(args[1]);
+                    elif cmd == "clientban":
+                        return self._rcon.ClientBan(args[1]);
+                    elif cmd == "clientunban":
+                        return self._rcon.ClientUnban(args[1]);
+                    elif cmd == "clientkick":
+                        return self._rcon.ClientKick(args[1]);
+                    elif cmd == "setteam1":
+                        return self._rcon.SetTeam1(args[1]);
+                    elif cmd == "setteam2":
+                        return self._rcon.SetTeam2(args[1]);
+                    elif cmd == "setcvar":
+                        return self._rcon.SetCvar(args[1], args[2]);
+                    elif cmd == "getcvar":
+                        return self._rcon.GetCvar(args[1]);
+                    elif cmd == "setvstr":
+                        return self._rcon.SetVstr(args[1], args[2]);
+                    elif cmd == "execvstr":
+                        return self._rcon.ExecVstr(args[1]);
+                    elif cmd == "getteam1":
+                        return self._rcon.GetTeam1();
+                    elif cmd == "getteam2":
+                        return self._rcon.GetTeam2();
+                    elif cmd == "mapreload":
+                        return self._rcon.MapReload(args[1]);
+                    elif cmd == "getcurrentmap":
+                        return self._rcon.GetCurrentMap();
+                    elif cmd == "changeteams":
+                        return self._rcon.ChangeTeams(args[1], args[2], args[3]);
+                    elif cmd == "status":
+                        return self._rcon.Status();
+                    elif cmd == "cvarlist":
+                        return self._rcon.CvarList();
+                    elif cmd == "dumpuser":
+                        return self._rcon.DumpUser();
+                    elif cmd == "quit":
+                        return self.blabla;
+                    else:
+                        self._logger.error("Unknown command for rcon interface %s"%cmd);
+        return "";
+
+
+
+            
 
     # def SendCommand(self, cmd : str) -> str:
     #     if self.IsOpened():
@@ -455,7 +631,4 @@ class PtyInterface(AServerInterface):
     #                 elif cmd == "du":
     #                     return self._rcon.DumpUser();
     #         return "";
-
-    def ReadResponse(self) -> str:
-        return True;
 
