@@ -136,13 +136,13 @@ class RCON(object):
             msg = bytes(msg, "UTF-8")
             return self.Request(b"\xff\xff\xff\xffrcon %b say %b" % (self._password, msg));
 
-    def SvTell(self, client, msg):
+    def SvTell(self, clientId, msg):
         if not type(msg) == bytes:
             msg = bytes(msg, "UTF-8")
-        if not type(client) == bytes:
-            client = str(client)
-            client = bytes(client, "UTF-8")
-        return self.Request(b"\xff\xff\xff\xffrcon %b svtell %b %b" % (self._password, client, msg));
+        if not type(clientId) == bytes:
+            clientId = str(clientId)
+            clientId = bytes(clientId, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b svtell %b %b" % (self._password, clientId, msg));
 
     def MbMode(self, cmd):
         return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i" % (self._password, cmd))
@@ -260,10 +260,12 @@ class RCON(object):
             return res;
   
     def CvarList(self) -> str:
+        start = time.time();
         res = self.Request(b"\xff\xff\xff\xffrcon %b cvarlist" % (self._password))
         if len(res) == 0:
             return None;
         res = res.decode("UTF-8", "ignore");
+        print("Cvarlist time taken %f"%(time.time() - start));
         return res
     
     def TeamSay(self, players, team, vstrStorage, msg, sleepBetweenChunks=0):
