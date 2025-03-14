@@ -11,6 +11,7 @@ from file_read_backwards import FileReadBackwards
 from typing import Any, Self;
 import re;
 import lib.shared.colors as colors;
+import lib.shared.util as util;
 
 IsUnix      = (os.name == "posix");
 IsWindows   = (os.name == "nt");
@@ -257,8 +258,12 @@ class RconInterface(AServerInterface):
 
 
 class PtyInterface(AServerInterface):
-
+    #region Processors
+    CMD_RESULT_FLAG_OK      = 0x00000001;
+    CMD_RESULT_FLAG_LOG     = 0x00000002;
+    
     class CommandProcessor():
+
         def __init__(self, cmd : str):
             self.cmdStr = cmd;
             self._linesResponse : list[str] = [];
@@ -302,9 +307,9 @@ class PtyInterface(AServerInterface):
         # return True if finished processing
         # return False if not finished, used to keep reading from log instead of global feed
         # First line is always cmdStr, should be
-        def ParseLine(self, line : str) -> bool:
+        def ParseLine(self, line : str) -> int:
             self._linesResponse.append(line);
-            return True;
+            return PtyInterface.CMD_RESULT_FLAG_OK;
     
     # Technical
     class ReadyProcessor(CommandProcessor):
@@ -312,21 +317,21 @@ class PtyInterface(AServerInterface):
             super().__init__(cmd)
             self._ptyInst = ptyInst;
 
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             #print("\"%s\""%line);
             self._SetReady();
-            return True;
+            return PtyInterface.CMD_RESULT_FLAG_OK;
 
     class QuitProcessor(CommandProcessor):
         def __init__(self, cmd):
             super().__init__(cmd);
     
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             #print("ASDF %s"%line);
             if line.startswith("(venv)"):
                 self._isReady = True;
-                return True;
-            return False;
+                return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
 
     # Commands
     class SvSayProcessor(CommandProcessor):
@@ -334,72 +339,78 @@ class PtyInterface(AServerInterface):
             super().__init__(cmd);
             self._message = colors.stripColorCodes(message);
 
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             super().ParseLine(line);
             print("%s versus %s"%(line.encode(), self._message.encode()));
             if line.startswith("broadcast:"):
                 if line.find(self._message) != -1:
                     self._SetReady();
-                    return True;
+                    return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
 
     class SayProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
             self._message = colors.stripColorCodes(message);
 
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             super().ParseLine(line);
             print("%s versus %s"%(line.encode(), self._message.encode()));
             if line.startswith("broadcast:"):
                 if line.find(self._message) != -1:
                     self._SetReady();
-                    return True;
+                    return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
 
     class SvTellProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
             self._message = colors.stripColorCodes(message);
 
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             super().ParseLine(line);
             print("%s versus %s"%(line.encode(), self._message.encode()));
             if line.startswith("broadcast:"):
                 if line.find(self._message) != -1:
                     self._SetReady();
-                    return True;
+                    return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
 
     class CvarlistProcessor(CommandProcessor):
         def __init__(self, cmd):
             super().__init__(cmd);
 
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             super().ParseLine(line);
             #print("%s versus %s"%(line.encode(), self._message.encode()));
             if line.rfind("total cvars") != -1:
                 self._SetReady();
-                return True;
+                return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
 
     class StatusProcessor(CommandProcessor):
         def __init__(self, cmd):
             super().__init__(cmd);
 
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             super().ParseLine(line);
             # b'Cvar g_campaignRotationFile = "campaignRotation"
             print("Status processing line %s"%(line.encode()));
             if line == "":
                 self._SetReady();
-                return True;
+                return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
 
     class GetCvarProcessor(CommandProcessor):
         def __init__(self, cmd):
             super().__init__(cmd);
     
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             super().ParseLine(line);
             if line.find("Cvar %s"%self.cmdStr) != -1:
                 self._SetReady();
-                return True;
+                return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
 
         def GetResponse(self):
             lines =  super().GetResponseLines();
@@ -411,13 +422,75 @@ class PtyInterface(AServerInterface):
         def __init__(self, cmd):
             super().__init__(cmd);
     
-        def ParseLine(self, line) -> bool:
+        def ParseLine(self, line) -> int:
             super().ParseLine(line);
             if line == self.cmdStr:
                 self._SetReady();
-                return True;
-            
+                return PtyInterface.CMD_RESULT_FLAG_OK;
+            return 0;
+
+    # dumpuser 0
+    #     userinfo
+    #     --------
+    #     team                 s
+    #     ip                   127.0.0.1:29071
+    #     ui_holdteam          3
+    #     snaps                40
+    #     sex                  male
+    #     rate                 25000
+    #     pbindicator          1
+    #     name                 echuta temper
+    #     jp                   0
+    #     ja_guid              AEB1C40E541088CB57DA55CCC18891E4
+    #     handicap             100
+    #     gfpw                 123456
+    #     gfname               Echuta
+    #     cg_predictItems      1
+    #     teamoverlay          1
+    class DumpuserProcessor(CommandProcessor):
+        def __init__(self, cmd):
+            self._linesRead = 0;
+            super().__init__(cmd);
     
+        # hardcoding the conditions, since that thing can be dynamically allocated with no clear end-of-result descriptor
+        def ParseLine(self, line) -> int:
+            print("Parsing line %s" % line);
+            if self._linesRead < 3: # god damn it
+                super().ParseLine(line);
+                self._linesRead += 1;
+                return 0;
+            splitted = line.split();
+            l = len ( splitted );
+            if l < 2:
+                self._SetReady();
+                return PtyInterface.CMD_RESULT_FLAG_OK | PtyInterface.CMD_RESULT_FLAG_LOG;
+            first = splitted[0];
+            if first.find(":") != -1:
+                self._SetReady();
+                return PtyInterface.CMD_RESULT_FLAG_OK | PtyInterface.CMD_RESULT_FLAG_LOG;
+            super().ParseLine(line);
+            return 0;
+
+    class SetVstrProcessor(CommandProcessor):
+        def __init__(self, cmd):
+            super().__init__(cmd);
+    
+        def ParseLine(self, line) -> int:
+            super().ParseLine(line);
+            self._SetReady();
+            return PtyInterface.CMD_RESULT_FLAG_OK;
+
+    class ExecVstrProcessor(CommandProcessor):
+        def __init__(self, cmd):
+            super().__init__(cmd);
+    
+        def ParseLine(self, line):
+            super().ParseLine(line);
+            self._SetReady();
+            return PtyInterface.CMD_RESULT_FLAG_OK;
+
+    #region EndProcessors
+
     MODE_INPUT   = 0;
     MODE_COMMAND = 1;
 
@@ -467,67 +540,67 @@ class PtyInterface(AServerInterface):
     #         self._logger.info("pty listener is ready, server is up.");
     #         return True;
 
+    def _ThreadServerOutput(self, message : str):
+        pass;        
+
     def _ThreadHandlePtyInput(self, control, frameTime):
         input : str = "";
-        bsent = False;
         while True:
             timeStart = time.time();
             with self._ptyThreadInputLock:
                 if control.stop:
                     break;
-                if self._currentCommandProc == None:
-                    if self._commandProcQueue.not_empty:
-                        self._currentCommandProc = self._commandProcQueue.get();
             try:
                 if not self._ptyInstance.closed:
-                        input += self._ptyInstance.read();
-                        #self._logger.debug("Read %i from stream -> %s : %s"%(len(input), input, input.encode()));
-                        inputLines = input.splitlines();
-                        if len ( inputLines ) > 0:
-                            lastLine = inputLines[-1];
-                            if not lastLine.endswith("\n"):
-                                input = inputLines.pop(-1); # bufferize incomplete line for next frame
-                            else:
-                                input = "";
-                            for line in inputLines:
-                                #print("line %s"%line.encode());
-                                line = self._re_ansi_escape.sub("", line);
-                                #if len(line) > 1:
-                                # Command mode
-                                if self._mode == PtyInterface.MODE_COMMAND:
-                                    if self._currentCommandProc.ParseLine(line):
-                                        self._currentCommandProc = None;
-                                        self._mode = PtyInterface.MODE_INPUT;
-                                        self._logger.debug("Setting mode to MODE_INPUT");
-                                # Regular read mode
-                                else: 
-                                    self._logger.debug("[Server] : \"%s\""% line);
-                                    if self._currentCommandProc != None:
-                                        #print("Fuck ! \"%s\" : \"%s\""%(line, self._currentCommandProc.cmdStr));
-                                        if line == self._currentCommandProc.cmdStr:
-                                            if self._currentCommandProc.ParseLine(line):
-                                                self._currentCommandProc = None;
-                                            else:
-                                                self._logger.debug("Setting mode to MODE_COMMAND");
-                                                self._mode = PtyInterface.MODE_COMMAND;
-                                            continue;
-                                        # else:
-                                        #     self._logger.debug("asrgs %s :"%(line.encode()));
-                                    self._workingMessageQueue.put(logMessage.LogMessage(line));
-                                # if line.startswith("Hitch warning:"):
-                                #     if not bsent:
-                                #         for i in range(100):
-                                #             self._ptyInstance.write("h%i\n"%i);
-                                #             time.sleep(self._outputDealy);
-                                #         self._ptyInstance.write("quit\n");
-                                #         time.sleep(self._outputDealy);
-                                #         self._ptyInstance.write("\x11");
-                                #         bsent = True;
-                        #self._logger.debug("Time taken %f"%(time.time() - timeStart));
-                        toSleep = frameTime - (time.time() - timeStart);
-                        if toSleep < 0:
-                            toSleep = 0;
-                        time.sleep(toSleep);
+                    #print("Reading!");
+                    input += self._ptyInstance.read();
+
+                    if self._currentCommandProc == None:
+                        if not self._commandProcQueue.empty():
+                            self._currentCommandProc = self._commandProcQueue.get();
+                    
+                    #self._logger.debug("Read %i from stream -> %s : %s"%(len(input), input, input.encode()));
+                    inputLines = input.splitlines();
+                    if len ( inputLines ) > 0:
+                        lastLine = inputLines[-1];
+                        if not lastLine.endswith("\n"):
+                            input = inputLines.pop(-1); # bufferize incomplete line for next frame
+                        else:
+                            input = "";
+                        for line in inputLines:
+                            #print("line %s"%line.encode());
+                            line = self._re_ansi_escape.sub("", line);
+                            #if len(line) > 1:
+                            # Command mode
+                            if self._mode == PtyInterface.MODE_COMMAND:
+                                pr = self._currentCommandProc.ParseLine(line);
+                                if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_OK):
+                                    self._currentCommandProc = None;
+                                    self._mode = PtyInterface.MODE_INPUT;
+                                    self._logger.debug("Setting mode to MODE_INPUT");
+                                    if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_LOG):
+                                        self._logger.debug("[Server] : \"%s\""% line);
+                                        self._workingMessageQueue.put(logMessage.LogMessage(line));
+                            # Regular read mode
+                            else: 
+                                self._logger.debug("[Server] : \"%s\""% line);
+                                if self._currentCommandProc != None:
+                                    #print("Fuck ! \"%s\" : \"%s\""%(line, self._currentCommandProc.cmdStr));
+                                    if line == self._currentCommandProc.cmdStr:
+                                        pr = self._currentCommandProc.ParseLine(line);
+                                        if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_OK): 
+                                            self._currentCommandProc = None;
+                                        else:
+                                            self._logger.debug("Setting mode to MODE_COMMAND");
+                                            self._mode = PtyInterface.MODE_COMMAND;
+                                        continue;
+                                    # else:
+                                    #     self._logger.debug("asrgs %s :"%(line.encode()));
+                                self._workingMessageQueue.put(logMessage.LogMessage(line));
+                    toSleep = frameTime - (time.time() - timeStart);
+                    if toSleep < 0:
+                        toSleep = 0;
+                    time.sleep(toSleep);
                 else:
                     self._logger.debug("MBII PTY closed.");
                     self._ptyInstance.close();
@@ -613,17 +686,15 @@ class PtyInterface(AServerInterface):
         if len (args) > 0:
             if self.IsOpened():
                 cmd = args[0];
+                print("Command str : %s" % cmd);
                 if force:
                     cmd = "".join(args);
                 else:
                     proc = None;
                     if cmd == "svsay":
                         cmdStr = "svsay %s"%args[1];
-                        #self._logger.debug(cmdStr);
-                        #self._logger.debug("WHAT THE FUCK %s" % self._re_ansi_escape.sub("", cmdStr));
                         proc = PtyInterface.SvSayProcessor(colors.stripColorCodes(cmdStr),args[1]);
                         self._EnqueueCommandProc(proc);
-                        self._logger.debug("aargh %s"%cmdStr);
                         self._ptyInstance.write(cmdStr+"\n")
                         return proc.Wait().GetResponse();
                     elif cmd == "say":
@@ -676,9 +747,19 @@ class PtyInterface(AServerInterface):
                         response = proc.Wait().GetResponse();
                         return response;
                     elif cmd == "setvstr":
-                        return self._rcon.SetVstr(args[1], args[2]);
+                        cmdStr = "%s %s"%(args[1], args[2]);
+                        proc = PtyInterface.SetVstrProcessor(cmdStr);
+                        self._EnqueueCommandProc(proc);
+                        self._ptyInstance.write(cmdStr+"\n")
+                        response = proc.Wait().GetResponse();
+                        return response;
                     elif cmd == "execvstr":
-                        return self._rcon.ExecVstr(args[1]);
+                        cmdStr = "%s"%(args[1]);
+                        proc = PtyInterface.GetCvarProcessor(cmdStr);
+                        self._EnqueueCommandProc(proc);
+                        self._ptyInstance.write(cmdStr+"\n")
+                        response = proc.Wait().GetResponse();
+                        return response;
                     elif cmd == "getteam1":
                         cmdStr = "g_siegeteam1";
                         proc = PtyInterface.GetCvarProcessor(cmdStr);
@@ -687,7 +768,7 @@ class PtyInterface(AServerInterface):
                         response = proc.Wait().GetResponse();
                         return response;
                     elif cmd == "getteam2":
-                        cmdStr = "g_siegeteam1";
+                        cmdStr = "g_siegeteam2";
                         proc = PtyInterface.GetCvarProcessor(cmdStr);
                         self._EnqueueCommandProc(proc);
                         self._ptyInstance.write(cmdStr+"\n")
@@ -706,16 +787,21 @@ class PtyInterface(AServerInterface):
                         self._ptyInstance.write(cmdStr+"\n")
                         return proc.Wait().GetResponse();
                     elif cmd == "cvarlist":
-                        start = time.time();
+                        #start = time.time();
                         cmdStr = "cvarlist";
                         proc = PtyInterface.CvarlistProcessor(cmdStr);
                         self._EnqueueCommandProc(proc);
                         self._ptyInstance.write(cmdStr+"\n")
                         response = proc.Wait().GetResponse();
-                        print("Cvarlist time taken %f"%(time.time() - start));
+                        #print("Cvarlist time taken %f"%(time.time() - start));
                         return response;
                     elif cmd == "dumpuser":
-                        return self._rcon.DumpUser();
+                        cmdStr = "dumpuser %s" % (args[1]);
+                        proc = PtyInterface.DumpuserProcessor(cmdStr);
+                        self._EnqueueCommandProc(proc);
+                        self._ptyInstance.write(cmdStr+"\n")
+                        response = proc.Wait().GetResponse();
+                        return response;
                     elif cmd == "quit":
                         proc = PtyInterface.QuitProcessor(cmd);
                         self._EnqueueCommandProc(proc);
@@ -725,7 +811,7 @@ class PtyInterface(AServerInterface):
                         self._ptyInstance.write("\n");
                         return "";
                     else:
-                        self._logger.error("Unknown command for rcon interface %s"%cmd);
+                        self._logger.error("Unknown command for server interface %s"%cmd);
         return "";
 
 

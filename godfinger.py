@@ -464,9 +464,8 @@ class MBIIServer:
         self._pluginManager.Loop();
     
     def _GetClients(self):
-        status = self._rcon.status()
+        status = self._svInterface.SendCommand(["status"]);
         if status != None:
-            status = status.decode("UTF-8", "ignore")
             status = status.split('\n')
             status = status[9:]
             for line in status:
@@ -669,6 +668,7 @@ class MBIIServer:
         extraName = len(lineParse) - 6;
         id = int(lineParse[3 + extraName]);
         ip = lineParse[-1].strip(")");
+        #Log.debug("I've got a result !\n%s"%self._svInterface.SendCommand(["dumpuser", str(id)]));
         name = lineParse[1];
         for i in range(extraName):
             name += " " + lineParse[2 + i];
