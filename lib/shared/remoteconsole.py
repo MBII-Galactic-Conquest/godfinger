@@ -85,7 +85,7 @@ class RCON(object):
         self._inBuf.Write(bb);
         return True;
 
-    def _GetResponse(self) -> bytes:
+    def _PopUnread(self) -> bytes:
         result = None;
         if self._inBuf.HasToRead():
             result = bytes(self._inBuf.Read(self._inBuf.GetEffective()));
@@ -102,7 +102,7 @@ class RCON(object):
     def Request(self, payload, responseSize = 1024 ) -> bytes:
         if self.IsOpened():
             result = b'';
-            startTime = time.time();
+            #startTime = time.time();
             isOk = False;
             with self._sockLock:
                 while not isOk:
@@ -111,12 +111,12 @@ class RCON(object):
                         if not self._ReadResponse(responseSize):
                             continue;
                         else:
-                            result = self._GetResponse();
+                            result = self._PopUnread();
                             isOk = True;
                     except Exception as ex:
                         print("Exception at Request in rcon %s" %str(ex));
                         break;
-            print("Request time %f" % (time.time() - startTime));
+            #print("Request time %f" % (time.time() - startTime));
         return result;
 
     def IsOpened(self)->bool:

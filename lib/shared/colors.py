@@ -1,8 +1,6 @@
 import re
 
 
-
-
 # default aka white, is 7
 COLOR_CODES = \
 {
@@ -27,6 +25,7 @@ COLOR_CODES = \
     "^0":"black",
     "black":"^0"
 };
+
 
 # returns a copy of text string with added color wrappings
 def ColorizeText(text, colorName, originalColorCode = "default"):

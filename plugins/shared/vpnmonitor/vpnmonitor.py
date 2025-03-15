@@ -76,7 +76,7 @@ class VPNMonitor():
             self._status = -1;
 
     def Start(self) -> bool:
-        statusStr = self._serverData.interface.SendCommand(["status"]);
+        statusStr = self._serverData.interface.Status();
         if statusStr != None:
             Log.debug(statusStr);
             splitted = statusStr.splitlines();
@@ -145,8 +145,8 @@ class VPNMonitor():
             Log.debug("Kicking a player with ip %s due to VPN block rules" % ip);
             if self.config.GetValue("action", 0) == 1:
                 Log.debug("Banning ip %s" % ip)
-                self._serverData.interface.SendCommand(["clientban", ip]);
-            self._serverData.interface.SendCommand(["clientkick", id]);
+                self._serverData.interface.ClientBan(ip);
+            self._serverData.interface.ClientKick(id);
             return;
         
         blacklist = self.config.cfg["blacklist"];
@@ -154,8 +154,8 @@ class VPNMonitor():
             Log.debug("Kicking a player with ip %s due to VPN blacklist rules" % ip);
             if self.config.GetValue("action", 0) == 1:
                 Log.debug("Banning ip %s" % ip)
-                self._serverData.interface.SendCommand(["clientban", ip]);
-            self._serverData.interface.SendCommand(["clientkick", id]);
+                self._serverData.interface.ClientBan(ip);
+            self._serverData.interface.ClientKick(id);
             return;
 
     def OnClientDisconnect(self, client : client.Client, reason, data ) -> bool:

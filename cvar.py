@@ -113,7 +113,7 @@ class CvarManager():
             return True;
 
     def _FetchCvars(self):
-        cvarStr = self._iface.SendCommand(["cvarlist"]);
+        cvarStr = self._iface.CvarList();
         if cvarStr != "":
             cvarsStr = colors.stripColorCodes(cvarStr);
             parsed = {};
@@ -141,5 +141,5 @@ class CvarManager():
         return name in self._cvars;
 
     def OnCvarChange(self, cvar : Cvar):
-        self._iface.SendCommand(["setcvar", cvar.GetName(), cvar.GetValue()]);
+        self._iface.SetCvar(cvar.GetName(), cvar.GetValue());
 

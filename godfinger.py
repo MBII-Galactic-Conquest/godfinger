@@ -14,7 +14,6 @@ import sys;
 import subprocess;
 import tempfile;
 
-
 IsVenv = sys.prefix != sys.base_prefix;
 if not IsVenv:
     print("ERROR : Running outside of virtual environment, run prepare.bat on windows or prepare.sh on unix, then come back");
@@ -225,15 +224,13 @@ class MBIIServer:
         self._svInterface = None;
         cfgIface = self._config.GetValue("interface", "pty");
         if cfgIface == "pty":
-            self._svInterface = godfingerinterface.PtyInterface(Log,\
-                                                                cwd=self._config.cfg["serverPath"],\
+            self._svInterface = godfingerinterface.PtyInterface(cwd=self._config.cfg["serverPath"],\
                                                                 args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["interfaces"]["pty"]["target"])]\
                                                                 + (Args.mbiicmd.split() if Args.mbiicmd else []),\
                                                                 inputDelay=self._config.cfg["interfaces"]["pty"]["inputDelay"],\
                                                                 );
         elif cfgIface == "rcon":
-            self._svInterface = godfingerinterface.RconInterface(   Log,\
-                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["ip"],\
+            self._svInterface = godfingerinterface.RconInterface(   self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["ip"],\
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["port"],\
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["bindAddress"],\
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["password"],\
@@ -312,7 +309,7 @@ class MBIIServer:
         # self._logMessagesLock = threading.Lock();
         # self._logMessagesQueue = queue.Queue();
         # self._logReaderLock = threading.Lock();
-        # self._logReaderThreadControl = threadcontrol.ThreadControl();
+        # self._logReaderThreadControl = threadcontrolf.ThreadControl();
         # self._logReaderTime = self._config.cfg["logReadDelay"];
         # self._logReaderThread = threading.Thread(target=self.ParseLogThreadHandler, daemon=True, args=(self._logReaderThreadControl, self._logReaderTime));
         # self._logPath = self._config.cfg["MBIIPath"] + self._config.cfg["logFilename"]
@@ -388,7 +385,7 @@ class MBIIServer:
     # -- ----- ---- --------------- --------------------------------------- -----
 
     def _FetchStatus(self):
-        statusStr = self._svInterface.SendCommand(["status"]);
+        statusStr = self._svInterface.Status();
         if statusStr != None:
             Log.debug(statusStr);
             splitted = statusStr.splitlines();
@@ -432,7 +429,9 @@ class MBIIServer:
                 return;
             self._isRunning = True;
             self._status = MBIIServer.STATUS_RUNNING;
-            self._svInterface.SendCommand(["svsay", "^1 {text}.".format(text = self._config.cfg["prologueMessage"])]);
+            #if Args.debug:
+            #    self._svInterface.Test();
+            self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]));
             while self._isRunning:
                 startTime = time.time();
                 self.Loop();
@@ -449,7 +448,7 @@ class MBIIServer:
     def Stop(self):
         if self._isRunning:
             Log.info("Stopping Godfinger...");
-            self._svInterface.SendCommand(["svsay", "^1 {text}.".format(text = self._config.cfg["epilogueMessage"])]);
+            self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["epilogueMessage"]));
             self._status = MBIIServer.STATUS_STOPPING;
             self._svInterface.Close();
             self._isRunning = False;
@@ -464,7 +463,7 @@ class MBIIServer:
         self._pluginManager.Loop();
     
     def _GetClients(self):
-        status = self._svInterface.SendCommand(["status"]);
+        status = self._svInterface.Status();
         if status != None:
             status = status.split('\n')
             status = status[9:]
@@ -668,7 +667,7 @@ class MBIIServer:
         extraName = len(lineParse) - 6;
         id = int(lineParse[3 + extraName]);
         ip = lineParse[-1].strip(")");
-        #Log.debug("I've got a result !\n%s"%self._svInterface.SendCommand(["dumpuser", str(id)]));
+        #Log.debug("I've got a result !\n%s"%self._svInterface.DumpUser(id));
         name = lineParse[1];
         for i in range(extraName):
             name += " " + lineParse[2 + i];
@@ -740,7 +739,7 @@ class MBIIServer:
                     self.OnMapChange(vars["mapname"], self._serverData.mapName)
                 self._serverData.mapName = vars["mapname"];
         else:
-            self._serverData.mapName = self._svInterface.SendCommand(["getcurrentmap"]);
+            self._serverData.mapName = self._svInterface.GetCurrentMap();
         
         Log.info("Current map name on init : %s", self._serverData.mapName);
         
