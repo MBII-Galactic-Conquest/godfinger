@@ -489,6 +489,15 @@ class PtyInterface(AServerInterface):
             self._SetReady();
             return PtyInterface.CMD_RESULT_FLAG_OK;
 
+    class MapReloadProcessor(CommandProcessor):
+        def __init__(self, cmd):
+            super().__init__(cmd);
+    
+        def ParseLine(self, line) -> int:
+            super().ParseLine(line);
+            self._SetReady();
+            return PtyInterface.CMD_RESULT_FLAG_OK;
+
     #region EndProcessors
 
     MODE_INPUT   = 0;
@@ -710,7 +719,11 @@ class PtyInterface(AServerInterface):
                         self._ptyInstance.write(cmdStr+"\n")
                         return proc.Wait().GetResponse();
                     elif cmd == "mbmode":
-                        return self._rcon.MbMode(args[1]);
+                        cmdStr = "mbmode %s"%(args[1]);
+                        proc = PtyInterface.SetCvarProcessor(cmdStr);
+                        self._EnqueueCommandProc(proc);
+                        self._ptyInstance.write(cmdStr+"\n")
+                        return proc.Wait().GetResponse();
                     elif cmd == "clientmute":
                         return self._rcon.ClientMute(args[1]);
                     elif cmd == "clientunmute":
@@ -775,11 +788,25 @@ class PtyInterface(AServerInterface):
                         response = proc.Wait().GetResponse();
                         return response;
                     elif cmd == "mapreload":
-                        return self._rcon.MapReload(args[1]);
+                        cmdStr = "map %s"%(args[1]);
+                        proc = PtyInterface.MapReloadProcessor(cmdStr);
+                        self._EnqueueCommandProc(proc);
+                        self._ptyInstance.write(cmdStr+"\n")
+                        response = proc.Wait().GetResponse();
+                        return response;
                     elif cmd == "getcurrentmap":
-                        return self._rcon.GetCurrentMap();
+                        cmdStr = "mapname";
+                        proc = PtyInterface.GetCvarProcessor(cmdStr);
+                        self._EnqueueCommandProc(proc);
+                        self._ptyInstance.write(cmdStr+"\n")
+                        response = proc.Wait().GetResponse();
+                        return response;
                     elif cmd == "changeteams":
-                        return self._rcon.ChangeTeams(args[1], args[2], args[3]);
+                        response = "";
+                        response += self.SendCommand(["setteam1", args[1]]);
+                        response += self.SendCommand(["setteam2", args[2]]);
+                        response += self.SendCommand(["mapreload", args[3]]);
+                        return response;
                     elif cmd == "status":
                         cmdStr = "status";
                         proc = PtyInterface.StatusProcessor(cmdStr);
