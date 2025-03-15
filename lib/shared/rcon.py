@@ -217,7 +217,7 @@ class Rcon(object):
       response = response.decode("UTF-8", "ignore")
       if response == "":
         repeats -= 1;
-        sleep(0.1);
+        sleep(0.75);
         continue;
       response = response.removeprefix("print\n\"g_siegeTeam1\" is:")
       response = response.split('"')[1][:-2].strip();
@@ -231,7 +231,7 @@ class Rcon(object):
       response = response.decode("UTF-8", "ignore")
       if response == "":
         repeats -= 1;
-        sleep(0.1);
+        sleep(0.75);
         continue;
       response = response.removeprefix("print\n\"g_siegeTeam2\" is:")
       response = response.split('"')[1][:-2].strip();
