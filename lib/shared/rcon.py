@@ -144,6 +144,10 @@ class Rcon(object):
       self.setVstr(vstrStorage, payload)
       self.execVstr(vstrStorage)
       
+  def smsay(self, msg):
+    if not type(msg) == bytes:
+      msg = bytes(msg, "UTF-8")
+    return self._Send(b"\xff\xff\xff\xffrcon %b smsay %b %b" % (self.rcon_pwd, msg), waitForResponse=False)
 
   def svtell(self, client, msg):
     if not type(msg) == bytes:
