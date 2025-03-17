@@ -109,7 +109,7 @@ class RCON(object):
     # waits for response, ensures delivery
     def Request(self, payload, responseSize = 4096, timeout = 1 ) -> bytes:
         if self.IsOpened():
-            print("Request with payload %s"%payload);
+            #print("Request with payload %s"%payload);
             result = b'';
             #startTime = time.time();
             isOk = False;
@@ -122,7 +122,7 @@ class RCON(object):
                             continue;
                         else:
                             result = self._PopUnread();
-                            print("Result from request %s"%result);
+                            #print("Result from request %s"%result);
                             isOk = True;
                     except Exception as ex:
                         print("Exception at Request in rcon %s" %str(ex));
@@ -284,7 +284,7 @@ class RCON(object):
         if len(res) == 0:
             return None;
         res = res.decode("UTF-8", "ignore");
-        print("Cvarlist time taken %f"%(time.time() - start));
+        #print("Cvarlist time taken %f"%(time.time() - start));
         return res
     
     def TeamSay(self, players, team, vstrStorage, msg, sleepBetweenChunks=0):
