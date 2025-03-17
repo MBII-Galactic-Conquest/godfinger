@@ -164,19 +164,6 @@ class VPNMonitor():
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
-    logMode = logging.INFO;
-    if serverData.args.debug:
-        logMode = logging.DEBUG;
-    if serverData.args.logfile != "":
-        logging.basicConfig(
-        filename=serverData.args.logfile,
-        level=logMode,
-        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
-    else:
-        logging.basicConfig(
-        level=logMode,
-        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
-
     global SERVER_DATA;
     SERVER_DATA = serverData; # keep it stored
     global PluginInstance;

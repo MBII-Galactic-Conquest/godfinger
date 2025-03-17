@@ -24,23 +24,28 @@ class RCON(object):
         if self._isOpened:
             self.Close();
 
-    def Open(self):
-        if not self._isOpened:
+    def Open(self) -> bool:
+        if not self.IsOpened():
             self._inBuf.Drop();
-            self._sock.bind((self._bindAddr, 0));
-            self._sock.connect(self._address);
-            self._sock.settimeout(0.001);
-            self._isOpened = True;
+            # This try block makes no sense for UDP because we dont modify MBII for custom UDP-subprotocol
+            try:
+                self._sock.bind((self._bindAddr, 0));
+                self._sock.connect(self._address);
+                self._sock.settimeout(0.001);
+                self._isOpened = True;
+            except Exception:
+                return False;
+        return self._isOpened;
 
     def Close(self):
-        if self._isOpened:
+        if self.IsOpened():
             #self._sock.shutdown(socket.SHUT_RDWR);
             with self._sockLock:
                 self._sock.close();
             self._isOpened = False;
 
     def _Send(self, payload : bytes):
-        if self._isOpened:
+        if self.IsOpened():
             l = len(payload);
             sent = 0;
             while sent < l:
@@ -49,7 +54,7 @@ class RCON(object):
 
     def _Read(self, count = 1024) -> bytes:
         result = b'';
-        if self._isOpened:
+        if self.IsOpened():
             while True:
                 try:
                     result += self._sock.recv(count);
@@ -60,13 +65,11 @@ class RCON(object):
     
     def _ReadResponse(self, count = 1024, timeout = 1) -> bool:
         bb = b'';
-        if self._isOpened:
+        if self.IsOpened():
             isFinished = False;
-            timedOut = False;
             self._requestTimeout.Set(timeout);
-            while not isFinished or not timedOut:
+            while not isFinished:
                 if not self._requestTimeout.IsSet():
-                    timedOut = True;
                     return False;
                 try:
                     bb += self._sock.recv(count);
@@ -212,15 +215,17 @@ class RCON(object):
     def GetTeam1(self):
         response = self.Request(b"\xff\xff\xff\xffrcon %b g_siegeteam1" % (self._password))
         response = response.decode("UTF-8", "ignore")
-        response = response.removeprefix("print\n\"g_siegeTeam1\" is:")
-        response = response.split('"')[1][:-2]
+        if response != None and len(response) > 0:
+            response = response.removeprefix("print\n\"g_siegeTeam1\" is:")
+            response = response.split('"')[1][:-2]
         return response
 
     def GetTeam2(self):
         response = self.Request(b"\xff\xff\xff\xffrcon %b g_siegeteam2" % (self._password))
         response = response.decode("UTF-8", "ignore")
-        response = response.removeprefix("print\n\"g_siegeTeam2\" is:")
-        response = response.split('"')[1][:-2]
+        if response != None and len(response) > 0:
+            response = response.removeprefix("print\n\"g_siegeTeam2\" is:")
+            response = response.split('"')[1][:-2]
         return response
 
     def _mapRestart(self, delay=0):
@@ -235,9 +240,10 @@ class RCON(object):
 
     def GetCurrentMap(self):
         response = self.Request(b"\xff\xff\xff\xffrcon %b mapname" % (self._password))
-        response = response.removeprefix(b'\xff\xff\xff\xffprint\n^9Cvar ^7mapname = ^9"^7')
-        mapName = response.removesuffix(b'^9"^7\n')
-        mapName = mapName.decode("UTF-8", "ignore");
+        if response != None and len(response) > 0:
+            response = response.removeprefix(b'\xff\xff\xff\xffprint\n^9Cvar ^7mapname = ^9"^7')
+            mapName = response.removesuffix(b'^9"^7\n')
+            mapName = mapName.decode("UTF-8", "ignore");
         return mapName
 
     def ChangeTeams(self, team1, team2, mapName):
@@ -256,7 +262,8 @@ class RCON(object):
         if not type(id) == bytes:
             id = bytes(str(id), "UTF-8") 
             res = self.Request(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self._password, id));
-            res = res.decode("UTF-8", "ignore");
+            if res != None and len(res) > 0:
+                res = res.decode("UTF-8", "ignore");
             return res;
   
     def CvarList(self) -> str:

@@ -114,7 +114,7 @@ class CvarManager():
 
     def _FetchCvars(self):
         cvarStr = self._iface.CvarList();
-        if cvarStr != "":
+        if cvarStr != "" and cvarStr != None:
             cvarsStr = colors.stripColorCodes(cvarStr);
             parsed = {};
             splitted = cvarsStr.splitlines();

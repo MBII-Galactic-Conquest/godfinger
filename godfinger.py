@@ -97,14 +97,14 @@ CONFIG_FALLBACK = \
     "serverPath":"your/path/here/",
     "serverFileName":"mbiided.x86.exe",
     "logicDelay":0.016,
-    "logReadDelay":0.1,
     "restartOnCrash": false,
 
     "interfaces":
     {
         "pty":
         {
-            
+            "target":"name/to/batch.bat",
+            "inputDelay":0.001
         },
         "rcon":
         {
@@ -119,7 +119,12 @@ CONFIG_FALLBACK = \
                 "password":"fuckmylife"
             },
             "logFilename":"server.log",
-            "logReadDelay":0.1
+            "logReadDelay":0.1,
+
+            "Debug":
+            {
+                "TestRetrospect":false
+            }
         }
     },
     "interface":"pty",
@@ -138,11 +143,8 @@ CONFIG_FALLBACK = \
         {
             "path":"plugins.shared.test.testPlugin"
         }
-    ],
-    "Debug":
-    {
-        "TestRetrospect":false
-    }
+    ]
+
 }
 """
 
@@ -187,6 +189,9 @@ class MBIIServer:
             return False;
         curVar = cfg.GetValue("interface", None);
         if curVar == None or ( curVar != "pty" and curVar != "rcon" ):
+            return False;
+        elif curVar == "pty":
+            Log.error("pty Interface is not fully implemented, use rcon instead.");
             return False;
         return True;
 
@@ -235,50 +240,13 @@ class MBIIServer:
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["bindAddress"],\
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["password"],\
                                                                     os.path.join(self._config.cfg["MBIIPath"], self._config.cfg["interfaces"]["rcon"]["logFilename"]),\
-                                                                    self._config.cfg["interfaces"]["rcon"]["logReadDelay"] );
+                                                                    self._config.cfg["interfaces"]["rcon"]["logReadDelay"],
+                                                                    self._config.cfg["interfaces"]["rcon"]["Debug"]["TestRetrospect"]);
         
         if self._svInterface == None:
             Log.error("Server interface was not initialized properly.");
             self._status = MBIIServer.STATUS_CONFIG_ERROR;
             return;
-
-    
-        # # Black magic woman
-        # self._mbiiInputLinesLock    = threading.Lock();
-        # self._mbiiInputLinesQueue   : queue[str] = queue.Queue();
-
-        # self._ptyThreadInputLock    = threading.Lock();
-        # self._ptyThreadInputControl = threadcontrol.ThreadControl();
-        # self._ptyThreadInput        = threading.Thread(target=self._ThreadHandlePtyInput, daemon=True, args=(self._ptyThreadInputControl, 0.01));
-        # self._mbiipty = winpty.PtyProcess.spawn([os.path.join(self._config.cfg["serverPath"], self._config.cfg["serverFileName"]),\
-        #                                         Args.mbiicmd.split() if Args.mbiicmd else ""],\
-        #                                         cwd=self._config.cfg["serverPath"],\
-        #                                         dimensions=(10000, 10000));
-        # self._ptyThreadInput.start();
-
-
-
-        # while self._mbiiproc.returncode == None:
-        #     pass;
-            # with self._mbiiInputLinesLock:
-            #     while not self._mbiiInputLinesQueue.empty():
-            #         line = self._mbiiInputLinesQueue.get();
-            #         Log.debug("MBII LINE : %" % line);
-            # Log.debug(str(self.fwriterIn.tell()) + " : : " + str(self._mbiiproc.returncode));
-            # lines = self.freaderIn.read();
-            # self.clone.write(lines);
-            #self.fwriterIn.flush();
-            #self.fwriterIn.seek(0);
-            #self.fwriterIn.truncate();
-            #Log.debug(self._mbiipty.readline());
-            #time.sleep(1);
-            # for line in iter(self._mbiiproc.stderr.readline, b''):
-            #     print(">>> " + str(line).rstrip())
-            # self._mbiiproc.stderr.flush();
-            # erro = self._mbiiproc.stderr.readline();
-            # Log.info("Erro %s"%(erro));
-            # sys.stdout.flush();
-            # self._mbiiproc.stderr.flush();
     
         if IsWindows:
             os.system("title " + self._config.cfg["Name"]);
@@ -294,26 +262,16 @@ class MBIIServer:
         self._pk3Manager = pk3.Pk3Manager();
         self._pk3Manager.Initialize([self._config.cfg["MBIIPath"]]);
 
-        # # remote console connector
-        # self._rcon: rcon.Rcon = rcon.Rcon( ( self._config.cfg["Remote"]["address"]["ip"], self._config.cfg["Remote"]["address"]["port"] ), 
-        #                     self._config.cfg["Remote"]["bindAddress"],
-        #                     self._config.cfg["Remote"]["password"] )
-        
-        self._svInterface.Open();
+        if not self._svInterface.Open():
+            Log.error("Unable to Open server interface.");
+            self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR;
+            return;
         self._svInterface.WaitUntilReady();
         
         # Cvars
         # Init at Start
         self._cvarManager = cvar.CvarManager(self._svInterface);
         
-        # self._logMessagesLock = threading.Lock();
-        # self._logMessagesQueue = queue.Queue();
-        # self._logReaderLock = threading.Lock();
-        # self._logReaderThreadControl = threadcontrolf.ThreadControl();
-        # self._logReaderTime = self._config.cfg["logReadDelay"];
-        # self._logReaderThread = threading.Thread(target=self.ParseLogThreadHandler, daemon=True, args=(self._logReaderThreadControl, self._logReaderTime));
-        # self._logPath = self._config.cfg["MBIIPath"] + self._config.cfg["logFilename"]
-
         # Client management
         self._clientManager = clientmanager.ClientManager();
 
@@ -333,10 +291,6 @@ class MBIIServer:
         self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._svInterface, Args);
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)));
 
-        
-        # while self._svInterface.IsOpened():
-        #     time.sleep(1);
-        # os.abort();
 
         # Technical
         # Plugins

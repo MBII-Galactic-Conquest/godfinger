@@ -13,6 +13,7 @@ import re;
 import lib.shared.colors as colors;
 import lib.shared.util as util;
 import lib.shared.client as client;
+import math;
 
 IsUnix      = (os.name == "posix");
 IsWindows   = (os.name == "nt");
@@ -337,6 +338,8 @@ class RconInterface(AServerInterface):
     def Open(self) -> bool:
         if not super().Open():
             return False;
+        if not self._rcon.Open():
+            return False;
         # FileReadBackwards package doesnt "support" ansi encoding in stock, change it yourself
         prestartLines = [];
         logFile = None;
@@ -375,7 +378,6 @@ class RconInterface(AServerInterface):
             with self._queueLock:
                 for i in range(len(prestartLines)):
                     self._workingMessageQueue.put(logMessage.LogMessage(prestartLines[i], True));
-        self._rcon.Open();
         self._logReaderThreadControl.stop = False;
         self._logReaderThread.start();
         self._isOpened = True;
@@ -493,7 +495,7 @@ class PtyInterface(AServerInterface):
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
-            #print("%s versus %s"%(line.encode(), self._message.encode()));
+            print("%s versus %s"%(line.encode(), self._message.encode()));
             if line.startswith("broadcast:"):
                 if line.find(self._message) != -1:
                     self._SetReady();
@@ -704,25 +706,53 @@ class PtyInterface(AServerInterface):
 
     #region PtyCommands
 
+    def _TruncateString(self, text : str) -> list[str]:
+        tl = len(text);
+        parts = math.floor(tl/63);
+        moda = tl%63;
+        result = [];
+        if parts > 0:
+            for i in range(parts):
+                result.append(text[i*63:(i+1)*63]);
+            if moda > 0:
+                result.append(text[parts*63:]);
+        else:
+            result.append(text);
+        return result;
+    
+
+    # 64 (63 with \n character) bytes length per message, otherwise the server chokes and cuts it, dont know.
     def SvSay(self, text : str) -> str:
         if self.IsOpened():
-            cmdStr = "svsay %s"%text;
-            proc = PtyInterface.SvSayProcessor(colors.stripColorCodes(cmdStr),text);
-            return self.ExecuteCommand(proc);
+            strs = self._TruncateString(text);
+            result = "";
+            for i in range(len(strs)):
+                cmdStr = "svsay %s"%strs[i];
+                proc = PtyInterface.SvSayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                result += self.ExecuteCommand(cmdStr, proc);
+            return result;
         return None;
 
     def Say(self, text : str ) -> str:
         if self.IsOpened():
-            cmdStr = "say %s"%text;
-            proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),text);
-            return self.ExecuteCommand(proc);
+            strs = self._TruncateString(text);
+            result = "";
+            for i in range(len(strs)):
+                cmdStr = "say %s"%strs[i];
+                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                result += self.ExecuteCommand(cmdStr, proc);
+            return result;
         return None;
 
     def SvTell(self, text : str, pid : int ) -> str:
         if self.IsOpened():
-            cmdStr = "svtell %i %s"%(pid, text);
-            proc = PtyInterface.SvTellProcessor(colors.stripColorCodes(cmdStr),text);
-            return self.ExecuteCommand(proc);
+            strs = self._TruncateString(text);
+            result = "";
+            for i in range(len(strs)):
+                cmdStr = "svtell %i %s"%(pid, strs[i]);
+                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                result += self.ExecuteCommand(cmdStr, proc);
+            return result;
         return None;
 
     def TeamSay(self, players : list[client.Client], team, vstrStorage, msg):
@@ -760,56 +790,56 @@ class PtyInterface(AServerInterface):
         if self.IsOpened():
             cmdStr = "mbmode %s"%(mode);
             proc = PtyInterface.SetCvarProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def ClientMute(self, pid : int) -> str:
         if self.IsOpened():
             cmdStr = "mute %i"%(pid);
             proc = PtyInterface.EchoProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def ClientUnmute(self, pid : int ) -> str:
         if self.IsOpened():
             cmdStr = "unmute %i"%(pid);
             proc = PtyInterface.EchoProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def ClientBan(self, pip : str) -> str:
         if self.IsOpened():
             cmdStr = "addip %s"%(pip);
             proc = PtyInterface.EchoProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def ClientUnban(self, pip : str ) ->str:
         if self.IsOpened():
             cmdStr = "removeip %s"%(pip);
             proc = PtyInterface.EchoProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def ClientKick(self, pid : int ) -> str:
         if self.IsOpened():
             cmdStr = "clientkick %i"%(pid);
             proc = PtyInterface.EchoProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def SetCvar(self, cvarName : str, value : str ) -> str:
         if self.IsOpened():
             cmdStr = "%s %s"%(cvarName, value);
             proc = PtyInterface.SetCvarProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def GetCvar(self, cvarName : str ) -> str:
         if self.IsOpened():
             cmdStr = "%s"%cvarName;
             proc = PtyInterface.GetCvarProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
 
     def SetTeam1(self, teamStr : str ) -> str:
@@ -846,7 +876,7 @@ class PtyInterface(AServerInterface):
         if self.IsOpened():
             cmdStr = "map %s"%(mapname);
             proc = PtyInterface.MapReloadProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def GetCurrentMap(self) -> str:
@@ -858,7 +888,7 @@ class PtyInterface(AServerInterface):
         if self.IsOpened():
             cmdStr = "status";
             proc = PtyInterface.StatusProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
     
     def CvarList(self) -> str:
@@ -866,7 +896,7 @@ class PtyInterface(AServerInterface):
             #start = time.time();
             cmdStr = "cvarlist";
             proc = PtyInterface.CvarlistProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
             #print("Cvarlist time taken %f"%(time.time() - start));
             return response;
         return None;
@@ -875,7 +905,7 @@ class PtyInterface(AServerInterface):
         if self.IsOpened():
             cmdStr = "dumpuser %s" % (pid);
             proc = PtyInterface.DumpuserProcessor(cmdStr);
-            return self.ExecuteCommand(proc);
+            return self.ExecuteCommand(cmdStr, proc);
         return None;
 
     def _Quit(self) -> str:
@@ -890,10 +920,11 @@ class PtyInterface(AServerInterface):
             return "";
         return None;
 
-    def ExecuteCommand(self, cmdProc : CommandProcessor) -> str:
-        Log.debug("Executing command %s"%(str(cmdProc)));
+    def ExecuteCommand(self, cmdStr : str,  cmdProc : CommandProcessor) -> str:
+        #Log.debug("Executing command %s"%(str(cmdProc)));
         self._EnqueueCommandProc(cmdProc);
-        self._ptyInstance.write(cmdProc.cmdStr+"\n");
+        #Log.debug("Writing to terminal %s"%cmdStr);
+        self._ptyInstance.write(cmdStr+"\n");
         return cmdProc.Wait().GetResponse();
 
 #region EndPtyCommands
@@ -917,7 +948,7 @@ class PtyInterface(AServerInterface):
                         if not self._commandProcQueue.empty():
                             self._currentCommandProc = self._commandProcQueue.get();
                     
-                    Log.debug("Read %i from stream -> %s : %s"%(len(input), input, input.encode()));
+                    #Log.debug("Read %i from stream -> %s : %s"%(len(input), input, input.encode()));
                     inputLines = input.splitlines();
                     if len ( inputLines ) > 0:
                         lastLine = inputLines[-1];
@@ -926,7 +957,7 @@ class PtyInterface(AServerInterface):
                         else:
                             input = "";
                         for line in inputLines:
-                            print("line %s"%line.encode());
+                            #print("line %s"%line.encode());
                             line = self._re_ansi_escape.sub("", line);
                             #if len(line) > 1:
                             # Command mode
@@ -935,13 +966,13 @@ class PtyInterface(AServerInterface):
                                 if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_OK):
                                     self._currentCommandProc = None;
                                     self._mode = PtyInterface.MODE_INPUT;
-                                    Log.debug("Setting mode to MODE_INPUT");
+                                    #Log.debug("Setting mode to MODE_INPUT");
                                     if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_LOG):
-                                        Log.debug("[Server] : \"%s\""% line);
+                                        Log.info("[Server] : \"%s\""% line);
                                         self._workingMessageQueue.put(logMessage.LogMessage(line));
                             # Regular read mode
                             else: 
-                                Log.debug("[Server] : \"%s\""% line);
+                                Log.info("[Server] : \"%s\""% line);
                                 if self._currentCommandProc != None:
                                     #print("Fuck ! \"%s\" : \"%s\""%(line, self._currentCommandProc.cmdStr));
                                     if line == self._currentCommandProc.cmdStr:
@@ -949,7 +980,7 @@ class PtyInterface(AServerInterface):
                                         if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_OK): 
                                             self._currentCommandProc = None;
                                         else:
-                                            Log.debug("Setting mode to MODE_COMMAND");
+                                            #Log.debug("Setting mode to MODE_COMMAND");
                                             self._mode = PtyInterface.MODE_COMMAND;
                                         continue;
                                     # else:
@@ -960,15 +991,15 @@ class PtyInterface(AServerInterface):
                         toSleep = 0;
                     time.sleep(toSleep);
                 else:
-                    Log.debug("MBII PTY closed.");
+                    Log.info("MBII PTY closed.");
                     self._ptyInstance.close();
                     break;
             except EOFError as eofEx:
-                Log.debug("Server pty was closed, terminating Input thread.");
+                Log.info("Server pty was closed, terminating Input thread.");
                 self._ptyInstance.close();
                 break;
             except Exception as ex:
-                Log.debug("What the fuck %s" % str(ex));
+                Log.info("What the fuck %s" % str(ex));
                 self._ptyInstance.close();
                 break;
     
@@ -1005,11 +1036,11 @@ class PtyInterface(AServerInterface):
         self._ptyThreadInput                = threading.Thread(target=self._ThreadHandlePtyInput, daemon=True, args=(self._ptyThreadInputControl, self._inputDelay));
         # self._ptyThreadOutputControl.stop   = False;
         # self._ptyThreadOutput               = threading.Thread(target=self._ThreadHandlePtyOutput, daemon=True, args=(self._ptyThreadOutputControl, self._inputDelay, self._outputDelay));
-        Log.debug("Arguments for child process : %s"%str(self._args));
+        #Log.debug("Arguments for child process : %s"%str(self._args));
         self._ptyInstance = ptym.PtyProcess.spawn(self._args if self._args != None else [],\
                                                 cwd=self._cwd,\
                                                 dimensions=(1024, 1024));
-        Log.debug("Instance %s"%str(self._ptyInstance));
+        #Log.debug("Instance %s"%str(self._ptyInstance));
         initProc = PtyInterface.ReadyProcessor("------- Game Initialization -------");
         self._EnqueueCommandProc(initProc);
         self._ptyThreadInput.start();
