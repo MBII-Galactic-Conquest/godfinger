@@ -224,7 +224,6 @@ class RCON(object):
         response = self.Request(b"\xff\xff\xff\xffrcon %b g_siegeteam1" % (self._password))
         response = response.decode("UTF-8", "ignore")
         if response != None and len(response) > 0:
-            print("Fucking get team1 %s"%response);
             response = response.removeprefix("print\n\"g_siegeTeam1\" is:")
             response = response.split('"')[1][:-2]
         return response
@@ -233,7 +232,6 @@ class RCON(object):
         response = self.Request(b"\xff\xff\xff\xffrcon %b g_siegeteam2" % (self._password))
         response = response.decode("UTF-8", "ignore")
         if response != None and len(response) > 0:
-            print("Fucking get team2 %s"%response);
             response = response.removeprefix("print\n\"g_siegeTeam2\" is:")
             response = response.split('"')[1][:-2]
         return response
