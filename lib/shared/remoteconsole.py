@@ -53,6 +53,10 @@ class RCON(object):
             while sent < l:
                 sent += self._sock.send(payload[sent:l]);
             self._bytesSent += sent;
+    
+    # Crunches
+    def _ClearInputSocket(self):
+        self._Read(1024*32);
 
     def _Read(self, count = 1024) -> bytes:
         result = b'';
@@ -107,13 +111,15 @@ class RCON(object):
         return False;
 
     # waits for response, ensures delivery
-    def Request(self, payload, responseSize = 4096, timeout = 1 ) -> bytes:
+    def Request(self, payload, responseSize = 4096, timeout = 1, responseParser = None ) -> bytes:
         if self.IsOpened():
             #print("Request with payload %s"%payload);
             result = b'';
             #startTime = time.time();
             isOk = False;
             with self._sockLock:
+                if responseParser != None:
+                    self._responseParser = responseParser;
                 self._inBuf.Drop(); # cleanup previous calls data ( junk )
                 while not isOk:
                     try:
@@ -128,6 +134,8 @@ class RCON(object):
                         print("Exception at Request in rcon %s" %str(ex));
                         break;
             #print("Request time %f" % (time.time() - startTime));
+            if self._responseParser != None:
+                self._responseParser = None;
         return result;
 
     def IsOpened(self)->bool:
@@ -240,15 +248,17 @@ class RCON(object):
         """ (DEPRECATED, DO NOT USE) """
         return self.Request(b"\xff\xff\xff\xffrcon %b map_restart %i" % (self._password, delay))
 
+    def _MapReloadParser(self, bb : bytes) -> bool:
+        return True if bb.decode("UTF-8", "ignore").rfind("InitGame:") != -1 else False;
+
     def MapReload(self, mapName):
         """ USE THIS """
         if not type(mapName) == bytes:
             mapName = bytes(mapName, "UTF-8")
-        with self._responseParserLock:
-            self._responseParser = lambda bb : True if bb.decode("UTF-8", "ignore").rfind("InitGame:") != -1 else False;
-            response =  self.Request(b"\xff\xff\xff\xffrcon %b map %b" % (self._password, mapName), 1024*32, 120 );
-            self._responseParser = None;
-            return response;
+        response =  self.Request(b"\xff\xff\xff\xffrcon %b map %b" % (self._password, mapName), 1024*32, 120, self._MapReloadParser);
+        time.sleep(5); # man, this is hard, 5 just in case, we cant be sure when it ends because there is no strict protocol
+        self._ClearInputSocket();
+        return response;
 
     def GetCurrentMap(self):
         response = self.Request(b"\xff\xff\xff\xffrcon %b mapname" % (self._password))
