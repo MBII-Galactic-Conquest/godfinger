@@ -36,7 +36,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 
 > [!IMPORTANT]
 > [`** REQUIRES PYTHON 3.12.7+ **`](https://www.python.org/downloads/release/python-3127/)
-> 
+>
 > Ensure your logfile is set to `server.log` in your `server.cfg.`
 > 
 > Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, and `g_logClientInfo` is `"1"` in your `server.cfg.`
@@ -73,6 +73,12 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > > The rcon messaging if rate is limiting will block calling thread until next timeframe, because we have to send/recieve rcon messaging in sync mode.
 > 
 > > So i.e, if you send 6 rcons within 20 miliseconds frame time, it will send 5 and then wait for 20 milliseconds and send the 6th rcon afterwards.
+>
+> 
+> </br>
+>
+> #3) If you don't have GIT natively installed when running the update process as a windows user, and it errors on portable install, `7z_portable.zip` is stored using Git LFS. You must [`download`](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/lib/other/win/7z_portable.zip) and place it in `./lib/other/win`, then run the update process again, or reference [`release`](https://github.com/MBII-Galactic-Conquest/godfinger/releases/) versions with 7Z portable file manager included natively.</br>
+> > Alternatively, and for `UNIX` users, ensure [`GIT is installed`](https://git-scm.com/downloads/) before using the godfinger platform as a necessary precaution.
 >
 
 </br>
