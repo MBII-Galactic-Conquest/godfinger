@@ -18,3 +18,6 @@ TEAM_SPEC: 's',
 
 def TranslateTeam(num):
     return TEAMS[num]
+
+def IsRealTeam(teamId : int ) -> bool:
+    return teamId == TEAM_GOOD or teamId == TEAM_EVIL;

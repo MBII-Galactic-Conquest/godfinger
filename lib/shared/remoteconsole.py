@@ -19,6 +19,8 @@ class RCON(object):
         self._bytesRead = 0;
         self._inBuf = buffer.Buffer();
         self._requestTimeout = timeout.Timeout();
+        self._responseParserLock = threading.Lock();
+        self._responseParser = None; # a crunch method to see if the response from server is complete ( command is executed )
     
     def __del__(self):
         if self._isOpened:
@@ -63,7 +65,7 @@ class RCON(object):
         self._bytesRead += len(result);
         return result;
     
-    def _ReadResponse(self, count = 1024, timeout = 1) -> bool:
+    def _ReadResponse(self, count = 4096, timeout = 1) -> bool:
         bb = b'';
         if self.IsOpened():
             isFinished = False;
@@ -96,25 +98,31 @@ class RCON(object):
         return result;
 
     def IsEndMessage(self, bt : bytes) -> bool:
-        if len(bt) > 0:
-            if bt[-1] == 10:
-                return True;
+        if self._responseParser != None:
+            return self._responseParser(bt);
+        else: # regular \n response, valid for most commands but very big ones like map/map_restart
+            if len(bt) > 0: 
+                if bt[-1] == 10:
+                    return True;
         return False;
 
     # waits for response, ensures delivery
-    def Request(self, payload, responseSize = 1024 ) -> bytes:
+    def Request(self, payload, responseSize = 4096, timeout = 1 ) -> bytes:
         if self.IsOpened():
+            print("Request with payload %s"%payload);
             result = b'';
             #startTime = time.time();
             isOk = False;
             with self._sockLock:
+                self._inBuf.Drop(); # cleanup previous calls data ( junk )
                 while not isOk:
                     try:
                         self._Send(payload);
-                        if not self._ReadResponse(responseSize):
+                        if not self._ReadResponse(responseSize, timeout):
                             continue;
                         else:
                             result = self._PopUnread();
+                            print("Result from request %s"%result);
                             isOk = True;
                     except Exception as ex:
                         print("Exception at Request in rcon %s" %str(ex));
@@ -137,7 +145,7 @@ class RCON(object):
     def Say(self, msg):
         if not type(msg) == bytes:
             msg = bytes(msg, "UTF-8")
-            return self.Request(b"\xff\xff\xff\xffrcon %b say %b" % (self._password, msg));
+        return self.Request(b"\xff\xff\xff\xffrcon %b say %b" % (self._password, msg));
 
     def SvTell(self, clientId, msg):
         if not type(msg) == bytes:
@@ -216,6 +224,7 @@ class RCON(object):
         response = self.Request(b"\xff\xff\xff\xffrcon %b g_siegeteam1" % (self._password))
         response = response.decode("UTF-8", "ignore")
         if response != None and len(response) > 0:
+            print("Fucking get team1 %s"%response);
             response = response.removeprefix("print\n\"g_siegeTeam1\" is:")
             response = response.split('"')[1][:-2]
         return response
@@ -224,6 +233,7 @@ class RCON(object):
         response = self.Request(b"\xff\xff\xff\xffrcon %b g_siegeteam2" % (self._password))
         response = response.decode("UTF-8", "ignore")
         if response != None and len(response) > 0:
+            print("Fucking get team2 %s"%response);
             response = response.removeprefix("print\n\"g_siegeTeam2\" is:")
             response = response.split('"')[1][:-2]
         return response
@@ -234,9 +244,13 @@ class RCON(object):
 
     def MapReload(self, mapName):
         """ USE THIS """
-        currMap = mapName
-        #self._Send(b"\xff\xff\xff\xffrcon %b mbmode 4" % (self._password))
-        return self.Request(b"\xff\xff\xff\xffrcon %b map %b" % (self._password, currMap))
+        if not type(mapName) == bytes:
+            mapName = bytes(mapName, "UTF-8")
+        with self._responseParserLock:
+            self._responseParser = lambda bb : True if bb.decode("UTF-8", "ignore").rfind("InitGame:") != -1 else False;
+            response =  self.Request(b"\xff\xff\xff\xffrcon %b map %b" % (self._password, mapName), 1024*32, 120 );
+            self._responseParser = None;
+            return response;
 
     def GetCurrentMap(self):
         response = self.Request(b"\xff\xff\xff\xffrcon %b mapname" % (self._password))
@@ -295,11 +309,11 @@ class RCON(object):
             else:
                 if cleanUp:
                     payload += f'unset {vstrStorage}'
-            self.SetVstr(vstrStorage, payload)
-            self.ExecVstr(vstrStorage)
-            payload = cmd
-            if sleepBetweenChunks > 0:
-                time.sleep(sleepBetweenChunks)
+                self.SetVstr(vstrStorage, payload)
+                self.ExecVstr(vstrStorage)
+                payload = cmd
+                if sleepBetweenChunks > 0:
+                    time.sleep(sleepBetweenChunks)
         if len(payload) > 0:
             if cleanUp:
                 payload += f'unset {vstrStorage}'

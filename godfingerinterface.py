@@ -44,10 +44,6 @@ class IServerInterface():
     def IsOpened(self) -> bool:
         return False
 
-    # str are server response, can be None or ""
-    def SendCommand(self, args : list[str], force : bool = False) -> str:
-        return "Not implemented";
-
     def SvSay(self, text : str) -> str:
         return "Not implemented";
 
@@ -117,12 +113,14 @@ class IServerInterface():
     def DumpUser(self, pid : int ) -> str:
         return "Not implemented";
     
-
     def GetMessages(self) -> queue.Queue:
         return None;
 
     def GetType(self) -> int:
         return IFACE_TYPE_INVALID;
+
+    def BatchExecute(self, vstrStorage, cmdList, sleepBetweenChunks=0, cleanUp=True):
+        return;
 
     def Test(self):
         pass;
@@ -207,7 +205,7 @@ class RconInterface(AServerInterface):
             return self._rcon.Say(text);
         return None;
 
-    def SvTell(self, text : str, pid : int ) -> str:
+    def SvTell(self, pid : int, text : str) -> str:
         if self.IsOpened():
             return self._rcon.SvTell(pid,text);
         return None;
@@ -215,6 +213,10 @@ class RconInterface(AServerInterface):
     def TeamSay(self, players, team, vstrStorage, msg):
         if self.IsOpened():
             self._rcon.TeamSay(players,team,vstrStorage,msg);
+    
+    def BatchExecute(self, vstrStorage, cmdList, sleepBetweenChunks=0, cleanUp=True):
+        if self.IsOpened():
+            return self._rcon.BatchExecute(vstrStorage, cmdList, sleepBetweenChunks, cleanUp);
 
     def MbMode(self, mode : int) -> str:
         if self.IsOpened():
@@ -697,13 +699,6 @@ class PtyInterface(AServerInterface):
     def __del__(self):
         self.Close();
     
-    # def _ReadyListener(self, line : str) -> bool:
-    #     if line.find("Common Initialization Complete") != -1:
-    #         self._isReady = True;
-    #         Log.info("pty listener is ready, server is up.");
-    #         return True;
-
-
     #region PtyCommands
 
     def _TruncateString(self, text : str) -> list[str]:
@@ -1006,27 +1001,6 @@ class PtyInterface(AServerInterface):
     def _EnqueueCommandProc(self, cmdProc):
         with self._commandProcQLock:
             self._commandProcQueue.put(cmdProc);
-
-    # def _ThreadHandlePtyOutput(self, control, frameTime):
-    #     while True:
-    #         timeStart = time.time();
-    #         with self._ptyThreadOutputLock:
-    #             if control.stop:
-    #                 break;
-    #         if not self._ptyInstance.closed:
-    #             try:                       
-    #                 toSleep = frameTime - (time.time() - timeStart);
-    #                 if toSleep < 0:
-    #                     toSleep = 0;
-    #                 time.sleep(toSleep);
-    #             except EOFError as eofEx:
-    #                 Log.debug("Server pty was closed, terminating Output thread.");
-    #                 self._ptyInstance.close();
-    #                 break;
-    #         else:
-    #             Log.debug("MBII PTY closed.");
-    #             self._ptyInstance.close();
-    #             break;
     
     def Open(self) -> bool:
         if not super().Open():
@@ -1034,9 +1008,7 @@ class PtyInterface(AServerInterface):
         
         self._ptyThreadInputControl.stop    = False;
         self._ptyThreadInput                = threading.Thread(target=self._ThreadHandlePtyInput, daemon=True, args=(self._ptyThreadInputControl, self._inputDelay));
-        # self._ptyThreadOutputControl.stop   = False;
-        # self._ptyThreadOutput               = threading.Thread(target=self._ThreadHandlePtyOutput, daemon=True, args=(self._ptyThreadOutputControl, self._inputDelay, self._outputDelay));
-        #Log.debug("Arguments for child process : %s"%str(self._args));
+
         self._ptyInstance = ptym.PtyProcess.spawn(self._args if self._args != None else [],\
                                                 cwd=self._cwd,\
                                                 dimensions=(1024, 1024));
@@ -1059,11 +1031,7 @@ class PtyInterface(AServerInterface):
             if self._ptyThreadInput.is_alive:
                 with self._ptyThreadInputLock:
                     self._ptyThreadInputControl.stop = True;
-            # if self._ptyThreadOutput.is_alive:
-            #     with self._ptyThreadOutputLock:
-            #         self._ptyThreadOutputControl.stop = True;
             self._ptyThreadInput.join();
-            # self._ptyThreadOutput.join();
             self._isOpened = False;
         super().Close();
     
