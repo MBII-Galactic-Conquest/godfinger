@@ -122,6 +122,18 @@ class IServerInterface():
     def BatchExecute(self, vstrStorage, cmdList, sleepBetweenChunks=0, cleanUp=True):
         return;
 
+    # R20.1.01 
+    def SvSound(self, soundName : str) -> bytes:
+        return;
+    
+    # R20.1.01 
+    def TeamSound(self, soundName : str, teamId : int) -> bytes:
+        return;
+    
+    # R20.1.01 
+    def ClientSound(self, soundName : str, clientId : int) -> bytes:
+        return;
+
     def Test(self):
         pass;
 
@@ -311,6 +323,24 @@ class RconInterface(AServerInterface):
     def DumpUser(self, pid : int ) -> str:
         if self.IsOpened():
             return self._rcon.DumpUser(pid);
+        return None;
+
+    # R20.1.01 
+    def SvSound(self, soundName : str) -> str:
+        if self.IsOpened():
+            return self._rcon.SvSound(soundName);
+        return None;
+    
+    # R20.1.01 
+    def TeamSound(self, soundName : str, teamId : int) -> bytes:
+        if self.IsOpened():
+            return self._rcon.TeamSound(soundName, teamId);
+        return None;
+    
+    # R20.1.01 
+    def ClientSound(self, soundName : str, clientId : int) -> bytes:
+        if self.IsOpened():
+            return self._rcon.ClientSound(soundName, clientId);
         return None;
 
 #region EndRconCommands
