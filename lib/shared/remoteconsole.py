@@ -201,16 +201,16 @@ class RCON(object):
         return self.Request(b"\xff\xff\xff\xffrcon %b g_siegeteam2 \"%b\"" % (self._password, team))
     
     # R20.1.01 
-    def SvSound(self, soundName : str) -> bytes:
-         return self.Request(b"\xff\xff\xff\xffrcon %b snd \"%s\"" % (self._password, soundName))
+    def SvSound(self, soundName : str) -> bytes:     
+        return self.Request(b"\xff\xff\xff\xffrcon %b snd \"%s\"" % (self._password, soundName.encode()))
     
     # R20.1.01 
     def TeamSound(self, soundName : str, teamId : int) -> bytes:
-         return self.Request(b"\xff\xff\xff\xffrcon %b sndTeam %i \"%s\"" % (self._password, teamId, soundName))
+        return self.Request(b"\xff\xff\xff\xffrcon %b sndTeam %i \"%s\"" % (self._password, teamId, soundName.encode()))
     
     # R20.1.01 
     def ClientSound(self, soundName : str, clientId : int) -> bytes:
-         return self.Request(b"\xff\xff\xff\xffrcon %b sndClient %i \"%s\"" % (self._password, clientId, soundName))
+        return self.Request(b"\xff\xff\xff\xffrcon %b sndClient %i \"%s\"" % (self._password, clientId, soundName.encode()))
 
     def SetCvar(self, cvar, val):
         if not type(cvar) == bytes:
