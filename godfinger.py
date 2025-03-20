@@ -148,8 +148,6 @@ CONFIG_FALLBACK = \
 }
 """
 
-if not IsUnix:
-    import winpty;
 
 class MBIIServer:
 
