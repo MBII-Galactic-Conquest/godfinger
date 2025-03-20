@@ -53,7 +53,7 @@ class Automessage():
     
     def SendAutoMessage(self):
         message = random.choice(self.config.cfg['messages'])
-        self._serverData.rcon.svsay(self.config.cfg["prefix"] + message);
+        self._serverData.interface.SvSay(self.config.cfg["prefix"] + message);
 
     def _main_thread(self, control, interval):
         while(True):
