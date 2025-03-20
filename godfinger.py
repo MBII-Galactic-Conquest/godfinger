@@ -330,17 +330,53 @@ class MBIIServer:
     # version : 1.0.1.0 26
     # game    : MBII
     # udp/ip  : localhost:29070 os(Windows) type(public dedicated)
-    # map     : mb2_smuggler gametype(7)
+    # map    : mb2_smuggler gametype(7)
     # players : 0 humans, 0 bots (32 max)
     # uptime  : 0h0m16s
     # cl score ping name            address                                 rate
     # -- ----- ---- --------------- --------------------------------------- -----
-
+    #  0     0   50 ^0^1C^0 ^72cwldys ^7                     he;put;my;ip;into;repository 50000
     def _FetchStatus(self):
         statusStr = self._svInterface.Status();
         if statusStr != None:
-            Log.debug("SERVER STATUS " + statusStr);
+            Log.debug(statusStr);
             splitted = statusStr.splitlines();
+            versionSplit = splitted[2].split();
+            version = versionSplit[2] + "_" + versionSplit[3];
+            gameType = splitted[3].split()[2];
+            mapLine = splitted[5];
+            splittedMap = mapLine.split();
+            mapName = splittedMap[2];
+            mode    = int(splittedMap[3][splittedMap[3].find("(")+1:splittedMap[3].rfind(")")]);
+            Log.info("Version %s, GameType %s, Mapname %s, Mode %i" %(version, gameType, mapName, mode));
+            self._serverData.version = version;
+            self._serverData.gameType = gameType;
+            self._serverData.mapName = mapName;
+            self._serverData.mode = mode;
+            l = len( splitted );
+            if l > 10:
+                for i in range (10, l):
+                    line = splitted[i];
+                    playerSplit = line.split();
+                    if len(playerSplit) >= 6: # hardcode
+                        addr = playerSplit[-2];
+                        id = int(playerSplit[0]);
+                        extraName = len(playerSplit) - 6;
+                        name = playerSplit[3];
+                        for i in range(extraName):
+                            name += " " + playerSplit[4 + i];
+                        if name[0] == '(' and name[-1] == ')':
+                            name = name[1:-1]   # strip only first and last '(' and ')' chars
+                        Log.debug("Status client info addr %s, id %s, name \"%s\"" %(addr, id, name));
+                        existing = self._clientManager.GetClientById(id);
+                        if existing == None:
+                            newClient = client.Client(id, name, addr)
+                            self._clientManager.AddClient(newClient);
+                        else:
+                            if existing.GetName() != name:
+                                existing._name = name;
+                            if existing.GetAddress() != addr:
+                                existing._address = addr;
             playersLine = splitted[6];
             startIndex = playersLine.find("(");
             endIndex = playersLine.find(" max");
@@ -413,26 +449,6 @@ class MBIIServer:
             message = messages.get();
             self._ParseMessage(message);
         self._pluginManager.Loop();
-    
-    def _GetClients(self):
-        status = self._svInterface.Status();
-        if status != None:
-            status = status.split('\n')
-            status = status[9:]
-            for line in status:
-                if len(line) > 0 and line[1] != '-':
-                    lineParse = line.split();
-                    extraName = len(lineParse) - 6;
-                    id = int(lineParse[0]);
-                    ip = lineParse[-2].strip(")");
-                    name = lineParse[3];
-                    if extraName > 0:
-                        for i in range(extraName):
-                            name += " " + lineParse[4 + i];
-                    newClient = client.Client(id, name, ip);
-                    self._clientManager.AddClient(newClient); # make sure its added BEFORE events are processed
-                    self._pluginManager.Event( godfingerEvent.ClientConnectEvent( newClient, None ) );
-        
 
     def _ParseMessage(self, message : logMessage.LogMessage):
         
@@ -619,7 +635,6 @@ class MBIIServer:
         extraName = len(lineParse) - 6;
         id = int(lineParse[3 + extraName]);
         ip = lineParse[-1].strip(")");
-        #Log.debug("I've got a result !\n%s"%self._svInterface.DumpUser(id));
         name = lineParse[1];
         for i in range(extraName):
             name += " " + lineParse[2 + i];

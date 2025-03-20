@@ -14,10 +14,13 @@ class ServerData():
         self.args = args;
         self.lock = threading.Lock()
         self.serverVars = {}
-        self.mapName = "";
         self.rcon = rcon;
         self.interface = iface;
         self.maxPlayers = 0;
+        self.version = "";
+        self.gameType = "";
+        self.mapName = "";
+        self.mode = -1;
     
     def GetInterfaceType(self):
         return self.interface.GetType();

@@ -76,21 +76,10 @@ class VPNMonitor():
             self._status = -1;
 
     def Start(self) -> bool:
-        statusStr = self._serverData.interface.Status();
-        if statusStr != None:
-            Log.debug(statusStr);
-            splitted = statusStr.splitlines();
-            l = len( splitted );
-            if l > 10:
-                for i in range (10, l):
-                    line = splitted[i];
-                    playerSplit = line.split();
-                    if len(playerSplit) >= 6: # hardcode
-                        addr = playerSplit[-2];
-                        ip = addr[:addr.rfind(":")];
-                        id = int(playerSplit[0]);
-                        vpnType = self.GetIpVpnType(ip);
-                        self.ProcessVpnClient(id, ip, vpnType);
+        allClients = self._serverData.API.GetAllClients();
+        for cl in allClients:
+            vpnType = self.GetIpVpnType(cl.GetIp());
+            self.ProcessVpnClient(id, cl.GetIp(), vpnType);
         if self._status == 0:
             return True;
         else:
