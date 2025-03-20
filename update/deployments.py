@@ -39,6 +39,9 @@ else:  # Non-Windows (Linux, macOS)
     else:
         print("Git executable not found on the system.")
 
+# Disable detached HEAD advice (suppress warning)
+subprocess.run([GIT_EXECUTABLE, "config", "advice.detachedHead", "false"], check=True)
+
 # Create default .env if it doesn't exist
 if not os.path.exists(ENV_FILE):
     with open(ENV_FILE, "w") as f:
@@ -131,9 +134,6 @@ for repo_branch, deploy_key in deployments.items():
         except subprocess.CalledProcessError as e:
             print(f"Error updating {repo_branch}: {e}")
             continue
-
-    # Disable detached HEAD advice (suppress warning)
-    subprocess.run([GIT_EXECUTABLE, "config", "advice.detachedHead", "false"], check=True)
 
     # Ask for commit hash (optional)
     commit_hash = input(f"Enter specific commit hash for {repo_branch} (or press Enter to deploy latest HEAD): ").strip()
