@@ -30,13 +30,13 @@ class RCON(object):
         if not self.IsOpened():
             self._inBuf.Drop();
             # This try block makes no sense for UDP because we dont modify MBII for custom UDP-subprotocol
-            try:
-                self._sock.bind((self._bindAddr, 0));
-                self._sock.connect(self._address);
-                self._sock.settimeout(0.001);
-                self._isOpened = True;
-            except Exception:
-                return False;
+            # try:
+            #     self._sock.bind((self._bindAddr, 0));
+            #     self._sock.connect(self._address);
+            #     self._sock.settimeout(0.001);
+            self._isOpened = True;
+            # except Exception:
+            #     return False;
         return self._isOpened;
 
     def Close(self):
@@ -46,8 +46,13 @@ class RCON(object):
                 self._sock.close();
             self._isOpened = False;
 
+    # Throwaway socket variant
     def _Send(self, payload : bytes):
         if self.IsOpened():
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Socket descriptor sending/receiving rcon commands to/from the server.
+            self._sock.bind((self._bindAddr, 0)) # Setting port as 0 will let the OS pick an available port for us.
+            self._sock.settimeout(0.001)
+            self._sock.connect(self._address)
             l = len(payload);
             sent = 0;
             while sent < l:
@@ -269,7 +274,7 @@ class RCON(object):
             mapName = bytes(mapName, "UTF-8")
         response =  self.Request(b"\xff\xff\xff\xffrcon %b map %b" % (self._password, mapName), 1024*32, 120, self._MapReloadParser);
         time.sleep(5); # man, this is hard, 5 just in case, we cant be sure when it ends because there is no strict protocol
-        self._ClearInputSocket();
+        #self._ClearInputSocket();
         return response;
 
     def GetCurrentMap(self):
@@ -300,9 +305,12 @@ class RCON(object):
                 res = res.decode("UTF-8", "ignore");
             return res;
   
+    def _CvarListParser(self, bb : bytes) -> bool:
+        return True if bb.decode("UTF-8", "ignore").rfind("total cvars") != -1 else False;
+
     def CvarList(self) -> str:
         start = time.time();
-        res = self.Request(b"\xff\xff\xff\xffrcon %b cvarlist" % (self._password))
+        res = self.Request(b"\xff\xff\xff\xffrcon %b cvarlist" % (self._password), responseParser=self._CvarListParser)
         if len(res) == 0:
             return None;
         res = res.decode("UTF-8", "ignore");

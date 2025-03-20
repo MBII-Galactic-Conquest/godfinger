@@ -339,7 +339,7 @@ class MBIIServer:
     def _FetchStatus(self):
         statusStr = self._svInterface.Status();
         if statusStr != None:
-            Log.debug(statusStr);
+            Log.debug("SERVER STATUS " + statusStr);
             splitted = statusStr.splitlines();
             playersLine = splitted[6];
             startIndex = playersLine.find("(");
