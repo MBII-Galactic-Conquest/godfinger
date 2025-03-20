@@ -103,7 +103,7 @@ CONFIG_FALLBACK = \
     {
         "pty":
         {
-            "target":"name/to/batch.bat",
+            "target":"path/to/your/mbiided.exe",
             "inputDelay":0.001
         },
         "rcon":
@@ -127,7 +127,7 @@ CONFIG_FALLBACK = \
             }
         }
     },
-    "interface":"pty",
+    "interface":"rcon",
     
 
     "paths":
