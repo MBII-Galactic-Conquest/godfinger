@@ -217,17 +217,19 @@ def sync_repo(commit_hash=None):
         subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], check=True)
         subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{BRANCH_NAME}"], check=True)
         subprocess.run([GIT_EXECUTABLE, "pull", "origin", BRANCH_NAME], check=True)
-        print("[GITHUB] Repository is now up to date.")
-        
+
+        # Disable detached HEAD advice (suppress warning)
+        subprocess.run([GIT_EXECUTABLE, "config", "advice.detachedHead", "false"], check=True)
+
         # If commit_hash is None, grab latest HEAD
-        if not commit_hash:
+        if commit_hash == None:
             print("[GITHUB] Repository is now synced to latest HEAD.")
             commit_hash = subprocess.run(
                 [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
             ).stdout.strip()
 
         # If a commit_hash is provided, checkout that specific commit
-        if commit_hash:
+        if commit_hash != None:
             print(f"[GITHUB] Checking out commit {commit_hash} ...")
             subprocess.run([GIT_EXECUTABLE, "checkout", commit_hash], check=True)
             print(f"[GITHUB] Checked out commit {commit_hash} ...")
