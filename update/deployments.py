@@ -132,6 +132,9 @@ for repo_branch, deploy_key in deployments.items():
             print(f"Error updating {repo_branch}: {e}")
             continue
 
+    # Disable detached HEAD advice (suppress warning)
+    subprocess.run([GIT_EXECUTABLE, "config", "advice.detachedHead", "false"], check=True)
+
     # Ask for commit hash (optional)
     commit_hash = input(f"Enter specific commit hash for {repo_branch} (or press Enter to deploy latest HEAD): ").strip()
     
