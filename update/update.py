@@ -14,6 +14,7 @@ REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
 REPO_PATH = "../"
 CFG_FILE_PATH = "commit.cfg"
 UPDATE_CFG_FILE = "updateCfg.json"
+COMMIT_ENV_FILE = "commit.env"
 
 # Directory for extracting 7z files
 EXTRACT_DIR = "../temp"
@@ -164,6 +165,33 @@ def start():
     if user_choice != 'y':
         exit(0)  # Exit if the user does not want to update
 
+    # Ask if they want to grab the latest HEAD for the specified branch
+    grab_head = input(f"Do you wish to grab the latest HEAD for the branch '{BRANCH_NAME}'? (Y/N): ").strip().lower()
+
+    if grab_head == 'y':
+        # User wants the latest HEAD, so set commit_hash to None to fetch the latest HEAD
+        commit_hash = None
+    else:
+        # If user chooses N, we ask them for a specific commit hash or use commit.env logic
+        commit_hash = input("Enter the 7-character commit hash you want to grab (or press Enter to use commit.env): ").strip()
+        if not commit_hash:
+            # If the user doesn't provide a commit hash, check if commit.env has a valid one
+            if os.path.exists(COMMIT_ENV_FILE):
+                with open(COMMIT_ENV_FILE, 'r') as file:
+                    stored_commit_hash = file.read().strip()
+                    if len(stored_commit_hash) == 7:  # Ensure it's a valid 7-character commit hash
+                        commit_hash = stored_commit_hash
+                    else:
+                        print("[INFO] Invalid commit hash in commit.env, using latest HEAD.")
+                        commit_hash = None
+            else:
+                print(f"[INFO] {COMMIT_ENV_FILE} not found. Will use the latest HEAD.")
+                with open(COMMIT_ENV_FILE, 'w') as file:
+                    file.write()
+                print(f"[INFO] {COMMIT_ENV_FILE} successfully created.")
+                commit_hash = None
+    return commit_hash
+
 def fetch_deploy():
     print(f"[DEPLOY] Checking for deployment keys in deployments.env...")
     deployment = os.path.abspath("./deployments.py")
@@ -183,7 +211,7 @@ def clone_repo_if_needed():
     subprocess.run([GIT_EXECUTABLE, "clone", "--branch", BRANCH_NAME, REPO_URL, REPO_PATH], check=True)
 
 # Sync repository (force update to latest commit)
-def sync_repo():
+def sync_repo(commit_hash=None):
     print("[GITHUB] Fetching latest changes...")
     try:
         subprocess.run([GIT_EXECUTABLE, "fetch", "--all"], check=True)
@@ -191,10 +219,11 @@ def sync_repo():
         subprocess.run([GIT_EXECUTABLE, "pull", "origin", BRANCH_NAME], check=True)
         print("[GITHUB] Repository is now up to date.")
         
-        # Get the latest commit hash
-        commit_hash = subprocess.run(
-            [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
-        ).stdout.strip()
+        # If commit_hash is None, grab latest HEAD
+        if not commit_hash:
+            commit_hash = subprocess.run(
+                [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
+            ).stdout.strip()
 
         # Write commit hash to commit.cfg
         with open(CFG_FILE_PATH, "w") as f:
@@ -211,10 +240,10 @@ def remove_temp_files():
 
 # Main script execution
 if __name__ == "__main__":
-    start()
+    commit_hash = start()
     if check_git_installed():
         clone_repo_if_needed()
-        sync_repo()
+        sync_repo(commit_hash)
         fetch_deploy()
     else:
         print("[INFO] Using 7-Zip Portable to extract Git...")
@@ -224,7 +253,7 @@ if __name__ == "__main__":
             extract_git(git_archive_path)
 
         clone_repo_if_needed()
-        sync_repo()
+        sync_repo(commit_hash)
         remove_temp_files()
         fetch_deploy()
 
