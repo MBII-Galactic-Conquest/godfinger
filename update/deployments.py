@@ -39,9 +39,6 @@ else:  # Non-Windows (Linux, macOS)
     else:
         print("Git executable not found on the system.")
 
-# Disable detached HEAD advice (suppress warning)
-subprocess.run([GIT_EXECUTABLE, "config", "advice.detachedHead", "false"], check=True)
-
 # Create default .env if it doesn't exist
 if not os.path.exists(ENV_FILE):
     with open(ENV_FILE, "w") as f:
@@ -150,6 +147,8 @@ for repo_branch, deploy_key in deployments.items():
 
     # Checkout specific commit if provided
     try:
+        # Disable detached HEAD advice
+        subprocess.run([GIT_EXECUTABLE, "config", "--local", "advice.detachedHead", "false"], cwd=repo_dir, check=True)
         subprocess.run([GIT_EXECUTABLE, "checkout", commit_hash], cwd=repo_dir, check=True, env=git_env)
         print(f"Checked out commit {commit_hash} for {repo_branch}")
         latest_commits[repo_branch] = commit_hash
