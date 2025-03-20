@@ -225,7 +225,14 @@ def sync_repo(commit_hash=None):
                 [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
             ).stdout.strip()
 
+        # If a commit_hash is provided, checkout that specific commit
+        if commit_hash:
+            print(f"[GITHUB] Checking out commit {commit_hash} ...")
+            subprocess.run([GIT_EXECUTABLE, "checkout", commit_hash], check=True)
+            print(f"[GITHUB] Checked out commit {commit_hash} ...")
+
         # Write commit hash to commit.cfg
+        print(f"[GITHUB] Current hash written to {CFG_FILE_PATH} ...")
         with open(CFG_FILE_PATH, "w") as f:
             f.write(commit_hash)
 
