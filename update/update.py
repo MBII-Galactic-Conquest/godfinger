@@ -230,9 +230,7 @@ def sync_repo(commit_hash=None):
 
         # If a commit_hash is provided, checkout that specific commit
         if commit_hash != None:
-            print(f"[GITHUB] Checking out commit {commit_hash} ...")
             subprocess.run([GIT_EXECUTABLE, "checkout", commit_hash], check=True)
-            print(f"[GITHUB] Checked out commit {commit_hash} ...")
 
         # Write commit hash to commit.cfg
         print(f"[GITHUB] Current hash written to {CFG_FILE_PATH} ...")
