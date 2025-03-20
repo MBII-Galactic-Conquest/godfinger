@@ -221,15 +221,14 @@ def sync_repo(commit_hash=None):
         # Disable detached HEAD advice (suppress warning)
         subprocess.run([GIT_EXECUTABLE, "config", "advice.detachedHead", "false"], check=True)
 
-        # If commit_hash is None, grab latest HEAD
+        # If commit_hash is None, grab latest HEAD, else, grab specific commit
         if commit_hash == None:
             print("[GITHUB] Repository is now synced to latest HEAD.")
             commit_hash = subprocess.run(
                 [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
             ).stdout.strip()
-
-        # If a commit_hash is provided, checkout that specific commit
-        if commit_hash != None:
+        else:
+            print(f"[GITHUB] Checking out commit {commit_hash} ...")
             subprocess.run([GIT_EXECUTABLE, "checkout", commit_hash], check=True)
 
         # Write commit hash to commit.cfg
