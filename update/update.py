@@ -173,7 +173,7 @@ def start():
         commit_hash = None
     else:
         # If user chooses N, we ask them for a specific commit hash or use commit.env logic
-        commit_hash = input("Enter the 7-character commit hash you want to grab (or press Enter to use commit.env): ").strip()
+        commit_hash = input("\nEnter the 7-character commit hash you want to grab (or press Enter to use commit.env): ").strip()
         if not commit_hash:
             # If the user doesn't provide a commit hash, check if commit.env has a valid one
             if os.path.exists(COMMIT_ENV_FILE):

@@ -133,7 +133,7 @@ for repo_branch, deploy_key in deployments.items():
             continue
 
     # Ask for commit hash (optional)
-    commit_hash = input(f"Enter specific commit hash for {repo_branch} (or press Enter to deploy latest HEAD): ").strip()
+    commit_hash = input(f"\nEnter specific commit hash for {repo_branch} (or press Enter to deploy latest HEAD): ").strip()
     
     # If the user doesn't provide a commit hash, get the latest HEAD
     if not commit_hash:
