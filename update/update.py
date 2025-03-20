@@ -221,6 +221,7 @@ def sync_repo(commit_hash=None):
         
         # If commit_hash is None, grab latest HEAD
         if not commit_hash:
+            print("[GITHUB] Repository is now synced to latest HEAD.")
             commit_hash = subprocess.run(
                 [GIT_EXECUTABLE, "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
             ).stdout.strip()
