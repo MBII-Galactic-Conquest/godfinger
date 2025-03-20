@@ -132,13 +132,29 @@ for repo_branch, deploy_key in deployments.items():
             print(f"Error updating {repo_branch}: {e}")
             continue
 
-    # Get latest commit hash
+    # Ask for commit hash (optional)
+    commit_hash = input(f"Enter specific commit hash for {repo_branch} (or press Enter to deploy latest HEAD): ").strip()
+    
+    # If the user doesn't provide a commit hash, get the latest HEAD
+    if not commit_hash:
+        try:
+            result = subprocess.run([GIT_EXECUTABLE, "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True, check=True)
+            commit_hash = result.stdout.strip()
+            print(f"Using latest HEAD: {commit_hash}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error getting latest commit hash for {repo_branch}: {e}")
+            continue
+
+    # Checkout specific commit if provided
     try:
-        result = subprocess.run([GIT_EXECUTABLE, "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True, check=True)
-        latest_commits[repo_branch] = result.stdout.strip()
-        print(f"Updated {repo_branch} -> {repo_dir}")
+        subprocess.run([GIT_EXECUTABLE, "checkout", commit_hash], cwd=repo_dir, check=True, env=git_env)
+        print(f"Checked out commit {commit_hash} for {repo_branch}")
+        latest_commits[repo_branch] = commit_hash
     except subprocess.CalledProcessError as e:
-        print(f"Error getting latest commit hash for {repo_branch}: {e}")
+        print(f"Error checking out commit {commit_hash} for {repo_branch}: {e}")
+        continue
+
+    print(f"Deployed {repo_branch} -> {repo_dir}")
 
 print("Deployment process completed.")
 input("Press Enter to exit...")
