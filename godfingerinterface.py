@@ -123,15 +123,18 @@ class IServerInterface():
         return;
 
     # R20.1.01 
-    def SvSound(self, soundName : str) -> bytes:
+    def SvSound(self, soundName : str) -> str:
         return;
     
     # R20.1.01 
-    def TeamSound(self, soundName : str, teamId : int) -> bytes:
+    def TeamSound(self, soundName : str, teamId : int) -> str:
         return;
     
     # R20.1.01 
-    def ClientSound(self, soundName : str, clientId : int) -> bytes:
+    def ClientSound(self, soundName : str, clientId : int) -> str:
+        return;
+
+    def Smsay(self, msg : str) -> str:
         return;
 
     def Test(self):
@@ -332,15 +335,20 @@ class RconInterface(AServerInterface):
         return None;
     
     # R20.1.01 
-    def TeamSound(self, soundName : str, teamId : int) -> bytes:
+    def TeamSound(self, soundName : str, teamId : int) -> str:
         if self.IsOpened():
             return self._rcon.TeamSound(soundName, teamId);
         return None;
     
     # R20.1.01 
-    def ClientSound(self, soundName : str, clientId : int) -> bytes:
+    def ClientSound(self, soundName : str, clientId : int) -> str:
         if self.IsOpened():
             return self._rcon.ClientSound(soundName, clientId);
+        return None;
+
+    def SmSay(self, soundName : str, clientId : int) -> str:
+        if self.IsOpened():
+            return self._rcon.SmSay(soundName, clientId);
         return None;
 
 #region EndRconCommands
