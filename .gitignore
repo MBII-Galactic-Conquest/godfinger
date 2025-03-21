@@ -4,7 +4,9 @@ plugins/private/*
 !plugins/private/.keep
 
 update/deploy/*
+!update/deploy/.keep
 update/key/*
+!update/key/.keep
 
 *.code-workspace
 
