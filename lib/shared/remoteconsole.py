@@ -347,3 +347,6 @@ class RCON(object):
                 payload += f'unset {vstrStorage}'
             self.SetVstr(vstrStorage, payload)
             self.ExecVstr(vstrStorage)
+
+    def SmSay(self, msg : str):
+        return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self.rcon_pwd, msg));

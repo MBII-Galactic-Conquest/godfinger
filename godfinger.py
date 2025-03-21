@@ -335,7 +335,7 @@ class MBIIServer:
     # uptime  : 0h0m16s
     # cl score ping name            address                                 rate
     # -- ----- ---- --------------- --------------------------------------- -----
-    #  0     0   50 ^0^1C^0 ^72cwldys ^7                     he;put;my;ip;into;repository 50000
+    #  0     0   50 ^0^1C^0 ^72cwldys ^7                     127.0.0.1:20071 50000
     def _FetchStatus(self):
         statusStr = self._svInterface.Status();
         if statusStr != None:
