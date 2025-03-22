@@ -187,7 +187,7 @@ def start():
             else:
                 print(f"[INFO] {COMMIT_ENV_FILE} not found. Will use the latest HEAD.")
                 with open(COMMIT_ENV_FILE, 'w') as file:
-                    file.write()
+                    file.write("")
                 print(f"[INFO] {COMMIT_ENV_FILE} successfully created.")
                 commit_hash = None
     return commit_hash
