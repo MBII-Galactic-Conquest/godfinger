@@ -2,6 +2,7 @@ import subprocess
 import json
 import os
 import time
+import shutil
 import requests
 
 CONFIG_FILE = "gtConfig.json"
@@ -9,6 +10,52 @@ PLACEHOLDER = "placeholder"
 PLACEHOLDER_REPO = "placeholder/placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
+
+# Check if the system is Windows
+if os.name == 'nt':  # Windows
+    GIT_PATH = shutil.which("git")
+
+    if GIT_PATH is None:
+        # If Git is not found, check a fallback directory
+        GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
+        GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
+    else:
+        GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
+
+    PYTHON_CMD = "python"  # On Windows, just use 'python'
+
+    # Set the environment variables for Windows if Git was found
+    if GIT_EXECUTABLE:
+        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+        print(f"Git executable set to: {GIT_EXECUTABLE}")
+    else:
+        print("Git executable could not be set. Ensure Git is installed.")
+
+else:  # Non-Windows (Linux, macOS)
+    # Get the default Git executable path
+    GIT_EXECUTABLE = shutil.which("git")
+    PYTHON_CMD = "python3" if shutil.which("python3") else "python"
+
+    if GIT_EXECUTABLE:
+        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+        print(f"Git executable set to default path: {GIT_EXECUTABLE}")
+    else:
+        print("Git executable not found on the system.")
+
+# Function to check if Git is installed
+def check_git_installed():
+    global GIT_EXECUTABLE
+    if shutil.which("git") or os.path.exists(GIT_EXECUTABLE):
+        try:
+            subprocess.run([GIT_EXECUTABLE, "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print("[INFO] Git is installed.")
+            return True
+        except subprocess.CalledProcessError:
+            print("[ERROR] Git version check failed.")
+            return False
+    else:
+        print("[ERROR] Git is not installed.")
+        exit(0)
 
 def create_config_placeholder():
     """Creates gtConfig.json with placeholder repositories if it doesn't exist."""
@@ -123,4 +170,5 @@ def monitor_commits():
 
 if __name__ == "__main__":
     create_config_placeholder()  # Ensure gtConfig.json exists with placeholder values
+    check_git_installed()
     monitor_commits()
