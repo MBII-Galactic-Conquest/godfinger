@@ -168,6 +168,9 @@ def get_latest_commit_info(repo_url: str, branch: str):
 
         response = requests.get(api_url)
 
+        if response.status_code == 403:
+            print(response.headers.get('X-RateLimit-Remaining'))
+
         if response.status_code == 200:
             commit_data = response.json()[0]
             commit_hash = commit_data["sha"][:7]
