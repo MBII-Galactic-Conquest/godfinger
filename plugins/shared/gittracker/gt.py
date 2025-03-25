@@ -2,8 +2,10 @@ import logging;
 import godfingerEvent;
 import pluginExports;
 import lib.shared.serverdata as serverdata
+import lib.shared.colors as colors
 import subprocess
 import json
+import sys
 import os
 import time
 import shutil
@@ -15,45 +17,43 @@ SERVER_DATA = None;
 
 ## Requires that your REPOSITORY is publicly visible ##
 
-CONFIG_FILE = "gtConfig.json"
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "gtConfig.json");
 PLACEHOLDER = "placeholder"
 PLACEHOLDER_REPO = "placeholder/placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
 
+if os.name == 'nt':  # Windows
+    GIT_PATH = shutil.which("git")
+
+    if GIT_PATH is None:
+        GIT_PATH = os.path.abspath(os.path.join("venv", "GIT", "bin"))
+        GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
+    else:
+        GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
+
+    PYTHON_CMD = "python"  # On Windows, just use 'python'
+
+    if GIT_EXECUTABLE:
+        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+        print(f"Git executable set to: {GIT_EXECUTABLE}")
+    else:
+        print("Git executable could not be set. Ensure Git is installed.")
+
+else:  # Non-Windows (Linux, macOS)
+    GIT_EXECUTABLE = shutil.which("git")
+    PYTHON_CMD = "python3" if shutil.which("python3") else "python"
+
+    if GIT_EXECUTABLE:
+        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+        print(f"Git executable set to default path: {GIT_EXECUTABLE}")
+    else:
+        print("Git executable not found on the system.")
+
 class gitTrackerPlugin(object):
-    def __init__(self, serverData) -> None:
-        self._serverData = serverData
+    def __init__(self, serverData : serverdata.ServerData) -> None:
+        self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[GT]", "lblue") + ": "
-
-# Check if the system is Windows
-def OSGitCheck():
-    if os.name == 'nt':  # Windows
-        GIT_PATH = shutil.which("git")
-
-        if GIT_PATH is None:
-            GIT_PATH = os.path.abspath(os.path.join("..", "..", "..", "venv", "GIT", "bin"))
-            GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
-        else:
-            GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
-
-        PYTHON_CMD = "python"  # On Windows, just use 'python'
-
-        if GIT_EXECUTABLE:
-            os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-            print(f"Git executable set to: {GIT_EXECUTABLE}")
-        else:
-            print("Git executable could not be set. Ensure Git is installed.")
-
-    else:  # Non-Windows (Linux, macOS)
-        GIT_EXECUTABLE = shutil.which("git")
-        PYTHON_CMD = "python3" if shutil.which("python3") else "python"
-
-        if GIT_EXECUTABLE:
-            os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-            print(f"Git executable set to default path: {GIT_EXECUTABLE}")
-        else:
-            print("Git executable not found on the system.")
 
 def check_git_installed():
     global GIT_EXECUTABLE
@@ -67,7 +67,7 @@ def check_git_installed():
             return False
     else:
         print("[ERROR] Git is not installed.")
-        exit(0)
+        sys.exit(0)
 
 def create_config_placeholder():
     if not os.path.exists(CONFIG_FILE):
@@ -102,8 +102,7 @@ def load_config():
     for repo in repositories:
         if repo["repository"] == PLACEHOLDER or repo["branch"] == PLACEHOLDER:
             print("\nPlaceholders detected in gtConfig.json. Please update the file.")
-            input("Press Enter to exit...")
-            exit(1)
+            sys.exit(0)
 
     return repositories, refresh_interval
 
@@ -112,7 +111,7 @@ def get_env_file_name(repo_url, branch_name):
     return f"{repo_name}_{branch_name}.env"
 
 def load_or_create_env(repo_url, branch_name):
-    env_dir = os.path.join(os.getcwd(), "env")
+    env_dir = os.path.join(os.path.dirname(__file__), "env")
     if not os.path.exists(env_dir):
         os.makedirs(env_dir)
 
@@ -159,7 +158,7 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         # Only update if hash or message has changed
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
-        PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + f"^5{commit_hash} ^7> {repo_url}|{branch_name} - ^5{commit_message}")
+        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5{commit_hash} ^7> {branch_name} - ^5{commit_message}")
     else:
         print(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
 
@@ -219,7 +218,6 @@ def monitor_commits():
 
                     update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message)
 
-            print("Sleeping...")
             time.sleep(refresh_interval)
 
     except KeyboardInterrupt:
@@ -257,13 +255,12 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     global PluginInstance
-    OSGitCheck()
     create_config_placeholder()
     check_git_installed()
     start_monitoring()
-    startTime = time()
-    loadTime = time() - startTime
-    PluginInstance._serverData.rcon.say(PluginInstance._messagePrefix + f"Git Tracker started in {loadTime:.2f} seconds!")
+    startTime = time.time()
+    loadTime = time.time() - startTime
+    PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"Git Tracker started in {loadTime:.2f} seconds!")
     return True; # indicate plugin start success
 
 # Called each loop tick from the system, TODO? maybe add a return timeout for next call
@@ -272,8 +269,6 @@ def OnLoop():
 
 # Called before plugin is unloaded by the system, finalize and free everything here
 def OnFinish():
-    global PluginInstance
-    del PluginInstance;
     pass;
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
