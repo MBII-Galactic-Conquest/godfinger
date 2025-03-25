@@ -160,7 +160,12 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         # Only update if hash or message has changed
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
-        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}")
+        full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
+        if len(full_message) > 137:
+            max_commit_message_length = 137 - len(f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5") - 3
+            commit_message = commit_message[:max_commit_message_length] + "..."
+            full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
+        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
     else:
         Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
 
