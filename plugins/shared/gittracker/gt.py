@@ -1,7 +1,7 @@
-#import logging;
-#import godfingerEvent;
-#import pluginExports;
-#import lib.shared.serverdata as serverdata
+import logging;
+import godfingerEvent;
+import pluginExports;
+import lib.shared.serverdata as serverdata
 import subprocess
 import json
 import os
@@ -11,39 +11,47 @@ import requests
 import threading
 from dotenv import load_dotenv, set_key
 
+## Requires that your REPOSITORY is publicly visible ##
+
 CONFIG_FILE = "gtConfig.json"
 PLACEHOLDER = "placeholder"
 PLACEHOLDER_REPO = "placeholder/placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
 
+class gitTrackerPlugin(object):
+    def __init__(self, serverData) -> None:
+        self._serverData = serverData
+        self._messagePrefix = colors.ColorizeText("[GT]", "lblue") + ": "
+
 # Check if the system is Windows
-if os.name == 'nt':  # Windows
-    GIT_PATH = shutil.which("git")
+def OSGitCheck():
+    if os.name == 'nt':  # Windows
+        GIT_PATH = shutil.which("git")
 
-    if GIT_PATH is None:
-        GIT_PATH = os.path.abspath(os.path.join("..", "..", "..", "venv", "GIT", "bin"))
-        GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
-    else:
-        GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
+        if GIT_PATH is None:
+            GIT_PATH = os.path.abspath(os.path.join("..", "..", "..", "venv", "GIT", "bin"))
+            GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
+        else:
+            GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = "python"  # On Windows, just use 'python'
+        PYTHON_CMD = "python"  # On Windows, just use 'python'
 
-    if GIT_EXECUTABLE:
-        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-        print(f"Git executable set to: {GIT_EXECUTABLE}")
-    else:
-        print("Git executable could not be set. Ensure Git is installed.")
+        if GIT_EXECUTABLE:
+            os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+            print(f"Git executable set to: {GIT_EXECUTABLE}")
+        else:
+            print("Git executable could not be set. Ensure Git is installed.")
 
-else:  # Non-Windows (Linux, macOS)
-    GIT_EXECUTABLE = shutil.which("git")
-    PYTHON_CMD = "python3" if shutil.which("python3") else "python"
+    else:  # Non-Windows (Linux, macOS)
+        GIT_EXECUTABLE = shutil.which("git")
+        PYTHON_CMD = "python3" if shutil.which("python3") else "python"
 
-    if GIT_EXECUTABLE:
-        os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-        print(f"Git executable set to default path: {GIT_EXECUTABLE}")
-    else:
-        print("Git executable not found on the system.")
+        if GIT_EXECUTABLE:
+            os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
+            print(f"Git executable set to default path: {GIT_EXECUTABLE}")
+        else:
+            print("Git executable not found on the system.")
 
 def check_git_installed():
     global GIT_EXECUTABLE
@@ -127,6 +135,7 @@ def load_or_create_env(repo_url, branch_name):
     return last_hash, last_message, env_file_path
 
 def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message):
+    global PluginInstance
     # First, reset last_hash and last_message
     last_hash, last_message, env_file_path = load_or_create_env(repo_url, branch_name)
     
@@ -148,6 +157,7 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         # Only update if hash or message has changed
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
+        PluginInstance._serverData.rcon.say(PluginInstance._messagePrefix + f"^5{commit_hash} ^7{repo_url} - ^5{commit_message}")
     else:
         print(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
 
@@ -218,100 +228,84 @@ def start_monitoring():
     monitoring_thread.daemon = True
     monitoring_thread.start()
 
-if __name__ == "__main__":
+# Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
+def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
+    logMode = logging.INFO;
+    if serverData.args.debug:
+        logMode = logging.DEBUG;
+    if serverData.args.logfile != "":
+        logging.basicConfig(
+        filename=serverData.args.logfile,
+        level=logMode,
+        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+    else:
+        logging.basicConfig(
+        level=logMode,
+        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+
+    global SERVER_DATA;
+    SERVER_DATA = serverData; # keep it stored
+    if exports != None:
+        pass;
+    global PluginInstance;
+    PluginInstance = gitTrackerPlugin(serverData)
+
+    return True; # indicate plugin load success
+
+# Called once when platform starts, after platform is done with loading internal data and preparing
+def OnStart():
+    global PluginInstance
+    OSGitCheck()
     create_config_placeholder()
     check_git_installed()
     start_monitoring()
-    input("Press Enter to stop monitoring...")
+    startTime = time()
+    loadTime = time() - startTime
+    PluginInstance._serverData.rcon.say(PluginInstance._messagePrefix + f"Git Tracker started in {loadTime:.2f} seconds!")
+    return True; # indicate plugin start success
 
-# Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
-#def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
-#    logMode = logging.INFO;
-#    if serverData.args.debug:
-#        logMode = logging.DEBUG;
-#    if serverData.args.logfile != "":
-#        logging.basicConfig(
-#        filename=serverData.args.logfile,
-#        level=logMode,
-#        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
-#    else:
-#        logging.basicConfig(
-#        level=logMode,
-#        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
-#
-#    global SERVER_DATA;
-#    SERVER_DATA = serverData; # keep it stored
-#    if exports != None:
-#        # e.g
-#        exports.Add("MyCoolFunction", MyCoolFunction);
-#        # Primitive variables are passed by assigment, not reference, so you'd better wrap your values in some kind of export data class to make it work.
-#        exports.Add("MyCoolVariables", MyCoolVariablesTable, isFunc = False);
-#        pass;
-#    return True; # indicate plugin load success
-#
-# Called once when platform starts, after platform is done with loading internal data and preparing
-#def OnStart():
-#    # You can get your cross plugin dependancies here, e.g
-#    targetPlug = SERVER_DATA.API.GetPlugin("plugins.shared.test.testPlugin");
-#    if targetPlug != None:
-#        xprts = targetPlug.GetExports();
-#        if xprts != None:
-#            myCoolFunction = xprts.Get("MyCoolFunction").pointer;
-#            myCoolVars : MyVariables = xprts.Get("MyCoolVariables").pointer;
-#            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
-#            myCoolVars.myCoolVariable = myCoolFunction(); # Execute it, if you want, or store for future use.
-#            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
-#            myCoolVars = xprts.Get("MyCoolVariables").pointer;
-#            #Log.debug("Testing Exports variable value %d", myCoolVars.myCoolVariable);
-#        else:
-#            Log.error("Failure at importing API from testPlugin.");
-#            return False;
-#    else:
-#        Log.error("Failure in getting testPlugin.");
-#        return False;
-#    return True; # indicate plugin start success
-#
 # Called each loop tick from the system, TODO? maybe add a return timeout for next call
-#def OnLoop():
-#    pass
-#    #print("Calling Loop function from plugin!");
-#
+def OnLoop():
+    pass
+
 # Called before plugin is unloaded by the system, finalize and free everything here
-#def OnFinish():
-#    pass;
-#
+def OnFinish():
+    global PluginInstance
+    del PluginInstance;
+    pass;
+
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
-#def OnEvent(event) -> bool:
-#    #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
-#    if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT:
-#        return False;
-#    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER_SPAWN:
-#        return False;
-#
-#    return False;
+def OnEvent(event) -> bool:
+    #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
+    if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER_SPAWN:
+        return False;
+
+    return False;
