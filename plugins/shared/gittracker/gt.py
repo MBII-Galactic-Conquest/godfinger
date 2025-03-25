@@ -14,6 +14,7 @@ import threading
 from dotenv import load_dotenv, set_key
 
 SERVER_DATA = None;
+Log = logging.getLogger(__name__);
 
 ## Requires that your REPOSITORY is publicly visible ##
 
@@ -60,10 +61,10 @@ def check_git_installed():
     if shutil.which("git") or os.path.exists(GIT_EXECUTABLE):
         try:
             subprocess.run([GIT_EXECUTABLE, "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            print("[INFO] Git is installed.")
+            print("[GT] Git is installed.")
             return True
         except subprocess.CalledProcessError:
-            print("[ERROR] Git version check failed.")
+            print("[GT] Git version check failed.")
             return False
     else:
         print("[ERROR] Git is not installed.")
@@ -120,13 +121,13 @@ def load_or_create_env(repo_url, branch_name):
     env_file_path = os.path.join(env_dir, env_file)
 
     if not os.path.exists(env_file_path):
-        print(f"Creating .env file: {env_file_path}")
+        Log.info(f"Creating .env file: {env_file_path}")
         # Create new .env file with placeholders
         set_key(env_file_path, "last_hash", "")
         set_key(env_file_path, "last_message", "")
         last_hash, last_message = "", ""  # Placeholder values if new
     else:
-        print(f".env file exists: {env_file_path}")
+        Log.info(f".env file exists: {env_file_path}")
     
     # Load existing .env data
     load_dotenv(env_file_path)
@@ -139,6 +140,7 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
     global PluginInstance
     # First, reset last_hash and last_message
     last_hash, last_message, env_file_path = load_or_create_env(repo_url, branch_name)
+    repo_name = repo_url.replace("MBII-Galactic-Conquest/", "").replace("MBII-Galactic-Conquest/", "")
     
     # Trim whitespace from the values
     commit_hash = commit_hash.strip()
@@ -146,21 +148,21 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
     last_hash = last_hash.strip() if last_hash else ""
     last_message = last_message.strip() if last_message else ""
 
-    print(f"Comparing commit info for {repo_url} ({branch_name}):")
-    print(f"Last commit hash: {last_hash}")
-    print(f"Last commit message: {last_message}")
-    print(f"New commit hash: {commit_hash}")
-    print(f"New commit message: {commit_message}")
+    Log.info(f"Comparing commit info for {repo_url} ({branch_name}):")
+    Log.info(f"Last commit hash: {last_hash}")
+    Log.info(f"Last commit message: {last_message}")
+    Log.info(f"New commit hash: {commit_hash}")
+    Log.info(f"New commit message: {commit_message}")
     
     # Check if the commit hash or message has changed for this specific repository
     if last_hash != commit_hash or last_message != commit_message:
-        print(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
+        Log.info(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
         # Only update if hash or message has changed
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
-        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5{commit_hash} ^7> {branch_name} - ^5{commit_message}")
+        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}")
     else:
-        print(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
+        Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
 
     # Reset the values after processing to ensure no state leakage for the next repository
     last_hash = None
@@ -175,12 +177,12 @@ def get_latest_commit_info(repo_url: str, branch: str):
         repo_name = repo_url.replace("https://github.com/", "").replace("http://github.com/", "")
         api_url = GITHUB_API_URL.format(repo_name, branch)
         
-        print(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
+        Log.info(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
 
         response = requests.get(api_url)
 
         if response.status_code == 403:
-            print(response.headers.get('X-RateLimit-Remaining'))
+            Log.info(response.headers.get('X-RateLimit-Remaining'))
 
         if response.status_code == 200:
             commit_data = response.json()[0]
@@ -188,10 +190,10 @@ def get_latest_commit_info(repo_url: str, branch: str):
             commit_message = commit_data["commit"]["message"]
             return commit_hash, commit_message
         else:
-            print(f"Error: Failed to fetch commit info from GitHub API. Status code {response.status_code}")
+            Log.info(f"Error: Failed to fetch commit info from GitHub API. Status code {response.status_code}")
             return None, None
     except requests.RequestException as e:
-        print(f"Error: Could not retrieve commit info for {repo_url} on branch '{branch}'. {str(e)}")
+        Log.info(f"Error: Could not retrieve commit info for {repo_url} on branch '{branch}'. {str(e)}")
         return None, None
 
 def monitor_commits():
@@ -203,18 +205,18 @@ def monitor_commits():
     
     try:
         while True:
-            print("Starting commit check loop...")
+            Log.info("Starting commit check loop...")
             for i, repo in enumerate(repositories, 1):
-                print(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
+                Log.info(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
                 repo_url = repo["repository"]
                 branch_name = repo["branch"]
 
                 commit_hash, commit_message = get_latest_commit_info(repo_url, branch_name)
 
                 if commit_hash and commit_message:
-                    print(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
-                    print(f"Hash: {commit_hash}")
-                    print(f"Message: {commit_message}")
+                    Log.info(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
+                    Log.info(f"Hash: {commit_hash}")
+                    Log.info(f"Message: {commit_message}")
 
                     update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message)
 
