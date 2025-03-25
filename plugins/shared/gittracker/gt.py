@@ -159,7 +159,7 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         # Only update if hash or message has changed
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
-        PluginInstance._serverData.rcon.say(PluginInstance._messagePrefix + f"^5{commit_hash} ^7{repo_url} - ^5{commit_message}")
+        PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + f"^5{commit_hash} ^7> {repo_url}|{branch_name} - ^5{commit_message}")
     else:
         print(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
 
