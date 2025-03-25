@@ -11,6 +11,8 @@ import requests
 import threading
 from dotenv import load_dotenv, set_key
 
+SERVER_DATA = None;
+
 ## Requires that your REPOSITORY is publicly visible ##
 
 CONFIG_FILE = "gtConfig.json"
