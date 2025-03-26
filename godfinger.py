@@ -532,10 +532,10 @@ class MBIIServer:
     
     def OnChatMessage(self, logMessage : logMessage.LogMessage):
         messageRaw = logMessage.content;
-        Log.debug("Chat message %s ", (messageRaw));
         lineParse = messageRaw.split();
         senderId = int(lineParse[0].strip(":"))
         senderClient = self._clientManager.GetClientById(senderId);
+        Log.debug("Chat message %s from client %s", (messageRaw, str(senderClient)));
         message : str = messageRaw.split("\"")[1]   # quote characters cannot appear in chat messages, meaning that index 1 will always contain the whole chat message
         self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) );
 
@@ -545,7 +545,7 @@ class MBIIServer:
         senderId = int(lineParse[0].strip(":"))
         senderClient = self._clientManager.GetClientById(senderId);
         message : str = messageRaw.split("\"")[1] 
-        Log.debug("Team chat meassge %s, with teamId %s", messageRaw, senderClient.GetTeamId());
+        Log.debug("Team chat meassge %s, from client %s", messageRaw, str(senderClient));
         self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) );
     
     

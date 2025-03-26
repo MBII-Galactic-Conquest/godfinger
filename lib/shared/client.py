@@ -32,7 +32,7 @@ class Client(object):
         return self._userinfo;
 
     def __repr__(self):
-        s = f"{self._name} (ID : {str(self._id)})"
+        s = f"{self._name} (ID : {str(self._id)}) (Name : {self._name}) (TeamId : {self._teamId})";
         return s
     
 
