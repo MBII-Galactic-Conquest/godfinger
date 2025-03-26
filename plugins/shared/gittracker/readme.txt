@@ -19,7 +19,9 @@ ENSURE YOU MODIFY YOUR gtConfig.json,
       "branch": "main"
     }
   ],
-  "refresh_interval": 60
+  "refresh_interval": 60,
+  "gfBuildBranch": main,
+  "isGFBuilding": false
 }
 
 ============

@@ -14,6 +14,7 @@ import threading
 from dotenv import load_dotenv, set_key
 
 SERVER_DATA = None;
+GODFINGER = "godfinger"
 Log = logging.getLogger(__name__);
 
 ## Requires that your REPOSITORY is publicly visible ##
@@ -23,6 +24,9 @@ PLACEHOLDER = "placeholder"
 PLACEHOLDER_REPO = "placeholder/placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
+
+UPDATE_NEEDED = False
+FALSE_VAR = "False"
 
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
@@ -83,7 +87,9 @@ def create_config_placeholder():
                     "branch": PLACEHOLDER_BRANCH
                 }
             ],
-            "refresh_interval": 60
+            "refresh_interval": 60,
+            "gfBuildBranch": PLACEHOLDER_BRANCH,
+            "isGFBuilding": FALSE_VAR
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(default_config, f, indent=2)
@@ -98,7 +104,9 @@ def load_config():
         config = json.load(f)
 
     repositories = config.get("repositories", [])
-    refresh_interval = config.get("refresh_interval", 60)
+    refresh_interval = config.get("refresh_interval")
+    gfBuildBranch = config.get("gfBuildBranch")
+    isGFBuilding = config.get("isGFBuilding")
 
     for repo in repositories:
         if repo["repository"] == PLACEHOLDER or repo["branch"] == PLACEHOLDER:
@@ -136,7 +144,7 @@ def load_or_create_env(repo_url, branch_name):
     
     return last_hash, last_message, env_file_path
 
-def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message):
+def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch):
     global PluginInstance
     # First, reset last_hash and last_message
     last_hash, last_message, env_file_path = load_or_create_env(repo_url, branch_name)
@@ -161,11 +169,16 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
-        if len(full_message) > 137:
-            max_commit_message_length = 137 - len(f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5") - 3
+        if len(full_message) > 131:
+            max_commit_message_length = 131 - len(f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5") - 3
             commit_message = commit_message[:max_commit_message_length] + "..."
             full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
+        if isGFBuilding == True and GODFINGER in repo_name and gfBuildBranch in branch_name:
+            PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "Godfinger change detected, applying when all players leave the server...")
+            deploy_hash = commit_hash
+            deploy_message = commit_message
+            UPDATE_NEEDED = True
     else:
         Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
 
@@ -235,6 +248,36 @@ def start_monitoring():
     monitoring_thread.daemon = True
     monitoring_thread.start()
 
+def check_and_trigger_update(repo_name, branch_name, commit_hash, deploy_hash, gfBuildBranch, isGFBuilding):
+
+    if isGFBuilding == True and UPDATE_NEEDED == True and commit_hash == deploy_hash and GODFINGER in repo_name and branch_name == gfBuildBranch:
+        Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
+
+        # Command to run update.py in a new window
+        update_script = os.path.abspath("./update/update.py")
+
+        # Define simulated inputs for update.py
+        simulated_inputs = ["Y", "N", deploy_hash, ""]
+        input_string = "\n".join(simulated_inputs) + "\n"
+
+        # Launch subprocess with simulated input
+        process = subprocess.Popen(
+            [PYTHON_CMD, update_script],  # Run the script
+            stdin=subprocess.PIPE,  # Provide input
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,  # Use text mode for I/O
+            creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0  # Open new window (Windows)
+        )
+
+        # Send input to the script
+        process.communicate(input=input_string)
+        Log.info("Update script executed with predefined inputs. Ensure godfinger autorestarting is on in godfingerCfg.json")
+        time.sleep(5) # Sleeping to ensure everything works as intended
+        print(0/0) # Crashing godfinger to force restart after update
+    else:
+        pass;
+
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     logMode = logging.INFO;
@@ -290,6 +333,9 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
+        check_and_trigger_update()
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;

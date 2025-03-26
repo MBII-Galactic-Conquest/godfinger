@@ -21,6 +21,7 @@ godfingerCfg.json
 automessageCfg.json
 vpnmonitorCfg.json
 automodCfg.json
+gtConfig.json
 
 *.db
 *.DB
