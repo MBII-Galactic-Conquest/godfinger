@@ -14,6 +14,7 @@ import threading
 from dotenv import load_dotenv, set_key
 
 SERVER_DATA = None;
+GODFINGER = "godfinger"
 Log = logging.getLogger(__name__);
 
 ## Requires that your REPOSITORY is publicly visible ##
@@ -23,6 +24,9 @@ PLACEHOLDER = "placeholder"
 PLACEHOLDER_REPO = "placeholder/placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
+
+UPDATE_NEEDED = False
+FALSE_VAR = "False"
 
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
@@ -83,7 +87,9 @@ def create_config_placeholder():
                     "branch": PLACEHOLDER_BRANCH
                 }
             ],
-            "refresh_interval": 60
+            "refresh_interval": 60,
+            "gfBuildBranch": PLACEHOLDER_BRANCH,
+            "isGFBuilding": FALSE_VAR
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(default_config, f, indent=2)
@@ -98,14 +104,16 @@ def load_config():
         config = json.load(f)
 
     repositories = config.get("repositories", [])
-    refresh_interval = config.get("refresh_interval", 60)
+    refresh_interval = config.get("refresh_interval")
+    gfBuildBranch = config.get("gfBuildBranch")
+    isGFBuilding = config.get("isGFBuilding")
 
     for repo in repositories:
         if repo["repository"] == PLACEHOLDER or repo["branch"] == PLACEHOLDER:
             print("\nPlaceholders detected in gtConfig.json. Please update the file.")
             sys.exit(0)
 
-    return repositories, refresh_interval
+    return repositories, refresh_interval, gfBuildBranch, isGFBuilding
 
 def get_env_file_name(repo_url, branch_name):
     repo_name = repo_url.split('/')[-1]
@@ -121,13 +129,14 @@ def load_or_create_env(repo_url, branch_name):
     env_file_path = os.path.join(env_dir, env_file)
 
     if not os.path.exists(env_file_path):
-        Log.info(f"Creating .env file: {env_file_path}")
+        #Log.info(f"Creating .env file: {env_file_path}")
         # Create new .env file with placeholders
         set_key(env_file_path, "last_hash", "")
         set_key(env_file_path, "last_message", "")
         last_hash, last_message = "", ""  # Placeholder values if new
     else:
-        Log.info(f".env file exists: {env_file_path}")
+        #Log.info(f".env file exists: {env_file_path}")
+        pass;
     
     # Load existing .env data
     load_dotenv(env_file_path)
@@ -136,7 +145,7 @@ def load_or_create_env(repo_url, branch_name):
     
     return last_hash, last_message, env_file_path
 
-def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message):
+def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch):
     global PluginInstance
     # First, reset last_hash and last_message
     last_hash, last_message, env_file_path = load_or_create_env(repo_url, branch_name)
@@ -148,26 +157,33 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
     last_hash = last_hash.strip() if last_hash else ""
     last_message = last_message.strip() if last_message else ""
 
-    Log.info(f"Comparing commit info for {repo_url} ({branch_name}):")
-    Log.info(f"Last commit hash: {last_hash}")
-    Log.info(f"Last commit message: {last_message}")
-    Log.info(f"New commit hash: {commit_hash}")
-    Log.info(f"New commit message: {commit_message}")
+    #Log.info(f"Comparing commit info for {repo_url} ({branch_name}):")
+    #Log.info(f"Last commit hash: {last_hash}")
+    #Log.info(f"Last commit message: {last_message}")
+    #Log.info(f"New commit hash: {commit_hash}")
+    #Log.info(f"New commit message: {commit_message}")
     
     # Check if the commit hash or message has changed for this specific repository
     if last_hash != commit_hash or last_message != commit_message:
-        Log.info(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
+        #Log.info(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
         # Only update if hash or message has changed
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
-        if len(full_message) > 137:
-            max_commit_message_length = 137 - len(f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5") - 3
+        if len(full_message) > 131:
+            max_commit_message_length = 131 - len(f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5") - 3
             commit_message = commit_message[:max_commit_message_length] + "..."
             full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
+        if isGFBuilding == True and GODFINGER in repo_name and gfBuildBranch in branch_name:
+            PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
+            deploy_hash = commit_hash
+            deploy_message = commit_message
+            UPDATE_NEEDED = True
+            return UPDATE_NEEDED, deploy_hash, deploy_message
     else:
-        Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
+        #Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
+        pass;
 
     # Reset the values after processing to ensure no state leakage for the next repository
     last_hash = None
@@ -182,7 +198,7 @@ def get_latest_commit_info(repo_url: str, branch: str):
         repo_name = repo_url.replace("https://github.com/", "").replace("http://github.com/", "")
         api_url = GITHUB_API_URL.format(repo_name, branch)
         
-        Log.info(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
+        #Log.info(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
 
         response = requests.get(api_url)
 
@@ -195,10 +211,10 @@ def get_latest_commit_info(repo_url: str, branch: str):
             commit_message = commit_data["commit"]["message"]
             return commit_hash, commit_message
         else:
-            Log.info(f"Error: Failed to fetch commit info from GitHub API. Status code {response.status_code}")
+            #Log.info(f"Error: Failed to fetch commit info from GitHub API. Status code {response.status_code}")
             return None, None
     except requests.RequestException as e:
-        Log.info(f"Error: Could not retrieve commit info for {repo_url} on branch '{branch}'. {str(e)}")
+        #Log.info(f"Error: Could not retrieve commit info for {repo_url} on branch '{branch}'. {str(e)}")
         return None, None
 
 def monitor_commits():
@@ -210,18 +226,18 @@ def monitor_commits():
     
     try:
         while True:
-            Log.info("Starting commit check loop...")
+            #Log.info("Starting commit check loop...")
             for i, repo in enumerate(repositories, 1):
-                Log.info(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
+                #Log.info(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
                 repo_url = repo["repository"]
                 branch_name = repo["branch"]
 
                 commit_hash, commit_message = get_latest_commit_info(repo_url, branch_name)
 
                 if commit_hash and commit_message:
-                    Log.info(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
-                    Log.info(f"Hash: {commit_hash}")
-                    Log.info(f"Message: {commit_message}")
+                    #Log.info(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
+                    #Log.info(f"Hash: {commit_hash}")
+                    #Log.info(f"Message: {commit_message}")
 
                     update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message)
 
@@ -234,6 +250,36 @@ def start_monitoring():
     monitoring_thread = threading.Thread(target=monitor_commits)
     monitoring_thread.daemon = True
     monitoring_thread.start()
+
+def check_and_trigger_update(deploy_hash, isGFBuilding):
+
+    if isGFBuilding and UPDATE_NEEDED == True:
+        Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
+
+        # Command to run update.py in a new window
+        update_script = os.path.abspath("./update/update.py")
+
+        # Define simulated inputs for update.py
+        simulated_inputs = ["Y", "N", deploy_hash, ""]
+        input_string = "\n".join(simulated_inputs) + "\n"
+
+        # Launch subprocess with simulated input
+        process = subprocess.Popen(
+            [PYTHON_CMD, update_script],  # Run the script
+            stdin=subprocess.PIPE,  # Provide input
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,  # Use text mode for I/O
+            creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0  # Open new window (Windows)
+        )
+
+        # Send input to the script
+        process.communicate(input=input_string)
+        Log.info("Update script executed with predefined inputs. Ensure godfinger autorestarting is on in godfingerCfg.json!")
+        time.sleep(5) # Sleeping to ensure everything works as intended
+        print(0/0) # Crashing godfinger to force restart after update
+    else:
+        pass;
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
@@ -290,6 +336,9 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
+        check_and_trigger_update()
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
