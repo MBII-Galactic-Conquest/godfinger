@@ -113,7 +113,7 @@ def load_config():
             print("\nPlaceholders detected in gtConfig.json. Please update the file.")
             sys.exit(0)
 
-    return repositories, refresh_interval
+    return repositories, refresh_interval, gfBuildBranch, isGFBuilding
 
 def get_env_file_name(repo_url, branch_name):
     repo_name = repo_url.split('/')[-1]
