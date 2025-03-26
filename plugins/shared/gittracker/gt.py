@@ -259,6 +259,7 @@ def start_monitoring():
 
 def check_and_trigger_update(isGFBuilding):
     global UPDATE_NEEDED
+    timeoutSeconds = 10
     
     if isGFBuilding and UPDATE_NEEDED:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
@@ -397,9 +398,8 @@ def check_and_trigger_update(isGFBuilding):
             Log.info("Unsupported OS for cleanup script.")
 
         # Force Godfinger to restart after update by crashing it
-        Log.info("Auto-update process executed with predefined inputs. Restarting godfinger...")
-        time.sleep(10) # Ensure everything runs properly before restarting
-        print(0/0)  # Crashing Godfinger to force a restart after update
+        Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
+        serverdata.ServerData.API.Restart(timeoutSeconds)
     else:
         pass;
 
@@ -462,7 +462,8 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
         _, _, _, isGFBuilding = load_config()
         check_and_trigger_update(isGFBuilding)
-        return False;
+        UPDATE_NEEDED = False
+        return UPDATE_NEEDED, False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
