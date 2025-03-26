@@ -303,20 +303,13 @@ def check_and_trigger_update(isGFBuilding):
 
         # Command to run deployments_noinput.py
         deploy_script = os.path.abspath("./update/deployments_noinput.py")
-        print(f"Debug: update.py path: {deploy_script}")  # Debug: Check the path to the script
-
-        # Define simulated inputs for update.py
-        simulated_inputs_deploy = ["", ""]  # Predefined inputs to pass
-        input_string_deploy = "\n".join(simulated_inputs_deploy) + "\n"
-
-        # Debug: Log simulated input
-        print(f"Debug: Simulated input: {input_string_deploy}")
+        print(f"Debug: deployments_noinput.py path: {deploy_script}")  # Debug: Check the path to the script
 
         try:
             # Run subprocess directly, providing input via stdin
             result = subprocess.run(
                 [PYTHON_CMD, deploy_script],  # Run the script
-                input=input_string_deploy,  # Simulated input to pass to the script
+                input="",  # Simulated input to pass to the script
                 text=True,  # Use text mode for I/O (Python 3.7+)
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
