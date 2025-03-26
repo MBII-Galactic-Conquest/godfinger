@@ -72,6 +72,7 @@ import math;
 import lib.shared.colors as colors;
 import cvar;
 import godfingerinterface;
+import lib.shared.timeout as timeout;
 
 INVALID_ID = -1;
 USERINFO_LEN = len("userinfo: ");
@@ -301,6 +302,9 @@ class MBIIServer:
     
         self._isFinished = False;
         self._isRunning = False;
+        self._isRestarting = False;
+        self._lastRestartTick = 0.0;
+        self._restartTimeout = timeout.Timeout();
         self.restartOnCrash = self._config.cfg["restartOnCrash"];
             
 
@@ -390,6 +394,14 @@ class MBIIServer:
             self._serverData.maxPlayers = 32;
             Log.warning("Server status is unreachable, setting default values to status data.");
         pass;
+
+    
+    def Restart(self, timeout = 60):
+        if not self._isRestarting:
+            self._isRestarting = True;
+            self._restartTimeout.Set(timeout);
+            self._lastRestartTick = timeout;
+            self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger Restarting procedure started, ETA %s"%self._restartTimeout.LeftDHMS()));
     
     def Start(self):
         try:
@@ -420,6 +432,7 @@ class MBIIServer:
             #if Args.debug:
             #    self._svInterface.Test();
             self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]));
+            self.Restart(25);
             while self._isRunning:
                 startTime = time.time();
                 self.Loop();
@@ -444,6 +457,17 @@ class MBIIServer:
             Log.info("Stopped."); 
 
     def Loop(self):
+        if self._isRestarting:
+            if self._restartTimeout.IsSet():
+                tick = self._restartTimeout.Left();
+                if tick - self._lastRestartTick <= -5:
+                    self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger is about to restart in %s"%self._restartTimeout.LeftDHMS()));
+                    self._lastRestartTick = tick;
+            else:
+                Sighandler(signal.SIGINT, -1);
+                self.restartOnCrash = False;
+                self.Stop();
+                return;
         messages = self._svInterface.GetMessages();
         while not messages.empty():
             message = messages.get();
@@ -692,7 +716,6 @@ class MBIIServer:
     def OnInitGame(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content;
         Log.debug("Init game log entry %s", textified);
-
         configStr = textified[len("InitGame: \\"):len(textified)];
         vars = {};
         splitted = configStr.split("\\");
@@ -781,6 +804,9 @@ class MBIIServer:
     def API_GetPlugin(self, name) -> plugin.Plugin:
         return self._pluginManager.GetPlugin(name);
 
+    def IsRestarting(self) -> bool:
+        return self._isRestarting;
+
 def InitLogger():
     loggingMode = logging.INFO;
     loggingFile = "";
@@ -842,6 +868,16 @@ def main():
         if int_status == MBIIServer.STATUS_SERVER_NOT_RUNNING:
             print("Unable to start with not running server for safety measures, abort init.");
         Server.Finish();
+        if Server.IsRestarting():
+            del Server
+            Server = None;
+            cmd = (" ".join( sys.argv ) );
+            dir = os.path.dirname(__file__);
+            cmd = os.path.normpath(os.path.join(dir, cmd));
+            cmd = (sys.executable + " " + cmd );
+            subprocess.Popen(cmd, creationflags=subprocess.DETACHED_PROCESS);
+            sys.exit();
+        del Server
         Server = None;
     else:
         Log.info("Godfinger initialize error %s" % (MBIIServer.StatusString(int_status)));
