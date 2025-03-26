@@ -399,7 +399,7 @@ def check_and_trigger_update(isGFBuilding):
 
         # Force Godfinger to restart after update by crashing it
         Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
-        serverdata.ServerData.API.Restart(timeoutSeconds)
+        PluginInstance._serverData.API.Restart(timeoutSeconds)
     else:
         pass;
 
