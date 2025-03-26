@@ -147,6 +147,7 @@ def load_or_create_env(repo_url, branch_name):
 
 def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch):
     global PluginInstance
+    global UPDATE_NEEDED
     # First, reset last_hash and last_message
     last_hash, last_message, env_file_path = load_or_create_env(repo_url, branch_name)
     repo_name = repo_url.replace("MBII-Galactic-Conquest/", "").replace("MBII-Galactic-Conquest/", "")
