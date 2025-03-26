@@ -72,7 +72,7 @@ if os.name == 'nt':  # Windows
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = shutil.which("python3") if shutil.which("python3") else "python"  # On Windows, just use 'python'
+    PYTHON_CMD = "python"
 
     # Set the environment variables for Windows if Git was found
     if GIT_EXECUTABLE:
