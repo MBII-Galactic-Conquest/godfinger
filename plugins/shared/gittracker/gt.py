@@ -176,7 +176,7 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
             full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
         if isGFBuilding == True and GODFINGER in repo_name and gfBuildBranch in branch_name:
-            PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "Godfinger change detected, applying when all players leave the server...")
+            PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
             deploy_hash = commit_hash
             deploy_message = commit_message
             UPDATE_NEEDED = True
