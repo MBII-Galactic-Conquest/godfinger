@@ -14,7 +14,7 @@ class ServerData():
         self.args = args;
         self.lock = threading.Lock()
         self.serverVars = {}
-        self.rcon = rcon;
+        # self.rcon = rcon;
         self.interface = iface;
         self.maxPlayers = 0;
         self.version = "";
