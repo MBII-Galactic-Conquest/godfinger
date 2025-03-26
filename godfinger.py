@@ -432,7 +432,6 @@ class MBIIServer:
             #if Args.debug:
             #    self._svInterface.Test();
             self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]));
-            self.Restart(25);
             while self._isRunning:
                 startTime = time.time();
                 self.Loop();
