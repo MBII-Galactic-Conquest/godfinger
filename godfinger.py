@@ -287,6 +287,7 @@ class MBIIServer:
         exportAPI.AddDatabase       = self.API_AddDatabase;
         exportAPI.GetDatabase       = self.API_GetDatabase;
         exportAPI.GetPlugin         = self.API_GetPlugin;
+        exportAPI.Restart           = self.Restart;
         self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._svInterface, Args);
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)));
 
