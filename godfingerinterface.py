@@ -351,7 +351,7 @@ class RconInterface(AServerInterface):
             return self._rcon.SmSay(soundName, clientId);
         return None;
 
-#region EndRconCommands
+#endregion RconCommands
 
     def ParseLogThreadHandler(self, control, sleepTime):
         with open(self._logPath, "r") as log:
@@ -692,7 +692,7 @@ class PtyInterface(AServerInterface):
             self._SetReady();
             return PtyInterface.CMD_RESULT_FLAG_OK;
 
-    #region EndProcessors
+    #endregion Processors
 
     MODE_INPUT   = 0;
     MODE_COMMAND = 1;
@@ -960,7 +960,7 @@ class PtyInterface(AServerInterface):
         self._ptyInstance.write(cmdStr+"\n");
         return cmdProc.Wait().GetResponse();
 
-#region EndPtyCommands
+#endregion PtyCommands
 
     # def _ThreadServerOutput(self, message : str):
     #     pass;        
