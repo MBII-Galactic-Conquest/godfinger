@@ -11,6 +11,7 @@ import time
 import shutil
 import requests
 import threading
+import platform
 from dotenv import load_dotenv, set_key
 
 SERVER_DATA = None;
@@ -44,6 +45,7 @@ if os.name == 'nt':  # Windows
         print(f"Git executable set to: {GIT_EXECUTABLE}")
     else:
         print("Git executable could not be set. Ensure Git is installed.")
+        sys.exit(0)
 
 else:  # Non-Windows (Linux, macOS)
     GIT_EXECUTABLE = shutil.which("git")
@@ -54,6 +56,7 @@ else:  # Non-Windows (Linux, macOS)
         print(f"Git executable set to default path: {GIT_EXECUTABLE}")
     else:
         print("Git executable not found on the system.")
+        sys.exit(0)
 
 class gitTrackerPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
@@ -98,22 +101,22 @@ def create_config_placeholder():
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         print(f"Error: Config file '{CONFIG_FILE}' not found.")
-        return None, None
+        return None
 
     with open(CONFIG_FILE, "r") as f:
         config = json.load(f)
 
-    repositories = config.get("repositories", [])
-    refresh_interval = config.get("refresh_interval")
-    gfBuildBranch = config.get("gfBuildBranch")
-    isGFBuilding = config.get("isGFBuilding")
-
-    for repo in repositories:
+    for repo in config.get("repositories", []):
         if repo["repository"] == PLACEHOLDER or repo["branch"] == PLACEHOLDER:
             print("\nPlaceholders detected in gtConfig.json. Please update the file.")
             sys.exit(0)
 
-    return repositories, refresh_interval, gfBuildBranch, isGFBuilding
+    return {
+        "repositories": config.get("repositories", []),
+        "refresh_interval": config.get("refresh_interval"),
+        "gfBuildBranch": config.get("gfBuildBranch"),
+        "isGFBuilding": config.get("isGFBuilding"),
+    }
 
 def get_env_file_name(repo_url, branch_name):
     repo_name = repo_url.split('/')[-1]
@@ -147,6 +150,8 @@ def load_or_create_env(repo_url, branch_name):
 
 def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch):
     global PluginInstance
+    global UPDATE_NEEDED
+
     # First, reset last_hash and last_message
     last_hash, last_message, env_file_path = load_or_create_env(repo_url, branch_name)
     repo_name = repo_url.replace("MBII-Galactic-Conquest/", "").replace("MBII-Galactic-Conquest/", "")
@@ -177,10 +182,8 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
         if isGFBuilding == True and GODFINGER in repo_name and gfBuildBranch in branch_name:
             PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
-            deploy_hash = commit_hash
-            deploy_message = commit_message
             UPDATE_NEEDED = True
-            return UPDATE_NEEDED, deploy_hash, deploy_message
+            return UPDATE_NEEDED
     else:
         #Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
         pass;
@@ -218,7 +221,12 @@ def get_latest_commit_info(repo_url: str, branch: str):
         return None, None
 
 def monitor_commits():
-    repositories, refresh_interval = load_config()
+    config = load_config()
+    if config:
+        repositories = config["repositories"]
+        refresh_interval = config["refresh_interval"]
+        gfBuildBranch = config["gfBuildBranch"]
+        isGFBuilding = config["isGFBuilding"]
     
     if not repositories:
         print("No repositories found in gtConfig.json.")
@@ -239,7 +247,7 @@ def monitor_commits():
                     #Log.info(f"Hash: {commit_hash}")
                     #Log.info(f"Message: {commit_message}")
 
-                    update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message)
+                    update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch)
 
             time.sleep(refresh_interval)
 
@@ -251,33 +259,149 @@ def start_monitoring():
     monitoring_thread.daemon = True
     monitoring_thread.start()
 
-def check_and_trigger_update(deploy_hash, isGFBuilding):
-
-    if isGFBuilding and UPDATE_NEEDED == True:
+def check_and_trigger_update(isGFBuilding):
+    global UPDATE_NEEDED
+    
+    if isGFBuilding and UPDATE_NEEDED:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
-        # Command to run update.py in a new window
-        update_script = os.path.abspath("./update/update.py")
+        # Command to run update_noinput.py
+        update_script = os.path.abspath("./update/update_noinput.py")
+        print(f"Debug: update.py path: {update_script}")  # Debug: Check the path to the script
 
-        # Define simulated inputs for update.py
-        simulated_inputs = ["Y", "N", deploy_hash, ""]
-        input_string = "\n".join(simulated_inputs) + "\n"
+        # Define simulated inputs for update_noinput.py
+        simulated_inputs_update = ["Y", "Y", "", ""]  # Predefined inputs to pass
+        input_string_update = "\n".join(simulated_inputs_update) + "\n"
 
-        # Launch subprocess with simulated input
-        process = subprocess.Popen(
-            [PYTHON_CMD, update_script],  # Run the script
-            stdin=subprocess.PIPE,  # Provide input
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,  # Use text mode for I/O
-            creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0  # Open new window (Windows)
-        )
+        # Debug: Log simulated input
+        print(f"Debug: Simulated input: {input_string_update}")
 
-        # Send input to the script
-        process.communicate(input=input_string)
+        try:
+            # Run subprocess directly, providing input via stdin
+            result = subprocess.run(
+                [PYTHON_CMD, update_script],  # Run the script
+                input=input_string_update,  # Simulated input to pass to the script
+                text=True,  # Use text mode for I/O (Python 3.7+)
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+
+            # Debug: Check subprocess return code and outputs
+            print(f"Debug: Return code: {result.returncode}")
+            print(f"Debug: stdout: {result.stdout}")
+            print(f"Debug: stderr: {result.stderr}")
+
+            if result.returncode == 0:
+                Log.info("Update script executed successfully with predefined inputs.")
+            else:
+                Log.error(f"Error running update script: {result.stderr}")
+        
+        except Exception as e:
+            Log.error(f"Exception occurred while running update script: {e}")
+            print(f"Debug: Exception: {e}")
+
+        # Command to run deployments_noinput.py
+        deploy_script = os.path.abspath("./update/deployments_noinput.py")
+        print(f"Debug: deployments_noinput.py path: {deploy_script}")  # Debug: Check the path to the script
+
+        try:
+            # Run subprocess directly, providing input via stdin
+            result = subprocess.run(
+                [PYTHON_CMD, deploy_script],  # Run the script
+                input="",  # Simulated input to pass to the script
+                text=True,  # Use text mode for I/O (Python 3.7+)
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+
+            # Debug: Check subprocess return code and outputs
+            print(f"Debug: Return code: {result.returncode}")
+            print(f"Debug: stdout: {result.stdout}")
+            print(f"Debug: stderr: {result.stderr}")
+
+            if result.returncode == 0:
+                Log.info("Deployments script executed successfully with predefined inputs.")
+            else:
+                Log.error(f"Error running deployments script: {result.stderr}")
+        
+        except Exception as e:
+            Log.error(f"Exception occurred while running deployments script: {e}")
+            print(f"Debug: Exception: {e}")
+
+        # Now, execute cleanup script based on the OS
+        if platform.system() == "Windows":
+            # Run cleanup.bat for Windows
+            cleanup_script = os.path.abspath("./cleanup.bat")
+            print(f"Debug: cleanup.bat path: {cleanup_script}")  # Debug: Check the path to cleanup.bat
+
+            # Simulate input "Y" for the cleanup.bat script
+            simulated_input = "Y\n"
+            try:
+                result = subprocess.run(
+                    [cleanup_script],
+                    input=simulated_input,
+                    text=True,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True
+                )
+
+                # Debug: Check subprocess return code and outputs
+                print(f"Debug: cleanup.bat return code: {result.returncode}")
+                print(f"Debug: cleanup.bat stdout: {result.stdout}")
+                print(f"Debug: cleanup.bat stderr: {result.stderr}")
+
+                if result.returncode == 0:
+                    Log.info("Cleanup script (cleanup.bat) executed for Windows.")
+                else:
+                    Log.error(f"Error executing cleanup.bat: {result.stderr}")
+            
+            except Exception as e:
+                Log.error(f"Exception occurred while running cleanup.bat: {e}")
+                print(f"Debug: Exception: {e}")
+
+        elif platform.system() in ["Linux", "Darwin"]:  # Darwin is for macOS
+            # Run cleanup.sh for Linux or macOS
+            cleanup_script = os.path.abspath("./cleanup.sh")
+            print(f"Debug: cleanup.sh path: {cleanup_script}")  # Debug: Check the path to cleanup.sh
+
+            # Simulate input "Y" for the cleanup.sh script
+            simulated_input = "Y\n"
+            try:
+                result = subprocess.run(
+                    [cleanup_script],
+                    input=simulated_input,
+                    text=True,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True
+                )
+
+                # Debug: Check subprocess return code and outputs
+                print(f"Debug: cleanup.sh return code: {result.returncode}")
+                print(f"Debug: cleanup.sh stdout: {result.stdout}")
+                print(f"Debug: cleanup.sh stderr: {result.stderr}")
+
+                if result.returncode == 0:
+                    Log.info("Cleanup script (cleanup.sh) executed for Linux/macOS.")
+                else:
+                    Log.error(f"Error executing cleanup.sh: {result.stderr}")
+            
+            except Exception as e:
+                Log.error(f"Exception occurred while running cleanup.sh: {e}")
+                print(f"Debug: Exception: {e}")
+
+        else:
+            Log.info("Unsupported OS for cleanup script.")
+
+        # Force Godfinger to restart after update by crashing it
         Log.info("Update script executed with predefined inputs. Ensure godfinger autorestarting is on in godfingerCfg.json!")
-        time.sleep(5) # Sleeping to ensure everything works as intended
-        print(0/0) # Crashing godfinger to force restart after update
+        time.sleep(10) # Ensure everything runs properly before restarting
+        print(0/0)  # Crashing Godfinger to force a restart after update
     else:
         pass;
 
@@ -338,7 +462,8 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
-        check_and_trigger_update()
+        _, _, _, isGFBuilding = load_config()
+        check_and_trigger_update(isGFBuilding)
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
