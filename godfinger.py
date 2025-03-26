@@ -803,6 +803,9 @@ class MBIIServer:
     def API_GetPlugin(self, name) -> plugin.Plugin:
         return self._pluginManager.GetPlugin(name);
 
+    def API_Restart(self, timeout = 60):
+        self.Restart(timeout);
+
     def IsRestarting(self) -> bool:
         return self._isRestarting;
 
