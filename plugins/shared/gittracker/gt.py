@@ -400,8 +400,9 @@ def check_and_trigger_update(isGFBuilding):
         # Force Godfinger to restart after update by crashing it
         Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
         PluginInstance._serverData.API.Restart(timeoutSeconds)
-        time.sleep(timeoutSeconds + 2)
-        os._exit(0)
+        #time.sleep(timeoutSeconds + 2)
+        #os._exit(0)
+        # Window stays open after closing, the above is not a solution, but here it is noted it should be eventually fixed.
     else:
         pass;
 
