@@ -181,6 +181,7 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
             deploy_hash = commit_hash
             deploy_message = commit_message
             UPDATE_NEEDED = True
+            return UPDATE_NEEDED, deploy_hash, deploy_message
     else:
         #Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
         pass;
