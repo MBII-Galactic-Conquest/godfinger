@@ -129,13 +129,14 @@ def load_or_create_env(repo_url, branch_name):
     env_file_path = os.path.join(env_dir, env_file)
 
     if not os.path.exists(env_file_path):
-        Log.info(f"Creating .env file: {env_file_path}")
+        #Log.info(f"Creating .env file: {env_file_path}")
         # Create new .env file with placeholders
         set_key(env_file_path, "last_hash", "")
         set_key(env_file_path, "last_message", "")
         last_hash, last_message = "", ""  # Placeholder values if new
     else:
-        Log.info(f".env file exists: {env_file_path}")
+        #Log.info(f".env file exists: {env_file_path}")
+        pass;
     
     # Load existing .env data
     load_dotenv(env_file_path)
@@ -156,15 +157,15 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
     last_hash = last_hash.strip() if last_hash else ""
     last_message = last_message.strip() if last_message else ""
 
-    Log.info(f"Comparing commit info for {repo_url} ({branch_name}):")
-    Log.info(f"Last commit hash: {last_hash}")
-    Log.info(f"Last commit message: {last_message}")
-    Log.info(f"New commit hash: {commit_hash}")
-    Log.info(f"New commit message: {commit_message}")
+    #Log.info(f"Comparing commit info for {repo_url} ({branch_name}):")
+    #Log.info(f"Last commit hash: {last_hash}")
+    #Log.info(f"Last commit message: {last_message}")
+    #Log.info(f"New commit hash: {commit_hash}")
+    #Log.info(f"New commit message: {commit_message}")
     
     # Check if the commit hash or message has changed for this specific repository
     if last_hash != commit_hash or last_message != commit_message:
-        Log.info(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
+        #Log.info(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
         # Only update if hash or message has changed
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
@@ -180,7 +181,8 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
             deploy_message = commit_message
             UPDATE_NEEDED = True
     else:
-        Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
+        #Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
+        pass;
 
     # Reset the values after processing to ensure no state leakage for the next repository
     last_hash = None
@@ -195,7 +197,7 @@ def get_latest_commit_info(repo_url: str, branch: str):
         repo_name = repo_url.replace("https://github.com/", "").replace("http://github.com/", "")
         api_url = GITHUB_API_URL.format(repo_name, branch)
         
-        Log.info(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
+        #Log.info(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
 
         response = requests.get(api_url)
 
@@ -208,10 +210,10 @@ def get_latest_commit_info(repo_url: str, branch: str):
             commit_message = commit_data["commit"]["message"]
             return commit_hash, commit_message
         else:
-            Log.info(f"Error: Failed to fetch commit info from GitHub API. Status code {response.status_code}")
+            #Log.info(f"Error: Failed to fetch commit info from GitHub API. Status code {response.status_code}")
             return None, None
     except requests.RequestException as e:
-        Log.info(f"Error: Could not retrieve commit info for {repo_url} on branch '{branch}'. {str(e)}")
+        #Log.info(f"Error: Could not retrieve commit info for {repo_url} on branch '{branch}'. {str(e)}")
         return None, None
 
 def monitor_commits():
@@ -223,18 +225,18 @@ def monitor_commits():
     
     try:
         while True:
-            Log.info("Starting commit check loop...")
+            #Log.info("Starting commit check loop...")
             for i, repo in enumerate(repositories, 1):
-                Log.info(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
+                #Log.info(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
                 repo_url = repo["repository"]
                 branch_name = repo["branch"]
 
                 commit_hash, commit_message = get_latest_commit_info(repo_url, branch_name)
 
                 if commit_hash and commit_message:
-                    Log.info(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
-                    Log.info(f"Hash: {commit_hash}")
-                    Log.info(f"Message: {commit_message}")
+                    #Log.info(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
+                    #Log.info(f"Hash: {commit_hash}")
+                    #Log.info(f"Message: {commit_message}")
 
                     update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message)
 
@@ -248,9 +250,9 @@ def start_monitoring():
     monitoring_thread.daemon = True
     monitoring_thread.start()
 
-def check_and_trigger_update(repo_name, branch_name, commit_hash, deploy_hash, gfBuildBranch, isGFBuilding):
+def check_and_trigger_update(deploy_hash, isGFBuilding):
 
-    if isGFBuilding == True and UPDATE_NEEDED == True and commit_hash == deploy_hash and GODFINGER in repo_name and branch_name == gfBuildBranch:
+    if isGFBuilding and UPDATE_NEEDED == True:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
         # Command to run update.py in a new window
@@ -272,7 +274,7 @@ def check_and_trigger_update(repo_name, branch_name, commit_hash, deploy_hash, g
 
         # Send input to the script
         process.communicate(input=input_string)
-        Log.info("Update script executed with predefined inputs. Ensure godfinger autorestarting is on in godfingerCfg.json")
+        Log.info("Update script executed with predefined inputs. Ensure godfinger autorestarting is on in godfingerCfg.json!")
         time.sleep(5) # Sleeping to ensure everything works as intended
         print(0/0) # Crashing godfinger to force restart after update
     else:
