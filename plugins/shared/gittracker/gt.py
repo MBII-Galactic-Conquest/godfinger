@@ -27,7 +27,7 @@ PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
 
 UPDATE_NEEDED = False
-FALSE_VAR = "False"
+FALSE_VAR = False
 
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
@@ -38,14 +38,13 @@ if os.name == 'nt':  # Windows
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = "python"  # On Windows, just use 'python'
+    PYTHON_CMD = shutil.which("python3") if shutil.which("python3") else "python"
 
     if GIT_EXECUTABLE:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-        print(f"Git executable set to: {GIT_EXECUTABLE}")
+        #print(f"Git executable set to: {GIT_EXECUTABLE}")
     else:
         print("Git executable could not be set. Ensure Git is installed.")
-        sys.exit(0)
 
 else:  # Non-Windows (Linux, macOS)
     GIT_EXECUTABLE = shutil.which("git")
@@ -53,10 +52,9 @@ else:  # Non-Windows (Linux, macOS)
 
     if GIT_EXECUTABLE:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-        print(f"Git executable set to default path: {GIT_EXECUTABLE}")
+        #print(f"Git executable set to default path: {GIT_EXECUTABLE}")
     else:
         print("Git executable not found on the system.")
-        sys.exit(0)
 
 class gitTrackerPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
@@ -74,7 +72,7 @@ def check_git_installed():
             print("[GT] Git version check failed.")
             return False
     else:
-        print("[ERROR] Git is not installed.")
+        print("[ERROR] Git is not installed. Plugin cannot continue.")
         sys.exit(0)
 
 def create_config_placeholder():
@@ -399,7 +397,7 @@ def check_and_trigger_update(isGFBuilding):
             Log.info("Unsupported OS for cleanup script.")
 
         # Force Godfinger to restart after update by crashing it
-        Log.info("Update script executed with predefined inputs. Ensure godfinger autorestarting is on in godfingerCfg.json!")
+        Log.info("Auto-update process executed with predefined inputs. Restarting godfinger...")
         time.sleep(10) # Ensure everything runs properly before restarting
         print(0/0)  # Crashing Godfinger to force a restart after update
     else:

@@ -70,12 +70,12 @@ if os.name == 'nt':  # Windows
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = "python"  # On Windows, just use 'python'
+    PYTHON_CMD = shutil.which("python3") if shutil.which("python3") else "python"  # On Windows, just use 'python'
 
     # Set the environment variables for Windows if Git was found
     if GIT_EXECUTABLE:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-        print(f"Git executable set to: {GIT_EXECUTABLE}")
+        #print(f"Git executable set to: {GIT_EXECUTABLE}")
     else:
         print("Git executable could not be set. Ensure Git is installed.")
 
@@ -86,7 +86,7 @@ else:  # Non-Windows (Linux, macOS)
 
     if GIT_EXECUTABLE:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-        print(f"Git executable set to default path: {GIT_EXECUTABLE}")
+        #print(f"Git executable set to default path: {GIT_EXECUTABLE}")
     else:
         print("Git executable not found on the system.")
 
