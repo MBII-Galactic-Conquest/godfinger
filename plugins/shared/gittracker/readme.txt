@@ -22,8 +22,12 @@ ENSURE YOU MODIFY YOUR gtConfig.json,
   ],
   "refresh_interval": 60,
   "gfBuildBranch": main,
+  "svnPostHookFile": path/to/bat/or/sh,
+  "isSVNBuilding": false,
   "isGFBuilding": false
 }
+
+IF you are using SVN building with a post hook file, ensure it is in godfinger RWD.
 
 ============
 
