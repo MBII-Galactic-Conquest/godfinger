@@ -106,7 +106,6 @@ def check_git_installed():
         
         if platform.system() in ["Linux", "Darwin"]:
             print("You will have to install Git manually on UNIX. Visit: https://git-scm.com/downloads")
-            input("Press Enter to exit...")
             exit(0)
         else:
             install_choice = input("Do you wish to install Git Portable in your virtual environment? (400mb~) (Y/N): ").strip().lower()
@@ -118,7 +117,6 @@ def check_git_installed():
             return False
             if install_choice != 'y':
                 print("You will have to install Git manually. Visit: https://git-scm.com/downloads")
-                input("Press Enter to exit...")
                 exit(0)
             return False
 
@@ -253,5 +251,4 @@ if __name__ == "__main__":
         remove_temp_files()
 
     print("\n\n[IMPORTANT] IF you encounter errors after updates, check fallback configs internally in godfinger and all plugins...\n\n")
-    input("Press Enter to exit...");
     exit(0);
