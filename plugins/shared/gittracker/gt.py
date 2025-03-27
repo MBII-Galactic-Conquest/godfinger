@@ -22,6 +22,7 @@ Log = logging.getLogger(__name__);
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "gtConfig.json");
 PLACEHOLDER = "placeholder"
+PLACEHOLDER_PATH = "path/to/bat/or/sh"
 PLACEHOLDER_REPO = "placeholder/placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
@@ -90,6 +91,8 @@ def create_config_placeholder():
             ],
             "refresh_interval": 60,
             "gfBuildBranch": PLACEHOLDER_BRANCH,
+            "svnPostHookFile": PLACEHOLDER_PATH,
+            "isSVNBuilding": FALSE_VAR,
             "isGFBuilding": FALSE_VAR
         }
         with open(CONFIG_FILE, "w") as f:
@@ -113,6 +116,8 @@ def load_config():
         "repositories": config.get("repositories", []),
         "refresh_interval": config.get("refresh_interval"),
         "gfBuildBranch": config.get("gfBuildBranch"),
+        "svnPostHookFile": config.get("svnPostHookFile"),
+        "isSVNBuilding": config.get("isSVNBuilding"),
         "isGFBuilding": config.get("isGFBuilding"),
     }
 
@@ -266,6 +271,31 @@ def start_monitoring():
     monitoring_thread.daemon = True
     monitoring_thread.start()
 
+def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
+    global UPDATE_NEEDED
+
+# Used to check for SVN updates as well, using post hooks #
+# Excellent for json configstores, private codebases, and other implements #
+
+    script_path = os.path.abspath(os.path.join(os.getcwd(), svnPostHookFile))
+    
+    if isSVNBuilding and UPDATE_NEEDED == True:
+        if not os.path.exists(script_path):
+            Log.error(f"SVN Post Hook file not found: {script_path}")
+            return
+        try:
+            if script_path.endswith('.bat') and os.name == 'nt':  # Windows
+                subprocess.run(script_path, shell=True, check=True)
+            elif script_path.endswith('.sh') and os.name != 'nt':  # Linux/macOS
+                subprocess.run(["bash", script_path], check=True)
+            else:
+                Log.error("Unsupported script type or OS")
+            Log.info(f"Successfully executed SVN Update: {script_path}")
+        except subprocess.CalledProcessError as e:
+            Log.error(f"Error executing SVN Update: {e}")
+    else:
+        pass;
+
 def run_script(script_path, simulated_inputs):
     global PYTHON_CMD
     CWD = os.getcwd()
@@ -308,18 +338,18 @@ def check_and_trigger_update(isGFBuilding):
     global UPDATE_NEEDED
     timeoutSeconds = 10
     
-    if isGFBuilding and UPDATE_NEEDED:
+    if isGFBuilding and UPDATE_NEEDED == True:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
         # Run update_noinput.py
         update_script = os.path.abspath(os.path.join(os.getcwd(), "update", "update_noinput.py"))
         #print(f"Debug: Checking update script at {update_script}")
-        run_script(update_script, ["Y", "Y"])
+        run_script(update_script, ["Y", "Y", "Y"])
 
         # Run deployments_noinput.py with the same logic
         deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", "deployments_noinput.py"))
         #print(f"Debug: Checking deployments script at {deploy_script}")
-        run_script(deploy_script, ["", ""])
+        run_script(deploy_script, ["", "", ""])
 
         # Now, execute cleanup script based on the OS
         cleanup_script = os.path.abspath("cleanup.bat" if platform.system() == "Windows" else "cleanup.sh")
@@ -411,7 +441,8 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
-        _, _, _, isGFBuilding = load_config()
+        _, _, _, svnPostHookFile, isSVNBuilding, isGFBuilding = load_config()
+        CheckForSVNUpdate(isSVNBuilding, svnPostHookFile)
         check_and_trigger_update(isGFBuilding)
         UPDATE_NEEDED = False
         return UPDATE_NEEDED, False;
