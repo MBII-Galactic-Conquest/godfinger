@@ -272,11 +272,11 @@ def run_script(script_path, simulated_inputs):
 
     if not os.path.exists(script_path):
         Log.error(f"Script not found: {script_path}")
-        print(f"Debug: Script not found: {script_path}")
+        #print(f"Debug: Script not found: {script_path}")
         return
 
     input_string = "\n".join(simulated_inputs) + "\n"
-    print(f"Debug: Running {script_path} with input: {input_string}")
+    #print(f"Debug: Running {script_path} with input: {input_string}")
 
     try:
         result = subprocess.run(
@@ -290,7 +290,7 @@ def run_script(script_path, simulated_inputs):
         )
 
         # Log the results
-        print(f"Debug: Script output: {result.stdout}")
+        #print(f"Debug: Script output: {result.stdout}")
         if result.returncode == 0:
             Log.info(f"Script executed successfully: {script_path}")
         else:
@@ -299,10 +299,10 @@ def run_script(script_path, simulated_inputs):
     except subprocess.CalledProcessError as e:
         # Log any errors
         Log.error(f"Error running {script_path}: {e.stderr}")
-        print(f"Debug: Exception: {e}")
+        #print(f"Debug: Exception: {e}")
     except Exception as e:
         Log.error(f"Unexpected error running {script_path}: {e}")
-        print(f"Debug: Exception: {e}")
+        #print(f"Debug: Exception: {e}")
 
 def check_and_trigger_update(isGFBuilding):
     global UPDATE_NEEDED
@@ -313,17 +313,17 @@ def check_and_trigger_update(isGFBuilding):
 
         # Run update_noinput.py
         update_script = os.path.abspath(os.path.join(os.getcwd(), "update", "update_noinput.py"))
-        print(f"Debug: Checking update script at {update_script}")
+        #print(f"Debug: Checking update script at {update_script}")
         run_script(update_script, ["Y", "Y"])
 
         # Run deployments_noinput.py with the same logic
         deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", "deployments_noinput.py"))
-        print(f"Debug: Checking deployments script at {deploy_script}")
+        #print(f"Debug: Checking deployments script at {deploy_script}")
         run_script(deploy_script, ["", ""])
 
         # Now, execute cleanup script based on the OS
         cleanup_script = os.path.abspath("cleanup.bat" if platform.system() == "Windows" else "cleanup.sh")
-        print(f"Debug: Cleanup script path: {cleanup_script}")
+        #print(f"Debug: Cleanup script path: {cleanup_script}")
         
         try:
             result = subprocess.run(
@@ -335,9 +335,9 @@ def check_and_trigger_update(isGFBuilding):
                 stderr=subprocess.PIPE,
                 check=True
             )
-            print(f"Debug: Cleanup return code: {result.returncode}")
-            print(f"Debug: Cleanup stdout: {result.stdout}")
-            print(f"Debug: Cleanup stderr: {result.stderr}")
+            #print(f"Debug: Cleanup return code: {result.returncode}")
+            #print(f"Debug: Cleanup stdout: {result.stdout}")
+            #print(f"Debug: Cleanup stderr: {result.stderr}")
 
             if result.returncode == 0:
                 Log.info(f"Cleanup script ({cleanup_script}) executed successfully.")
@@ -346,7 +346,7 @@ def check_and_trigger_update(isGFBuilding):
         
         except Exception as e:
             Log.error(f"Exception occurred while running cleanup script: {e}")
-            print(f"Debug: Exception: {e}")
+            #print(f"Debug: Exception: {e}")
         
         # Force Godfinger to restart after update by crashing it
         Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
