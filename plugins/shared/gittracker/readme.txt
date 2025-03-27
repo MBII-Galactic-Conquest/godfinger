@@ -21,8 +21,8 @@ ENSURE YOU MODIFY YOUR gtConfig.json,
     }
   ],
   "refresh_interval": 60,
-  "gfBuildBranch": main,
-  "svnPostHookFile": path/to/bat/or/sh,
+  "gfBuildBranch": "main",
+  "svnPostHookFile": "path/to/bat/or/sh",
   "isSVNBuilding": false,
   "isGFBuilding": false
 }
