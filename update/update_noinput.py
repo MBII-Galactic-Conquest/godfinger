@@ -14,14 +14,12 @@ REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
 REPO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../")
 CFG_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commit.cfg")
 COMMIT_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commit.env")
-UPDATE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPDATE_CFG_FILE = os.path.join(UPDATE_DIR, "updateCfg.json")
+UPDATE_CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "updateCfg.json")
 
 # Directory for extracting 7z files
-EXTRACT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../temp")
-SEVEN_PLUGINDIR = os.path.dirname(os.path.abspath(__file__))
+EXTRACT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../", "temp")
 SEVEN_ZIP_EXECUTABLE = os.path.join(EXTRACT_DIR, '7-ZipPortable', 'App', '7-Zip', '7z.exe')
-SEVEN_ZIP_ARCHIVE = os.path.join(SEVEN_PLUGINDIR, "../lib/other/win/7z_portable.zip")
+SEVEN_ZIP_ARCHIVE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../", "lib/other/win/7z_portable.zip")
 GIT_ARCHIVE = "PortableGit-2.48.1-64-bit.7z.exe"
 GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.windows.1/PortableGit-2.48.1-64-bit.7z.exe"
 
@@ -72,7 +70,7 @@ if os.name == 'nt':  # Windows
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = "python"
+    PYTHON_CMD = sys.executable
 
     # Set the environment variables for Windows if Git was found
     if GIT_EXECUTABLE:

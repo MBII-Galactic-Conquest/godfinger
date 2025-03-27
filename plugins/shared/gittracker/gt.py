@@ -38,7 +38,7 @@ if os.name == 'nt':  # Windows
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = shutil.which("python3") if shutil.which("python3") else "python"
+    PYTHON_CMD = sys.executable
 
     if GIT_EXECUTABLE:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
@@ -141,8 +141,8 @@ def load_or_create_env(repo_url, branch_name):
     
     # Load existing .env data
     load_dotenv(env_file_path)
-    last_hash = os.getenv("last_hash", "")
-    last_message = os.getenv("last_message", "")
+    last_hash = os.getenv("last_hash")
+    last_message = os.getenv("last_message")
     
     return last_hash, last_message, env_file_path
 
@@ -156,16 +156,23 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
     
     # Trim whitespace from the values
     commit_hash = commit_hash.strip()
-    commit_message = commit_message.strip()
-    last_hash = last_hash.strip() if last_hash else ""
-    last_message = last_message.strip() if last_message else ""
+    commit_message = commit_message.strip()[:60]
+    last_hash = last_hash.strip()[:60] if last_hash else ""
+    last_message = last_message.strip()[:60] if last_message else ""
+
+    if "'" or "\n" in commit_message:
+        commit_message = commit_message.replace("'", "/")
+        commit_message = commit_message.replace("\n", "")
 
     #Log.info(f"Comparing commit info for {repo_url} ({branch_name}):")
     #Log.info(f"Last commit hash: {last_hash}")
     #Log.info(f"Last commit message: {last_message}")
     #Log.info(f"New commit hash: {commit_hash}")
     #Log.info(f"New commit message: {commit_message}")
-    
+
+    if last_hash == commit_hash or last_message == commit_message:
+        pass;
+
     # Check if the commit hash or message has changed for this specific repository
     if last_hash != commit_hash or last_message != commit_message:
         #Log.info(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
@@ -173,12 +180,14 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         set_key(env_file_path, "last_hash", commit_hash)
         set_key(env_file_path, "last_message", commit_message)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
+        if last_hash == commit_hash or last_message == commit_message:
+            pass;
         if len(full_message) > 131:
             max_commit_message_length = 131 - len(f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5") - 3
             commit_message = commit_message[:max_commit_message_length] + "..."
             full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
-        if isGFBuilding == True and GODFINGER in repo_name and gfBuildBranch in branch_name:
+        if isGFBuilding == True and UPDATE_NEEDED == False and GODFINGER in repo_name and gfBuildBranch in branch_name:
             PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
             UPDATE_NEEDED = True
             return UPDATE_NEEDED
@@ -191,8 +200,8 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
     last_message = None
 
     # Optionally, clear out environment variables to prevent interference between repository checks
-    os.environ.pop("last_hash", None)
-    os.environ.pop("last_message", None)
+    os.environ.pop("last_hash")
+    os.environ.pop("last_message")
 
 def get_latest_commit_info(repo_url: str, branch: str):
     try:
@@ -257,6 +266,44 @@ def start_monitoring():
     monitoring_thread.daemon = True
     monitoring_thread.start()
 
+def run_script(script_path, simulated_inputs):
+    global PYTHON_CMD
+    CWD = os.getcwd()
+
+    if not os.path.exists(script_path):
+        Log.error(f"Script not found: {script_path}")
+        print(f"Debug: Script not found: {script_path}")
+        return
+
+    input_string = "\n".join(simulated_inputs) + "\n"
+    print(f"Debug: Running {script_path} with input: {input_string}")
+
+    try:
+        result = subprocess.run(
+            [PYTHON_CMD, script_path],
+            input=input_string,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            cwd=CWD
+        )
+
+        # Log the results
+        print(f"Debug: Script output: {result.stdout}")
+        if result.returncode == 0:
+            Log.info(f"Script executed successfully: {script_path}")
+        else:
+            Log.error(f"Script failed with return code {result.returncode}. Error: {result.stderr}")
+    
+    except subprocess.CalledProcessError as e:
+        # Log any errors
+        Log.error(f"Error running {script_path}: {e.stderr}")
+        print(f"Debug: Exception: {e}")
+    except Exception as e:
+        Log.error(f"Unexpected error running {script_path}: {e}")
+        print(f"Debug: Exception: {e}")
+
 def check_and_trigger_update(isGFBuilding):
     global UPDATE_NEEDED
     timeoutSeconds = 10
@@ -264,139 +311,43 @@ def check_and_trigger_update(isGFBuilding):
     if isGFBuilding and UPDATE_NEEDED:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
-        # Command to run update_noinput.py
-        update_script = os.path.abspath("./update/update_noinput.py")
-        print(f"Debug: update.py path: {update_script}")  # Debug: Check the path to the script
+        # Run update_noinput.py
+        update_script = os.path.abspath(os.path.join(os.getcwd(), "update", "update_noinput.py"))
+        print(f"Debug: Checking update script at {update_script}")
+        run_script(update_script, ["Y", "Y"])
 
-        # Define simulated inputs for update_noinput.py
-        simulated_inputs_update = ["Y", "Y", "", ""]  # Predefined inputs to pass
-        input_string_update = "\n".join(simulated_inputs_update) + "\n"
-
-        # Debug: Log simulated input
-        print(f"Debug: Simulated input: {input_string_update}")
-
-        try:
-            # Run subprocess directly, providing input via stdin
-            result = subprocess.run(
-                [PYTHON_CMD, update_script],  # Run the script
-                input=input_string_update,  # Simulated input to pass to the script
-                text=True,  # Use text mode for I/O (Python 3.7+)
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True
-            )
-
-            # Debug: Check subprocess return code and outputs
-            print(f"Debug: Return code: {result.returncode}")
-            print(f"Debug: stdout: {result.stdout}")
-            print(f"Debug: stderr: {result.stderr}")
-
-            if result.returncode == 0:
-                Log.info("Update script executed successfully with predefined inputs.")
-            else:
-                Log.error(f"Error running update script: {result.stderr}")
-        
-        except Exception as e:
-            Log.error(f"Exception occurred while running update script: {e}")
-            print(f"Debug: Exception: {e}")
-
-        # Command to run deployments_noinput.py
-        deploy_script = os.path.abspath("./update/deployments_noinput.py")
-        print(f"Debug: deployments_noinput.py path: {deploy_script}")  # Debug: Check the path to the script
-
-        try:
-            # Run subprocess directly, providing input via stdin
-            result = subprocess.run(
-                [PYTHON_CMD, deploy_script],  # Run the script
-                input="",  # Simulated input to pass to the script
-                text=True,  # Use text mode for I/O (Python 3.7+)
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True
-            )
-
-            # Debug: Check subprocess return code and outputs
-            print(f"Debug: Return code: {result.returncode}")
-            print(f"Debug: stdout: {result.stdout}")
-            print(f"Debug: stderr: {result.stderr}")
-
-            if result.returncode == 0:
-                Log.info("Deployments script executed successfully with predefined inputs.")
-            else:
-                Log.error(f"Error running deployments script: {result.stderr}")
-        
-        except Exception as e:
-            Log.error(f"Exception occurred while running deployments script: {e}")
-            print(f"Debug: Exception: {e}")
+        # Run deployments_noinput.py with the same logic
+        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", "deployments_noinput.py"))
+        print(f"Debug: Checking deployments script at {deploy_script}")
+        run_script(deploy_script, ["", ""])
 
         # Now, execute cleanup script based on the OS
-        if platform.system() == "Windows":
-            # Run cleanup.bat for Windows
-            cleanup_script = os.path.abspath("./cleanup.bat")
-            print(f"Debug: cleanup.bat path: {cleanup_script}")  # Debug: Check the path to cleanup.bat
+        cleanup_script = os.path.abspath("cleanup.bat" if platform.system() == "Windows" else "cleanup.sh")
+        print(f"Debug: Cleanup script path: {cleanup_script}")
+        
+        try:
+            result = subprocess.run(
+                [cleanup_script],
+                input="Y\n",
+                text=True,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+            print(f"Debug: Cleanup return code: {result.returncode}")
+            print(f"Debug: Cleanup stdout: {result.stdout}")
+            print(f"Debug: Cleanup stderr: {result.stderr}")
 
-            # Simulate input "Y" for the cleanup.bat script
-            simulated_input = "Y\n"
-            try:
-                result = subprocess.run(
-                    [cleanup_script],
-                    input=simulated_input,
-                    text=True,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=True
-                )
-
-                # Debug: Check subprocess return code and outputs
-                print(f"Debug: cleanup.bat return code: {result.returncode}")
-                print(f"Debug: cleanup.bat stdout: {result.stdout}")
-                print(f"Debug: cleanup.bat stderr: {result.stderr}")
-
-                if result.returncode == 0:
-                    Log.info("Cleanup script (cleanup.bat) executed for Windows.")
-                else:
-                    Log.error(f"Error executing cleanup.bat: {result.stderr}")
-            
-            except Exception as e:
-                Log.error(f"Exception occurred while running cleanup.bat: {e}")
-                print(f"Debug: Exception: {e}")
-
-        elif platform.system() in ["Linux", "Darwin"]:  # Darwin is for macOS
-            # Run cleanup.sh for Linux or macOS
-            cleanup_script = os.path.abspath("./cleanup.sh")
-            print(f"Debug: cleanup.sh path: {cleanup_script}")  # Debug: Check the path to cleanup.sh
-
-            # Simulate input "Y" for the cleanup.sh script
-            simulated_input = "Y\n"
-            try:
-                result = subprocess.run(
-                    [cleanup_script],
-                    input=simulated_input,
-                    text=True,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=True
-                )
-
-                # Debug: Check subprocess return code and outputs
-                print(f"Debug: cleanup.sh return code: {result.returncode}")
-                print(f"Debug: cleanup.sh stdout: {result.stdout}")
-                print(f"Debug: cleanup.sh stderr: {result.stderr}")
-
-                if result.returncode == 0:
-                    Log.info("Cleanup script (cleanup.sh) executed for Linux/macOS.")
-                else:
-                    Log.error(f"Error executing cleanup.sh: {result.stderr}")
-            
-            except Exception as e:
-                Log.error(f"Exception occurred while running cleanup.sh: {e}")
-                print(f"Debug: Exception: {e}")
-
-        else:
-            Log.info("Unsupported OS for cleanup script.")
-
+            if result.returncode == 0:
+                Log.info(f"Cleanup script ({cleanup_script}) executed successfully.")
+            else:
+                Log.error(f"Error executing cleanup script: {result.stderr}")
+        
+        except Exception as e:
+            Log.error(f"Exception occurred while running cleanup script: {e}")
+            print(f"Debug: Exception: {e}")
+        
         # Force Godfinger to restart after update by crashing it
         Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
         PluginInstance._serverData.API.Restart(timeoutSeconds)

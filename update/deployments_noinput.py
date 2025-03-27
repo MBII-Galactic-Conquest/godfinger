@@ -3,6 +3,7 @@ import subprocess
 import shutil
 from dotenv import load_dotenv
 import stat
+import sys
 
 # Define file paths
 ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deployments.env")
@@ -20,7 +21,7 @@ if os.name == 'nt':  # Windows
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = "python"
+    PYTHON_CMD = sys.executable
 
     # Set the environment variables for Windows if Git was found
     if GIT_EXECUTABLE:

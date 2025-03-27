@@ -70,7 +70,7 @@ if os.name == 'nt':  # Windows
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
 
-    PYTHON_CMD = "python"
+    PYTHON_CMD = sys.executable
 
     # Set the environment variables for Windows if Git was found
     if GIT_EXECUTABLE:
