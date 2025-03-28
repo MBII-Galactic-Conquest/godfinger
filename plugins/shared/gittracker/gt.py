@@ -334,7 +334,7 @@ def run_script(script_path, simulated_inputs):
         Log.error(f"Unexpected error running {script_path}: {e}")
         #print(f"Debug: Exception: {e}")
 
-def check_and_trigger_update(isGFBuilding):
+def CheckForGITUpdate(isGFBuilding):
     global UPDATE_NEEDED
     timeoutSeconds = 10
     
@@ -443,7 +443,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
         _, _, _, svnPostHookFile, isSVNBuilding, isGFBuilding = load_config()
         CheckForSVNUpdate(isSVNBuilding, svnPostHookFile)
-        check_and_trigger_update(isGFBuilding)
+        CheckForGITUpdate(isGFBuilding)
         UPDATE_NEEDED = False
         return UPDATE_NEEDED, False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
