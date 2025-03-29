@@ -267,7 +267,7 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
     
     if isSVNBuilding and UPDATE_NEEDED == True:
         if not os.path.exists(script_path):
-            Log.error(f"SVN Post Hook file not found: {script_path}")
+            Log.error(f"SVN Post Hook file not found.")
             return
         try:
             if script_path.endswith('.bat') and os.name == 'nt':  # Windows
