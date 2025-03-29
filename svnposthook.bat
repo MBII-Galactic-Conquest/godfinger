@@ -31,7 +31,7 @@ set ACCEPT_CHOICE=%ACCEPT_CHOICE:~1,-1%
 echo Commit to %REPO_PATH% at revision %REVISION% >> "./svn_commits.log"
 
 :: Update the working copy
-svn update %WORKING_COPY% --username %USERNAME% --password %PASSWORD% --non-interactive --accept %ACCEPT_CHOICE%
+svn update %WORKING_COPY% --username %USERNAME% --password %PASSWORD% --non-interactive --accept %ACCEPT_CHOICE% >> "./svn_commits.log" 2>&1
 
 echo Press enter to exit...
 set /p input=

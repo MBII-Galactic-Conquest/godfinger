@@ -54,6 +54,6 @@ ACCEPT_CHOICE=$(jq -r '.accept_choice' "$CONFIG_FILE")
 echo "Commit to $REPO_PATH at revision $REVISION" >> "./svn_commits.log"
 
 # Update the working copy
-svn update "$WORKING_COPY" --username "$USERNAME" --password "$PASSWORD" --non-interactive --accept "$ACCEPT_CHOICE"
+svn update "$WORKING_COPY" --username "$USERNAME" --password "$PASSWORD" --non-interactive --accept "$ACCEPT_CHOICE" >> "./svn_commits.log" 2>&1
 
 read -p "Press enter to exit..." input
