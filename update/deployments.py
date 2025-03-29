@@ -70,8 +70,7 @@ with open(ENV_FILE, "r") as f:
 
 # If no valid deployments found, print message and exit
 if not deployments:
-    print("No deployments to manage. Press enter to continue...")
-    input()
+    print("No deployments to manage.")
     exit(0)
 
 # Process deployments
@@ -160,4 +159,4 @@ for repo_branch, deploy_key in deployments.items():
     print(f"Deployed {repo_branch} -> {repo_dir}")
 
 print("Deployment process completed.")
-input("Press Enter to exit...")
+input("Press Enter to continue...")
