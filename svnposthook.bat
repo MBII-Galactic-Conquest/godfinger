@@ -9,11 +9,11 @@ set CONFIG_FILE=svnConfig.json
 
 :: Check if svnConfig.json exists, if not create it with default values
 if not exist "%CONFIG_FILE%" (
-    echo { > "%CONFIG_FILE%"
-    echo "username": "" >> "%CONFIG_FILE%"
-    echo "password": "" >> "%CONFIG_FILE%"
-    echo "accept_choice": "theirs-full" >> "%CONFIG_FILE%"
-    echo } >> "%CONFIG_FILE%"
+    echo {> "%CONFIG_FILE%"
+    echo "username": "">> "%CONFIG_FILE%"
+    echo "password": "">> "%CONFIG_FILE%"
+    echo "accept_choice": "theirs-full">> "%CONFIG_FILE%"
+    echo }>> "%CONFIG_FILE%"
     echo svnConfig.json created with empty username, password, and default accept_choice.
 )
 
