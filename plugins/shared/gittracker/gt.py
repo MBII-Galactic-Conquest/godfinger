@@ -194,6 +194,7 @@ def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
         if isGFBuilding == True and UPDATE_NEEDED == False and GODFINGER in repo_name and gfBuildBranch in branch_name:
             PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
+            Log.debug(f"Godfinger change intercepted, automatically building '{gfBuildBranch}' when all players leave the server...")
             UPDATE_NEEDED = True
             return UPDATE_NEEDED
     else:
