@@ -12,7 +12,6 @@ import shutil
 import requests
 import threading
 import platform
-from dotenv import load_dotenv, set_key
 
 SERVER_DATA = None;
 GODFINGER = "godfinger"
@@ -121,93 +120,79 @@ def load_config():
         "isGFBuilding": config.get("isGFBuilding"),
     }
 
-def get_env_file_name(repo_url, branch_name):
+def get_json_file_name(repo_url, branch_name):
     repo_name = repo_url.split('/')[-1]
-    return f"{repo_name}_{branch_name}.env"
+    return f"{repo_name}_{branch_name}.json"
 
-def load_or_create_env(repo_url, branch_name):
-    env_dir = os.path.join(os.path.dirname(__file__), "env")
-    if not os.path.exists(env_dir):
-        os.makedirs(env_dir)
+def load_or_create_json(repo_url, branch_name):
+    config_dir = os.path.join(os.path.dirname(__file__), "jsonstore")
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
 
-    # Ensure each repository gets its own .env file
-    env_file = get_env_file_name(repo_url, branch_name)
-    env_file_path = os.path.join(env_dir, env_file)
+    # Ensure each repository gets its own .json file
+    config_file = get_json_file_name(repo_url, branch_name)
+    config_file_path = os.path.abspath(os.path.join(config_dir, config_file))
 
-    if not os.path.exists(env_file_path):
-        #Log.info(f"Creating .env file: {env_file_path}")
-        # Create new .env file with placeholders
-        set_key(env_file_path, "last_hash", "")
-        set_key(env_file_path, "last_message", "")
-        last_hash, last_message = "", ""  # Placeholder values if new
+    if not os.path.exists(config_file_path):
+        # Create new config file with placeholders
+        default_config = {"last_hash": ""}
+        with open(config_file_path, "w") as f:
+            json.dump(default_config, f)
     else:
-        #Log.info(f".env file exists: {env_file_path}")
-        pass;
+        pass  # No need to do anything if the file already exists
     
-    # Load existing .env data
-    load_dotenv(env_file_path)
-    last_hash = os.getenv("last_hash")
-    last_message = os.getenv("last_message")
+    # Load existing config data
+    with open(config_file_path, "r") as f:
+        config_data = json.load(f)
     
-    return last_hash, last_message, env_file_path
+    last_hash = config_data.get("last_hash", "").strip().strip("'").strip('"')
+    
+    return last_hash, config_file_path
 
-def update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch):
+def save_json(config_file_path, commit_hash):
+    with open(config_file_path, "r") as f:
+        config_data = json.load(f)
+    
+    config_data["last_hash"] = commit_hash
+    
+    with open(config_file_path, "w") as f:
+        json.dump(config_data, f, indent=4)
+
+def update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch):
     global PluginInstance
     global UPDATE_NEEDED
 
-    # First, reset last_hash and last_message
-    last_hash, last_message, env_file_path = load_or_create_env(repo_url, branch_name)
+    # First, reset last_hash
+    last_hash, config_file_path = load_or_create_json(repo_url, branch_name)
     repo_name = repo_url.replace("MBII-Galactic-Conquest/", "").replace("MBII-Galactic-Conquest/", "")
     
     # Trim whitespace from the values
-    commit_hash = commit_hash.strip()
-    commit_message = commit_message.strip()[:60]
-    last_hash = last_hash.strip()[:60] if last_hash else ""
-    last_message = last_message.strip()[:60] if last_message else ""
-
-    if "'" or "\n" in commit_message:
-        commit_message = commit_message.replace("'", "/")
-        commit_message = commit_message.replace("\n", "")
+    commit_hash = commit_hash.strip()[:7]
+    commit_message = commit_message.strip()[:72]
+    last_hash = last_hash.strip()[:7]
 
     #Log.info(f"Comparing commit info for {repo_url} ({branch_name}):")
     #Log.info(f"Last commit hash: {last_hash}")
-    #Log.info(f"Last commit message: {last_message}")
     #Log.info(f"New commit hash: {commit_hash}")
     #Log.info(f"New commit message: {commit_message}")
 
-    if last_hash == commit_hash or last_message == commit_message:
-        pass;
+    if last_hash == commit_hash:
+        return
 
-    # Check if the commit hash or message has changed for this specific repository
-    if last_hash != commit_hash or last_message != commit_message:
-        #Log.info(f"Updating .env file for {repo_url} ({branch_name}) with new commit (Hash: {commit_hash}, Message: {commit_message})")
-        # Only update if hash or message has changed
-        set_key(env_file_path, "last_hash", commit_hash)
-        set_key(env_file_path, "last_message", commit_message)
+    # Check if the commit hash has changed for this specific repository
+    if last_hash != commit_hash:
+        # Only update if hash has changed
+        save_json(config_file_path, commit_hash)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
-        if last_hash == commit_hash or last_message == commit_message:
-            pass;
-        if len(full_message) > 131:
-            max_commit_message_length = 131 - len(f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5") - 3
-            commit_message = commit_message[:max_commit_message_length] + "..."
-            full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
+        
         if isGFBuilding == True and UPDATE_NEEDED == False and GODFINGER in repo_name and gfBuildBranch in branch_name:
             PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
             Log.debug(f"Godfinger change intercepted, automatically building '{gfBuildBranch}' and private deployments when all players leave the server...")
             UPDATE_NEEDED = True
             return UPDATE_NEEDED
     else:
-        #Log.info(f"No changes for {repo_url} ({branch_name}). Commit (Hash: {commit_hash}, Message: {commit_message}) is the same as the last one.")
-        pass;
-
-    # Reset the values after processing to ensure no state leakage for the next repository
-    last_hash = None
-    last_message = None
-
-    # Optionally, clear out environment variables to prevent interference between repository checks
-    os.environ.pop("last_hash")
-    os.environ.pop("last_message")
+        return
 
 def get_latest_commit_info(repo_url: str, branch: str):
     try:
@@ -260,7 +245,7 @@ def monitor_commits():
                     #Log.info(f"Hash: {commit_hash}")
                     #Log.info(f"Message: {commit_message}")
 
-                    update_env_file_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch)
+                    update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, isGFBuilding, gfBuildBranch)
 
             time.sleep(refresh_interval)
 
