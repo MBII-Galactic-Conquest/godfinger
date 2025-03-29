@@ -111,8 +111,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "logicDelay" : Interval of time to pass between script heartbeat loops.
 > - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
 > - "paths" : A list of string paths to append to system path, used to pass import directories for dependancies of plugins and such.
-> - "prologueMessage" : A string to post in svsay when the platform is up.
-> - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
 >
 > - "interfaces"
@@ -124,12 +122,13 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >         - "address"
 >            - "ip" : The IP address of the server to connect to. In most cases this should be localhost as the script requires access to the log file to function.
 >            - "port" : The port to connect to. In most cases, should be 29070.
->     - "bindAddress" : The address for the script to use as a bind address. In most cases should be the same as the IP.
->     - "password" : The server's rcon password. Set in server.cfg.
->   - "logFilename" : Name of the server log file (defined in server.cfg, default is server.log)
->   - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
->   - "Debug": TestRetrospect true/false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
-> - "interface": Where you can specify which interface you wish to use, in this case, "rcon" or "pty", with "rcon" as default.
+>       - "bindAddress" : The address for the script to use as a bind address. In most cases should be the same as the IP.
+>       - "password" : The server's rcon password. Set in server.cfg.
+>      - "logFilename" : Name of the server log file (defined in server.cfg, default is server.log)
+>      - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
+>     - "Debug"
+>       - "TestRetrospect" : true/false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
+> - "interface" : Where you can specify which interface you wish to use, in this case, "rcon" or "pty", with "rcon" as default.
 >
 > - "paths": Where you can specify foreign directories not native to the godfinger root working directory, in the event of private codebases, or other implements with the godfinger system. Default is ".\\"
 >
