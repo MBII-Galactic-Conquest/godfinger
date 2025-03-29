@@ -30,6 +30,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 - account systems,
 - sql databases,
 - AI responses,
+- automated asset building,
 - integrating other languages,
 - discord integration, & more.
 ```
