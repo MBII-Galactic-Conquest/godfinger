@@ -1,5 +1,14 @@
 #!/bin/bash
 
+read -p "Do you wish to install Subversion on your system? (Y/N): " confirm
+
+confirm=$(echo "$confirm" | tr 'a-z' 'A-Z')
+
+if [ "$confirm" != "Y" ]; then
+    echo "Operation cancelled. Portable SVN install aborted..."
+    exit 0
+fi
+
 # Function to install SVN based on OS
 install_svn() {
     echo "Checking system for package manager..."

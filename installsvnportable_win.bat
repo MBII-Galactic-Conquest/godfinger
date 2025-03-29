@@ -11,6 +11,12 @@ setlocal
 
 :: ========================================= ::
 
+set /p confirm="Do you wish to install a portable version of Subversion in your virtual environment? This can override your PATH (Y/N): "
+if /i "%confirm%" neq "Y" (
+    echo Operation cancelled. Portable SVN install aborted...
+    exit /b
+)
+
 :: Create a log file to capture all output for debugging
 set LOG_FILE=%CD%\install_svnportable_log.log
 echo Script started at %DATE% %TIME% > "%LOG_FILE%"
