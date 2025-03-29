@@ -12,7 +12,7 @@ setlocal
 :: ========================================= ::
 
 :: Create a log file to capture all output for debugging
-set LOG_FILE=%CD%\install_svnportable_log.txt
+set LOG_FILE=%CD%\install_svnportable_log.log
 echo Script started at %DATE% %TIME% > "%LOG_FILE%"
 
 :: Check if SVN is installed by looking for svn.exe in the PATH
