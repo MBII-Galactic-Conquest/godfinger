@@ -128,14 +128,15 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >      - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
 >     - "Debug"
 >       - "TestRetrospect" : true/false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
+>
 > - "interface" : Where you can specify which interface you wish to use, in this case, "rcon" or "pty", with "rcon" as default.
 >
-> - "paths": Where you can specify foreign directories not native to the godfinger root working directory, in the event of private codebases, or other implements with the godfinger system. Default is ".\\"
+> - "paths" : Where you can specify foreign directories not native to the godfinger root working directory, in the event of private codebases, or other implements with the godfinger system. Default is ".\\"
 >
-> - "prologueMessage": String to show when the godfinger system has acknowledged sufficiently starting up, and deployed natively without error.
-> - "epilogueMessage": String to show when the godfinger system concludes, and has exited cleanly, safely.
+> - "prologueMessage" : String to show when the godfinger system has acknowledged sufficiently starting up, and deployed natively without error.
+> - "epilogueMessage" : String to show when the godfinger system concludes, and has exited cleanly, safely.
 >
-> - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
+> - "Plugins" : A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
 > ```
 
 </br>
