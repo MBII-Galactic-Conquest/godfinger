@@ -104,6 +104,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >         - "port" : The port to connect to. In most cases, should be 29070.
 >     - "bindAddress" : The address for the script to use as a bind address. In most cases should be the same as the IP.
 >     - "password" : The server's rcon password. Set in server.cfg.
+>
 > - "MBIIPath" : File path to the MBII installation to be used.
 > - "logFilename" : Name of the server log file (defined in server.cfg, default is server.log)
 > - "serverFileName" : Name of the server executable file to use.
@@ -113,8 +114,29 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "prologueMessage" : A string to post in svsay when the platform is up.
 > - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
+>
+> - "interfaces"
+>    - "pty" : Pseudo-terminal utilities (https://docs.python.org/3/library/pty.html), used to wrap the mbiided process.
+>        - "target" : File path to the MBII dedicated server executable.
+>         - "inputDelay" : Interval of time to pass between terminal heartbeat loops.
+>    - "rcon" : The typical use of the godfinger script extension system, generic logfile parsing.
+>     - "Remote"
+>         - "address"
+>            - "ip" : The IP address of the server to connect to. In most cases this should be localhost as the script requires access to the log file to function.
+>            - "port" : The port to connect to. In most cases, should be 29070.
+>     - "bindAddress" : The address for the script to use as a bind address. In most cases should be the same as the IP.
+>     - "password" : The server's rcon password. Set in server.cfg.
+>   - "logFilename" : Name of the server log file (defined in server.cfg, default is server.log)
+>   - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
+>   - "Debug": TestRetrospect true/false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
+> - "interface": Where you can specify which interface you wish to use, in this case, "rcon" or "pty", with "rcon" as default.
+>
+> - "paths": Where you can specify foreign directories not native to the godfinger root working directory, in the event of private codebases, or other implements with the godfinger system. Default is ".\\"
+>
+> - "prologueMessage": String to show when the godfinger system has acknowledged sufficiently starting up, and deployed natively without error.
+> - "epilogueMessage": String to show when the godfinger system concludes, and has exited cleanly, safely.
+>
 > - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
-> - "Debug": TestRetrospect true|false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
 > ```
 
 </br>
