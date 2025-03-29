@@ -263,7 +263,7 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
 # Used to check for SVN updates as well, using post hooks #
 # Excellent for json configstores, private codebases, and other implements #
 
-    script_path = os.path.abspath(os.path.join(os.getcwd(), svnPostHookFile))
+    script_path = os.path.abspath(os.path.join(os.getcwd(), svnPostHookFile)) if svnPostHookFile else None
     
     if isSVNBuilding and UPDATE_NEEDED == True:
         if not os.path.exists(script_path):
@@ -271,9 +271,9 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
             return
         try:
             if script_path.endswith('.bat') and os.name == 'nt':  # Windows
-                subprocess.run(script_path, shell=True, check=True)
+                subprocess.run(script_path, shell=True, check=True, input="")
             elif script_path.endswith('.sh') and os.name != 'nt':  # Linux/macOS
-                subprocess.run(["bash", script_path], check=True)
+                subprocess.run(["bash", script_path], check=True, input="")
             else:
                 Log.error("Unsupported script type or OS")
             Log.info(f"Successfully executed SVN Update: {script_path}")
