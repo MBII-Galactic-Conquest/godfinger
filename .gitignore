@@ -3,9 +3,9 @@ lib/private/*
 plugins/private/*
 !plugins/private/.keep
 
-tmp/
-temp/
-temporary/
+tmp/*
+temp/*
+temporary/*
 
 update/deploy/*
 !update/deploy/.keep
@@ -29,5 +29,5 @@ gtConfig.json
 
 *.db
 *.DB
-ignored/
-venv/
+ignored/*
+venv/*
