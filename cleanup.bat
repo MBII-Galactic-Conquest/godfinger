@@ -1,38 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Ask the user for confirmation
+:: Ask the user for confirmation (this will be skipped if piped input is provided)
 set /p choice=Do you wish to do __pycache__ cleanup? This can prevent conflicts. (Y/N): 
 
-:: Convert input to uppercase to handle lowercase input as well
-set choice=!choice:A=a!
-set choice=!choice:B=b!
-set choice=!choice:C=c!
-set choice=!choice:D=d!
-set choice=!choice:E=e!
-set choice=!choice:F=f!
-set choice=!choice:G=g!
-set choice=!choice:H=h!
-set choice=!choice:I=i!
-set choice=!choice:J=j!
-set choice=!choice:K=k!
-set choice=!choice:L=l!
-set choice=!choice:M=m!
-set choice=!choice:N=n!
-set choice=!choice:O=o!
-set choice=!choice:P=p!
-set choice=!choice:Q=q!
-set choice=!choice:R=r!
-set choice=!choice:S=s!
-set choice=!choice:T=t!
-set choice=!choice:U=u!
-set choice=!choice:V=v!
-set choice=!choice:W=w!
-set choice=!choice:X=x!
-set choice=!choice:Y=y!
-set choice=!choice:Z=z!
+:: Convert the input to lowercase (if it was lowercase or uppercase)
+set choice=%choice:~0,1%
+set choice=!choice: =!
 
-if not "!choice!" == "y" (
+:: Check if the input is "y" or "n" (case-insensitive)
+if /i "%choice%" neq "y" (
     echo Pycache cleanup aborted.
     goto :end
 )
