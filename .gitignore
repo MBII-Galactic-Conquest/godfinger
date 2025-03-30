@@ -3,6 +3,10 @@ lib/private/*
 plugins/private/*
 !plugins/private/.keep
 
+tmp/
+temp/
+temporary/
+
 update/deploy/*
 !update/deploy/.keep
 update/key/*
