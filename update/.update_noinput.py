@@ -65,7 +65,8 @@ if os.name == 'nt':  # Windows
 
     if GIT_PATH is None:
         # If Git is not found, check a fallback directory
-        GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
+        PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+        GIT_PATH = os.path.abspath(os.path.join(PLUGIN_DIR, "..", "venv", "GIT", "bin"))
         GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
@@ -80,7 +81,7 @@ if os.name == 'nt':  # Windows
         print("Git executable could not be set. Ensure Git is installed.")
 
 else:  # Non-Windows (Linux, macOS)
-    # Get the default Git executable path
+        # Get the default Git executable path
     GIT_EXECUTABLE = shutil.which("git")
     PYTHON_CMD = sys.executable
 
@@ -93,6 +94,8 @@ else:  # Non-Windows (Linux, macOS)
 # Function to check if Git is installed
 def check_git_installed():
     global GIT_EXECUTABLE
+    OS = platform.system()
+
     if shutil.which("git") or os.path.exists(GIT_EXECUTABLE):
         try:
             subprocess.run([GIT_EXECUTABLE, "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -105,57 +108,12 @@ def check_git_installed():
         print("[ERROR] Git is not installed.")
         
         if platform.system() in ["Linux", "Darwin"]:
-            print("You will have to install Git manually on UNIX. Visit: https://git-scm.com/downloads")
-            exit(0)
+            print(f"You will have to install Git manually on {OS}. Visit: https://git-scm.com/downloads")
+            sys.exit(0)
         else:
-            install_choice = input("Do you wish to install Git Portable in your virtual environment? (400mb~) (Y/N): ").strip().lower()
-            if install_choice == 'y':
-                GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
-                GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
-                os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
-                os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
+            print(f"You will have to install Git manually on {OS}. Visit: https://git-scm.com/downloads")
+            sys.exit(0)
             return False
-            if install_choice != 'y':
-                print("You will have to install Git manually. Visit: https://git-scm.com/downloads")
-                exit(0)
-            return False
-
-# Function to download the Git archive (PortableGit)
-def download_git():
-    print("[DOWNLOAD] Downloading PortableGit archive...")
-    response = requests.get(GIT_URL)
-    if response.status_code == 200:
-        git_archive_path = os.path.join(EXTRACT_DIR, GIT_ARCHIVE)
-        with open(git_archive_path, 'wb') as f:
-            f.write(response.content)
-        print(f"[DOWNLOAD] Successfully downloaded {GIT_ARCHIVE}")
-        return git_archive_path
-    else:
-        print(f"[ERROR] Failed to download {GIT_ARCHIVE} from {GIT_URL}")
-        return None
-
-# Function to extract PortableGit using 7-Zip
-def extract_git(git_archive_path):
-    print(f"[EXTRACT] Extracting {git_archive_path} to ../venv/GIT...")
-    extract_dir = os.path.abspath(os.path.join("..", "venv", "GIT"))
-    os.makedirs(extract_dir, exist_ok=True)
-
-    try:
-        subprocess.run([SEVEN_ZIP_EXECUTABLE, "x", git_archive_path, f"-o{extract_dir}", "-aoa"], 
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("[EXTRACT] Extraction complete.")
-    except subprocess.CalledProcessError as e:
-        print(f"[ERROR] Failed to extract Git: {e}")
-        return False
-    return True
-
-# Extract 7z Portable
-def extract_7z():
-    print(f"[EXTRACT] Extracting {SEVEN_ZIP_ARCHIVE}...")
-    os.makedirs(EXTRACT_DIR, exist_ok=True)
-    with zipfile.ZipFile(SEVEN_ZIP_ARCHIVE, 'r') as zip_ref:
-        zip_ref.extractall(EXTRACT_DIR)
-    print("[EXTRACT] Extraction complete.")
 
 def start():
     # Prompt user for update
@@ -239,16 +197,9 @@ if __name__ == "__main__":
     if check_git_installed():
         clone_repo_if_needed()
         sync_repo(commit_hash)
-    else:
-        print("[INFO] Using 7-Zip Portable to extract Git...")
-        extract_7z()
-        git_archive_path = download_git()
-        if git_archive_path:
-            extract_git(git_archive_path)
 
-        clone_repo_if_needed()
-        sync_repo(commit_hash)
-        remove_temp_files()
+    if check_git_installed() == False:
+        sys.exit(0);
 
     print("\n\n[IMPORTANT] IF you encounter errors after updates, check fallback configs internally in godfinger and all plugins...\n\n")
     exit(0);
