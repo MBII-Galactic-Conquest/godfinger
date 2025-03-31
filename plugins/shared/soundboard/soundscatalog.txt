@@ -1,0 +1,17 @@
+MBAssets4.pk3 # MB2_SUP_ASSETS
+└── sound
+    ├── sup
+    │   ├── bloop # bizwarn style sound, hlvox
+    │   ├── changeteam # hlvox
+    │   ├── countdown # 5,4,3,2,1 hlvox
+    │   ├── message # attention gathering msg sound
+    │   ├── playerjoin # melancholy join sound
+    │   ├── playerleave # melancholy leave sound
+    │   ├── playerstart # melancholy client_begin sound
+    │   ├── thirtyseconds # 30 seconds remaining, hlvox
+    │   ├── timetovote # hlvox, alt time to vote sound
+    │   └── welcome # sourcemod traditional, client, welcome sound
+    ├── announcer
+    │   └── vote_now.wav # hlquake3 announcer, "VOTE NOW", generally louder
+    └── barney
+        └── ba_later.wav # catch me later, buy you a beer, mapchange sound
