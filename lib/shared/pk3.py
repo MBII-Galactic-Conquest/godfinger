@@ -77,21 +77,23 @@ class Pk3():
 
 class Pk3Manager():
     def __init__(self):
-        self._rootDir = None;
+        self._dirs = [];
         self._pks : dict[str, Pk3]= {};
         self._isInit = False;
     
-    def Initialize(self, rootDir):
+    def Initialize(self, dirs : list[str]):
         if not self._isInit:
             print("Initializing pk3 manager...")
-            if os.path.isdir(rootDir):
-                self.LoadDir(rootDir);
-                self._rootDir = rootDir;
-                for pk in self._pks:
-                    print(self._pks[pk].GetPath());
-                print("Cached %s pk3 archives." % (str(len(self._pks.keys()))));
-                print("Pk3 manager initialized.");
-                self._isInit = True;
+            for dir in dirs:
+                if os.path.isdir(dir):
+                    self.LoadDir(dir);
+                    for pk in self._pks:
+                        print(self._pks[pk].GetPath());
+            print("Cached %s pk3 archives." % (str(len(self._pks.keys()))));
+            print("Pk3 manager initialized.");
+            self._dirs.clear();
+            self._dirs += dirs;
+            self._isInit = True;
     
     def Unload(self, filePath):
         if filePath in self._pks:

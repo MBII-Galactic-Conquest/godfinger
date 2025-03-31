@@ -126,6 +126,8 @@ def filter_message(message):
     # Regular expression to match HTTP URLs and 'discord'
     if re.search(r'https?://|discord', message, re.IGNORECASE):
         return ""  # Return an empty string if the message contains discord or URLs
+    if re.search(r'urllib3.connectionpool', message, re.IGNORECASE):
+        return "" # Return an empty string if the message contains url requests
     return message
 
 # Send a message to a Discord thread or channel, ensuring it's within the 2000/4000 character limit

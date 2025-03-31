@@ -144,6 +144,32 @@ class Rcon(object):
       self.setVstr(vstrStorage, payload)
       self.execVstr(vstrStorage)
       
+  def smsay(self, msg):
+    if not type(msg) == bytes:
+      msg = bytes(msg, "UTF-8")
+    return self._Send(b"\xff\xff\xff\xffrcon %b smsay %b" % (self.rcon_pwd, msg), waitForResponse=False)
+
+  def sound(self, path):
+    """ Plays a sound from the game's directory to the entire server. Players must have sv_serversounds set to '1' to be able to hear sounds from the server. """
+    if not type(path) == bytes:
+      path = bytes(path, "UTF-8")
+    return self._Send(b"\xff\xff\xff\xffrcon %b snd %b" % (self.rcon_pwd, path), waitForResponse=False)
+
+  def soundClient(self, path, client):
+    """ Plays a sound from the game's directory to the given client. The target player must have sv_serversounds set to '1' to be able to hear sounds from the server. """
+    if not type(path) == bytes:
+      path = bytes(path, "UTF-8")
+    if not type(client) == bytes:
+      client = bytes(client, "UTF-8")
+    return self._Send(b"\xff\xff\xff\xffrcon %b sndClient %b %b" % (self.rcon_pwd, client, path), waitForResponse=False)
+
+  def soundTeam(self, path, team):
+    """ Plays a sound from the game's directory to the given team ID (defined in `lib.shared.teams`). Players must have sv_serversounds set to '1' to be able to hear sounds from the server. """
+    if not type(path) == bytes:
+      path = bytes(path, "UTF-8")
+    if not type(team) == bytes:
+      team = bytes(team, "UTF-8")
+    return self._Send(b"\xff\xff\xff\xffrcon %b sndTeam %b %b" % (self.rcon_pwd, team, path), waitForResponse=False)
 
   def svtell(self, client, msg):
     if not type(msg) == bytes:
