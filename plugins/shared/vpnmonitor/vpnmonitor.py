@@ -76,22 +76,10 @@ class VPNMonitor():
             self._status = -1;
 
     def Start(self) -> bool:
-        status = self._serverData.rcon.status();
-        if status != None:
-            statusStr = status.decode("UTF-8", "ignore");
-            Log.debug(statusStr);
-            splitted = statusStr.splitlines();
-            l = len( splitted );
-            if l > 10:
-                for i in range (10, l):
-                    line = splitted[i];
-                    playerSplit = line.split();
-                    if len(playerSplit) >= 6: # hardcode
-                        addr = playerSplit[-2];
-                        ip = addr[:addr.rfind(":")];
-                        id = int(playerSplit[0]);
-                        vpnType = self.GetIpVpnType(ip);
-                        self.ProcessVpnClient(id, ip, vpnType);
+        allClients = self._serverData.API.GetAllClients();
+        for cl in allClients:
+            vpnType = self.GetIpVpnType(cl.GetIp());
+            self.ProcessVpnClient(id, cl.GetIp(), vpnType);
         if self._status == 0:
             return True;
         else:
@@ -146,8 +134,8 @@ class VPNMonitor():
             Log.debug("Kicking a player with ip %s due to VPN block rules" % ip);
             if self.config.GetValue("action", 0) == 1:
                 Log.debug("Banning ip %s" % ip)
-                self._serverData.rcon.clientban(ip);
-            self._serverData.rcon.clientkick(id);
+                self._serverData.interface.ClientBan(ip);
+            self._serverData.interface.ClientKick(id);
             return;
         
         blacklist = self.config.cfg["blacklist"];
@@ -155,8 +143,8 @@ class VPNMonitor():
             Log.debug("Kicking a player with ip %s due to VPN blacklist rules" % ip);
             if self.config.GetValue("action", 0) == 1:
                 Log.debug("Banning ip %s" % ip)
-                self._serverData.rcon.clientban(ip);
-            self._serverData.rcon.clientkick(id);
+                self._serverData.interface.ClientBan(ip);
+            self._serverData.interface.ClientKick(id);
             return;
 
     def OnClientDisconnect(self, client : client.Client, reason, data ) -> bool:
@@ -165,19 +153,6 @@ class VPNMonitor():
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
-    logMode = logging.INFO;
-    if serverData.args.debug:
-        logMode = logging.DEBUG;
-    if serverData.args.logfile != "":
-        logging.basicConfig(
-        filename=serverData.args.logfile,
-        level=logMode,
-        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
-    else:
-        logging.basicConfig(
-        level=logMode,
-        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
-
     global SERVER_DATA;
     SERVER_DATA = serverData; # keep it stored
     global PluginInstance;

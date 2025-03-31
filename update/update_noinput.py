@@ -11,15 +11,15 @@ import json
 
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
-REPO_PATH = "../"
-CFG_FILE_PATH = "commit.cfg"
-UPDATE_CFG_FILE = "updateCfg.json"
-COMMIT_ENV_FILE = "commit.env"
+REPO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../")
+CFG_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commit.cfg")
+COMMIT_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commit.env")
+UPDATE_CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "updateCfg.json")
 
 # Directory for extracting 7z files
-EXTRACT_DIR = "../temp"
+EXTRACT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../", "temp")
 SEVEN_ZIP_EXECUTABLE = os.path.join(EXTRACT_DIR, '7-ZipPortable', 'App', '7-Zip', '7z.exe')
-SEVEN_ZIP_ARCHIVE = "../lib/other/win/7z_portable.zip"
+SEVEN_ZIP_ARCHIVE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../", "lib/other/win/7z_portable.zip")
 GIT_ARCHIVE = "PortableGit-2.48.1-64-bit.7z.exe"
 GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.windows.1/PortableGit-2.48.1-64-bit.7z.exe"
 
@@ -106,7 +106,6 @@ def check_git_installed():
         
         if platform.system() in ["Linux", "Darwin"]:
             print("You will have to install Git manually on UNIX. Visit: https://git-scm.com/downloads")
-            input("Press Enter to exit...")
             exit(0)
         else:
             install_choice = input("Do you wish to install Git Portable in your virtual environment? (400mb~) (Y/N): ").strip().lower()
@@ -118,7 +117,6 @@ def check_git_installed():
             return False
             if install_choice != 'y':
                 print("You will have to install Git manually. Visit: https://git-scm.com/downloads")
-                input("Press Enter to exit...")
                 exit(0)
             return False
 
@@ -192,16 +190,6 @@ def start():
                 commit_hash = None
     return commit_hash
 
-def fetch_deploy():
-    print(f"[DEPLOY] Checking for deployment keys in deployments.env...")
-    deployment = os.path.abspath("./deployments.py")
-    try:
-        subprocess.run([PYTHON_CMD, deployment], check=True)
-        print("\n\n[IMPORTANT] IF you encounter errors after updates, check fallback configs internally in godfinger and all plugins...\n\n")
-        sys.exit()
-    except subprocess.CalledProcessError as e:
-        print(f"Error fetching deployments.py: {e}")
-
 # Function to clone the repository if it doesn't exist
 def clone_repo_if_needed():
     if os.path.isdir(os.path.join(REPO_PATH, ".git")):
@@ -251,7 +239,6 @@ if __name__ == "__main__":
     if check_git_installed():
         clone_repo_if_needed()
         sync_repo(commit_hash)
-        fetch_deploy()
     else:
         print("[INFO] Using 7-Zip Portable to extract Git...")
         extract_7z()
@@ -262,8 +249,6 @@ if __name__ == "__main__":
         clone_repo_if_needed()
         sync_repo(commit_hash)
         remove_temp_files()
-        fetch_deploy()
 
     print("\n\n[IMPORTANT] IF you encounter errors after updates, check fallback configs internally in godfinger and all plugins...\n\n")
-    input("Press Enter to exit...");
     exit(0);

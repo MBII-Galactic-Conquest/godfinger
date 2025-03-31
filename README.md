@@ -4,6 +4,10 @@
 
 ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ![GC logo](https://github.com/MBII-Galactic-Conquest/godfinger/blob/main/gc.png)
 
+ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ![Windows Terminal](https://img.shields.io/badge/Windows%20Terminal-%234D4D4D.svg?style=for-the-badge&logo=windows-terminal&logoColor=white)	 		![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)	 		![Bash Script](https://img.shields.io/badge/bash_script-%23121011.svg?style=for-the-badge&logo=gnu-bash&logoColor=white)</br>
+ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ		 				 				 				 				 				 			ㅤㅤㅤ![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)	 				 				 			![macOS](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0)	 		![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
+
+
 </br>
 
 #### A modular script extension system that allows streamlined rcon &amp; plugin interaction to simplify serverside processing for MBII in python. Aimed to better equip server owners to improve their own creative works, and have more expression over their game servers.
@@ -26,6 +30,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 - account systems,
 - sql databases,
 - AI responses,
+- automated asset building,
 - integrating other languages,
 - discord integration, & more.
 ```
@@ -100,17 +105,39 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >         - "port" : The port to connect to. In most cases, should be 29070.
 >     - "bindAddress" : The address for the script to use as a bind address. In most cases should be the same as the IP.
 >     - "password" : The server's rcon password. Set in server.cfg.
+>
 > - "MBIIPath" : File path to the MBII installation to be used.
 > - "logFilename" : Name of the server log file (defined in server.cfg, default is server.log)
 > - "serverFileName" : Name of the server executable file to use.
 > - "logicDelay" : Interval of time to pass between script heartbeat loops.
 > - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
 > - "paths" : A list of string paths to append to system path, used to pass import directories for dependancies of plugins and such.
-> - "prologueMessage" : A string to post in svsay when the platform is up.
-> - "epilogueMessage" : A string to post in svsay when the platform is finishing.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
-> - "Plugins": A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
-> - "Debug": TestRetrospect true|false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
+>
+> - "interfaces"
+>    - "pty" : Pseudo-terminal utilities (https://docs.python.org/3/library/pty.html), used to wrap the mbiided process.
+>        - "target" : File path to the MBII dedicated server executable.
+>         - "inputDelay" : Interval of time to pass between terminal heartbeat loops.
+>    - "rcon" : The typical use of the godfinger script extension system, generic logfile parsing.
+>     - "Remote"
+>         - "address"
+>            - "ip" : The IP address of the server to connect to. In most cases this should be localhost as the script requires access to the log file to function.
+>            - "port" : The port to connect to. In most cases, should be 29070.
+>       - "bindAddress" : The address for the script to use as a bind address. In most cases should be the same as the IP.
+>       - "password" : The server's rcon password. Set in server.cfg.
+>      - "logFilename" : Name of the server log file (defined in server.cfg, default is server.log)
+>      - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
+>     - "Debug"
+>       - "TestRetrospect" : true/false allows for simulating and recreating active game data for the purpose of test case bugfixing. False is generally considered default.
+>
+> - "interface" : Where you can specify which interface you wish to use, in this case, "rcon" or "pty", with "rcon" as default.
+>
+> - "paths" : Where you can specify foreign directories not native to the godfinger root working directory, in the event of private codebases, or other implements with the godfinger system. Default is ".\\"
+>
+> - "prologueMessage" : String to show when the godfinger system has acknowledged sufficiently starting up, and deployed natively without error.
+> - "epilogueMessage" : String to show when the godfinger system concludes, and has exited cleanly, safely.
+>
+> - "Plugins" : A list of plugin names, defined as python package strings (https://docs.python.org/3/tutorial/modules.html#packages), to use with the engine.
 > ```
 
 </br>

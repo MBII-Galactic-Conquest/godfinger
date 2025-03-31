@@ -15,7 +15,7 @@ SERVER_DATA = None;
 Log = logging.getLogger(__name__);
 
 class TKManagerPlugin(object):
-    def __init__(self, serverData) -> None:
+    def __init__(self, serverData : serverdata.ServerData) -> None:
         self._serverData = serverData
         self._messagePrefix = colors.ColorizeText("[TK]", "orange") + ": "
         self._commandList = \
@@ -39,7 +39,7 @@ class TKManagerPlugin(object):
             }
 
     def HandleResetTK(self, playerName, smodID, adminIP, messageParse):
-        self._serverData.rcon.execVstr("cleartk")
+        self._serverData.interface.ExecVstr("clearTK")
         return True
 
     def HandleSmodCommand(self, playerName, smodId, adminIP, cmdArgs):
@@ -106,9 +106,9 @@ def OnStart():
     global PluginInstance
     startTime = time()
     resetTKVstr = '"settk 0 0;wait 1;settk 1 0;wait 1;settk 2 0;wait 1;settk 3 0;settk 4 0;wait 1;settk 5 0;wait 1;settk 6 0;settk 7 0;wait 1;settk 8 0;wait 9;settk 10 0;wait 1;settk 11 0;settk 12 0;wait 1;settk 13 0;wait 1;settk 14 0;settk 15 0;wait 1;settk 16 0;wait 1;settk 17 0;wait 1;settk 18 0;settk 19 0;wait 1;settk 20 0;wait 1;settk 21 0;settk 22 0;wait 1;settk 23 0;wait 1;settk 24 0;wait 1;settk 25 0;settk 26 0;wait 1;settk 27 0;wait 1;settk 28 0;settk 29 0;wait 1;settk 30 0;wait 1;settk 31 0"'
-    PluginInstance._serverData.rcon.setVstr('clearTK', resetTKVstr)
+    PluginInstance._serverData.interface.SetVstr('clearTK', resetTKVstr)
     loadTime = time() - startTime
-    PluginInstance._serverData.rcon.say(PluginInstance._messagePrefix + f"TK Manager started in {loadTime:.2f} seconds!")
+    # PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"TK Manager started in {loadTime:.2f} seconds!")
     return True; # indicate plugin start success
 
 # Called each loop tick from the system

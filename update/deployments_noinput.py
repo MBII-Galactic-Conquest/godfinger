@@ -6,9 +6,9 @@ import stat
 import sys
 
 # Define file paths
-ENV_FILE = "deployments.env"
-DEPLOY_DIR = "./deploy"
-KEY_DIR = "./key"
+ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deployments.env")
+DEPLOY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./deploy")
+KEY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./key")
 
 # Determine GIT_EXECUTABLE path based on OS
 if os.name == 'nt':  # Windows
@@ -87,7 +87,7 @@ for repo_branch, deploy_key in deployments.items():
         os.makedirs(repo_dir)
 
     # Set up SSH command with debugging output (absolute path to the key)
-    absolute_key_path = os.path.abspath(deploy_key)  # Get absolute path to the key
+    absolute_key_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), deploy_key)  # Get absolute path to the key
     quoted_key_path = f"\"{absolute_key_path}\""  # Wrap path in quotes for spaces handling
     print(f"Using SSH key: {quoted_key_path}")  # Debugging the key path
 
@@ -159,4 +159,3 @@ for repo_branch, deploy_key in deployments.items():
     print(f"Deployed {repo_branch} -> {repo_dir}")
 
 print("Deployment process completed.")
-input("Press Enter to continue...")
