@@ -31,6 +31,15 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+:: Run the noinput obscuring script
+echo Obscuring update & deployments noinput files, as they are not intended to be used...
+call ./obscure_win.bat
+if %errorlevel% neq 0 (
+    echo Error running obscure_win.bat. Press Enter to exit.
+    pause
+    exit /b
+)
+
 :: Wait for user input before exiting
 goto end
 

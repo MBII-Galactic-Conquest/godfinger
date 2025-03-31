@@ -93,6 +93,8 @@ else:  # Non-Windows (Linux, macOS)
 # Function to check if Git is installed
 def check_git_installed():
     global GIT_EXECUTABLE
+    OS = platform.system()
+
     if shutil.which("git") or os.path.exists(GIT_EXECUTABLE):
         try:
             subprocess.run([GIT_EXECUTABLE, "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -105,9 +107,9 @@ def check_git_installed():
         print("[ERROR] Git is not installed.")
         
         if platform.system() in ["Linux", "Darwin"]:
-            print("You will have to install Git manually on UNIX. Visit: https://git-scm.com/downloads")
+            print(f"You will have to install Git manually on {OS}. Visit: https://git-scm.com/downloads")
             input("Press Enter to exit...")
-            exit(0)
+            sys.exit(0)
         else:
             install_choice = input("Do you wish to install Git Portable in your virtual environment? (400mb~) (Y/N): ").strip().lower()
             if install_choice == 'y':
@@ -115,11 +117,11 @@ def check_git_installed():
                 GIT_EXECUTABLE = os.path.abspath(os.path.join("..", "venv", "GIT", "bin", "git.exe"))
                 os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_EXECUTABLE
                 os.environ["PATH"] = os.path.dirname(GIT_PATH) + ";" + os.environ["PATH"]
-            return False
             if install_choice != 'y':
-                print("You will have to install Git manually. Visit: https://git-scm.com/downloads")
+                OS = platform.system()
+                print(f"You will have to install Git manually on {OS}. Visit: https://git-scm.com/downloads")
                 input("Press Enter to exit...")
-                exit(0)
+                sys.exit(0)
             return False
 
 # Function to download the Git archive (PortableGit)
