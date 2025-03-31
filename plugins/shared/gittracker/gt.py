@@ -325,7 +325,7 @@ def CheckForGITUpdate(isGFBuilding):
     global UPDATE_NEEDED
     timeoutSeconds = 10
 
-    if isGFBuilding and UPDATE_NEEDED == False:
+    if isGFBuilding == True and UPDATE_NEEDED == False:
         Log.info("isGFBuilding is enabled. Checking automatically for latest deployment HEADs...")
 
 
@@ -367,7 +367,7 @@ def CheckForGITUpdate(isGFBuilding):
     else:
         pass;
 
-    if isGFBuilding and UPDATE_NEEDED == True:
+    if isGFBuilding == True and UPDATE_NEEDED == True:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
         # Run update_noinput.py
