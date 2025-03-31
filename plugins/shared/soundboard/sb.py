@@ -67,6 +67,9 @@ def SV_PlayerJoin(PLAYERJOIN_SOUND_PATH):
         Log.error(f"{PLAYERJOIN_SOUND_PATH} is null or using placeholder, exiting...")
         sys.exit(0)
 
+    if PLAYERJOIN_SOUND_PATH == "void":
+        return;
+
     PluginInstance._serverData.interface.SvSound(f"{PLAYERJOIN_SOUND_PATH}")
     Log.info(f"{PLAYERJOIN_SOUND_PATH} has been played to all players...")
 
@@ -79,6 +82,9 @@ def SV_PlayerLeave(PLAYERLEAVE_SOUND_PATH):
         Log.error(f"{PLAYERLEAVE_SOUND_PATH} is null or using placeholder, exiting...")
         sys.exit(0)
 
+    if PLAYERLEAVE_SOUND_PATH == "void":
+        return;
+
     PluginInstance._serverData.interface.SvSound(f"{PLAYERLEAVE_SOUND_PATH}")
     Log.info(f"{PLAYERLEAVE_SOUND_PATH} has been played to all players...")
 
@@ -90,6 +96,9 @@ def SV_MessageGlobal(MESSAGEGLOBAL_SOUND_PATH):
     if MESSAGEGLOBAL_SOUND_PATH is None or MESSAGEGLOBAL_SOUND_PATH == "" or MESSAGEGLOBAL_SOUND_PATH == PLACEHOLDER:
         Log.error(f"{MESSAGEGLOBAL_SOUND_PATH} is null or using placeholder, exiting...")
         sys.exit(0)
+
+    if MESSAGEGLOBAL_SOUND_PATH == "void":
+        return;
 
     PluginInstance._serverData.interface.SvSound(f"{MESSAGEGLOBAL_SOUND_PATH}")
     Log.info(f"{MESSAGEGLOBAL_SOUND_PATH} has been played to all players...")
@@ -104,6 +113,9 @@ def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     if PLAYERSTART_SOUND_PATH is None or PLAYERSTART_SOUND_PATH == "" or PLAYERSTART_SOUND_PATH == PLACEHOLDER:
         Log.error(f"{PLAYERSTART_SOUND_PATH} is null or using placeholder, exiting...")
         sys.exit(0)
+
+    if PLAYERSTART_SOUND_PATH == "void":
+        return;
 
     if ID in ClientsData:  # check if client is present ( shouldnt be negative anyway )
         if ClientsData[ID].hasBeenGreeted == False: # check if client wasnt greeted yet
