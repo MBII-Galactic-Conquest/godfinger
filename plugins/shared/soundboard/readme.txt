@@ -7,6 +7,7 @@ Server and Client must share the same files, you cannot use custom ones not supp
 Set values in sbConfig.json to "void" if you wish to avoid specific usecases.
 
 Ensure file extension (.mp3/.wav) is included in the declared variables in the JSON config.
+Ensure .mp3 sound files are sampled at 44100hz, and is Mono. Stereo .mp3 and .wav files are not allowed in engine.
 Ensure players playing on your server has cl_serversounds enabled to 1.
 
 CREATED BY 2CWLDYS & VICEDICE
