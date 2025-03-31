@@ -185,6 +185,7 @@ def update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, is
         save_json(config_file_path, commit_hash)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
+        PluginInstance._serverData.interface.SvSound("sound/sup/message.mp3")
         
         if isGFBuilding == True and UPDATE_NEEDED == False and GODFINGER in repo_name and gfBuildBranch in branch_name:
             PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
