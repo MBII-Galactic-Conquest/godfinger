@@ -17,6 +17,7 @@ Log = logging.getLogger(__name__);
 ## Sound paths are not based on local, but use PK3 file hierarchy #
 ## Ensure file extension is included #
 
+PLACEHOLDER = "placeholder"
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "sbConfig.json");
 PYTHON_CMD = sys.executable
 
@@ -32,7 +33,6 @@ class ClientInfo():
 ClientsData : dict[int, ClientInfo] = {};
 
 def SV_LoadJson():
-    PLACEHOLDER = "placeholder"
 
     FALLBACK_JSON = {
         "PLAYERJOIN_SOUND_PATH": "placeholder",
@@ -63,6 +63,10 @@ def SV_LoadJson():
 def SV_PlayerJoin(PLAYERJOIN_SOUND_PATH):
     global PluginInstance
 
+    if PLAYERJOIN_SOUND_PATH is None or PLAYERJOIN_SOUND_PATH == "" or PLAYERJOIN_SOUND_PATH == PLACEHOLDER:
+        Log.error(f"{PLAYERJOIN_SOUND_PATH} is null or using placeholder, exiting...")
+        sys.exit(0)
+
     PluginInstance._serverData.interface.SvSound(f"{PLAYERJOIN_SOUND_PATH}")
     Log.info(f"{PLAYERJOIN_SOUND_PATH} has been played to all players...")
 
@@ -71,6 +75,10 @@ def SV_PlayerJoin(PLAYERJOIN_SOUND_PATH):
 def SV_PlayerLeave(PLAYERLEAVE_SOUND_PATH):
     global PluginInstance
 
+    if PLAYERLEAVE_SOUND_PATH is None or PLAYERLEAVE_SOUND_PATH == "" or PLAYERLEAVE_SOUND_PATH == PLACEHOLDER:
+        Log.error(f"{PLAYERLEAVE_SOUND_PATH} is null or using placeholder, exiting...")
+        sys.exit(0)
+
     PluginInstance._serverData.interface.SvSound(f"{PLAYERLEAVE_SOUND_PATH}")
     Log.info(f"{PLAYERLEAVE_SOUND_PATH} has been played to all players...")
 
@@ -78,6 +86,10 @@ def SV_PlayerLeave(PLAYERLEAVE_SOUND_PATH):
 
 def SV_MessageGlobal(MESSAGEGLOBAL_SOUND_PATH):
     global PluginInstance
+
+    if MESSAGEGLOBAL_SOUND_PATH is None or MESSAGEGLOBAL_SOUND_PATH == "" or MESSAGEGLOBAL_SOUND_PATH == PLACEHOLDER:
+        Log.error(f"{MESSAGEGLOBAL_SOUND_PATH} is null or using placeholder, exiting...")
+        sys.exit(0)
 
     PluginInstance._serverData.interface.SvSound(f"{MESSAGEGLOBAL_SOUND_PATH}")
     Log.info(f"{MESSAGEGLOBAL_SOUND_PATH} has been played to all players...")
@@ -88,6 +100,10 @@ def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     global PluginInstance
 
     ID = cl.GetId()
+
+    if PLAYERSTART_SOUND_PATH is None or PLAYERSTART_SOUND_PATH == "" or PLAYERSTART_SOUND_PATH == PLACEHOLDER:
+        Log.error(f"{PLAYERSTART_SOUND_PATH} is null or using placeholder, exiting...")
+        sys.exit(0)
 
     if ID in ClientsData:  # check if client is present ( shouldnt be negative anyway )
         if ClientsData[ID].hasBeenGreeted == False: # check if client wasnt greeted yet
