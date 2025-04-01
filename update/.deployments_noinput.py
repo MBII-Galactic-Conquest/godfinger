@@ -16,7 +16,8 @@ if os.name == 'nt':  # Windows
 
     if GIT_PATH is None:
         # If Git is not found, check a fallback directory
-        GIT_PATH = os.path.abspath(os.path.join("..", "venv", "GIT", "bin"))
+        PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+        GIT_PATH = os.path.abspath(os.path.join(PLUGIN_DIR, "..", "venv", "GIT", "bin"))
         GIT_EXECUTABLE = os.path.abspath(os.path.join(GIT_PATH, "git.exe"))
     else:
         GIT_EXECUTABLE = os.path.abspath(GIT_PATH)
