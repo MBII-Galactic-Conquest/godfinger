@@ -330,7 +330,7 @@ def CheckForGITUpdate(isGFBuilding):
 
 
         # Run deployments_noinput.py
-        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", "deployments_noinput.py"))
+        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".deployments_noinput.py"))
         #print(f"Debug: Checking deployments script at {deploy_script}")
         run_script(deploy_script, ["", "", ""])
 
@@ -371,12 +371,12 @@ def CheckForGITUpdate(isGFBuilding):
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
         # Run update_noinput.py
-        update_script = os.path.abspath(os.path.join(os.getcwd(), "update", "update_noinput.py"))
+        update_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".update_noinput.py"))
         #print(f"Debug: Checking update script at {update_script}")
         run_script(update_script, ["Y", "Y", "Y"])
 
         # Run deployments_noinput.py with the same logic
-        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", "deployments_noinput.py"))
+        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".deployments_noinput.py"))
         #print(f"Debug: Checking deployments script at {deploy_script}")
         run_script(deploy_script, ["", "", ""])
 
