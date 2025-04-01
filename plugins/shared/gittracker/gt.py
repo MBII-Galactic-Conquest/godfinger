@@ -266,7 +266,7 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
 
     script_path = os.path.abspath(os.path.join(os.getcwd(), svnPostHookFile)) if svnPostHookFile else None
     
-    if isSVNBuilding and UPDATE_NEEDED == True:
+    if isSVNBuilding:
         if not os.path.exists(script_path):
             Log.error(f"SVN Post Hook file not found.")
             return
