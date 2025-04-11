@@ -37,8 +37,8 @@ chmod +x ./cleanup.sh
 chmod +x ./update/update.py
 chmod +x ./godfinger.py
 
-if test -f venv/Scripts/activate; then
-    source venv/Scripts/activate
+if test -f venv/bin/activate; then
+    source venv/bin/activate
     cd ./update
     $PYTHON_CMD ./update.py
     cd ../
@@ -46,6 +46,6 @@ if test -f venv/Scripts/activate; then
     $PYTHON_CMD ./godfinger.py
     read -p "Press Enter to continue..."
 else
-    echo "Virtual environment does not exist or was created improperly, please run prepare.bat in the prepare directory. Aborting."
+    echo "Virtual environment does not exist or was created improperly, please run prepare.sh in the prepare directory. Aborting."
     read -p "Press enter to exit..."
 fi
