@@ -13,10 +13,10 @@ fi
 echo Configuring virtual environment, please wait...
 
 # Check if virtual environment exists, create it if not
-if ! test -f ../../venv/Scripts/activate; then
+if ! test -f ../../venv/bin/activate; then
     python -m venv ../../venv
 fi
-source ../../venv/Scripts/activate
+source ../../venv/bin/activate
 echo Using python at
 which python
 
