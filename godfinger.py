@@ -199,6 +199,12 @@ class MBIIServer:
         return self._status;
 
     def __init__(self):
+        self._isFinished = False
+        self._isRunning = False
+        self._isRestarting = False
+        self._pluginManager = None
+        self._svInterface = None
+
         startTime = time.time();
         self._status = MBIIServer.STATUS_INIT;
         Log.info("Initializing Godfinger...");
@@ -311,23 +317,29 @@ class MBIIServer:
 
         Log.info("The Godfinger initialized in %.2f seconds!\n" %(time.time() - startTime));
     
-
     def Finish(self):
-        if not self._isFinished:
-            Log.info("Finishing Godfinger...");
-            self._status = MBIIServer.STATUS_FINISHING;
-            self.Stop();
-            self._pluginManager.Finish();
-            self._status = MBIIServer.STATUS_FINISHED;
-            self._isFinished = True;
-            Log.info("Finished Godfinger.");
+        # Ensure that finish is called only once; if _isFinished is already set, skip cleanup.
+        if not hasattr(self, "_isFinished") or not self._isFinished:
+            Log.info("Finishing Godfinger...")
+            self._status = MBIIServer.STATUS_FINISHING
+            self.Stop()
+            # Only attempt to finish _pluginManager if it was successfully initialized.
+            if self._pluginManager is not None:
+                self._pluginManager.Finish()
+            self._status = MBIIServer.STATUS_FINISHED
+            self._isFinished = True
+            Log.info("Finished Godfinger.")
     
     def __del__(self):
-        self.Finish();
-        del self._pluginManager;
-        del self._svInterface;
-        self._pluginManager = None;
-        self._svInterface = None;   
+        self.Finish()
+        # Safely delete attributes if they exist.
+        if hasattr(self, "_pluginManager"):
+            del self._pluginManager
+            self._pluginManager = None
+        if hasattr(self, "_svInterface"):
+            del self._svInterface
+            self._svInterface = None
+
 
 
     # status notrunc
