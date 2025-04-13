@@ -377,52 +377,62 @@ class RconInterface(AServerInterface):
 
     def Open(self) -> bool:
         if not super().Open():
-            return False;
+            return False
         if not self._rcon.Open():
-            return False;
-        # FileReadBackwards package doesnt "support" ansi encoding in stock, change it yourself
-        prestartLines = [];
-        logFile = None;
+            return False
+
+        # Check if the log file exists; if not, attempt to create it.
+        if not os.path.exists(self._logPath):
+            try:
+                # For Linux (IsUnix), we expect UTF-8 encoding.
+                with open(self._logPath, "w", encoding="utf-8") as f:
+                    pass  # Create an empty file.
+            except Exception as e:
+                Log.error("Unable to create log file at path %s: %s", self._logPath, str(e))
+                return False
+
+        prestartLines = []
+        logFile = None
         try:
             if IsUnix:
-                logFile = FileReadBackwards(self._logPath, encoding = "utf-8");
+                logFile = FileReadBackwards(self._logPath, encoding="utf-8")
             else:
-                logFile = FileReadBackwards(self._logPath, encoding="ansi");
+                logFile = FileReadBackwards(self._logPath, encoding="ansi")
             
             for line in logFile:
-                line = line[7:];
+                line = line[7:]
                 if line.startswith("InitGame"):
-                    prestartLines.append(line);
-                    break;
+                    prestartLines.append(line)
+                    break
                 
-                # filter out player retrospect player messages.
+                # Filter out retrospective player messages.
                 lineParse = line.split()
-                l = len(lineParse);
-                if l > 1:
+                if len(lineParse) > 1:
                     if not self._testRetrospect:
                         if lineParse[0].startswith("SMOD"):
                             continue
                         elif lineParse[1].startswith("say"):
-                            continue;
+                            continue
                         elif lineParse[1].startswith("sayteam"):
-                            continue;
+                            continue
                 
-                prestartLines.append(line);
+                prestartLines.append(line)
         
         except FileNotFoundError:
-            Log.error("Unable to open log file at path %s to read, abort startup." % self._logPath);
-            return False;
+            Log.error("Unable to open log file at path %s to read, abort startup." % self._logPath)
+            return False
     
         if len(prestartLines) > 0:
-            prestartLines.reverse();
+            prestartLines.reverse()
             with self._queueLock:
-                for i in range(len(prestartLines)):
-                    self._workingMessageQueue.put(logMessage.LogMessage(prestartLines[i], True));
-        self._logReaderThreadControl.stop = False;
-        self._logReaderThread.start();
-        self._isOpened = True;
-        self._isReady = True;
-        return True;
+                for line in prestartLines:
+                    self._workingMessageQueue.put(logMessage.LogMessage(line, True))
+        self._logReaderThreadControl.stop = False
+        self._logReaderThread.start()
+        self._isOpened = True
+        self._isReady = True
+        return True
+
 
     def Close(self):
         if self.IsOpened():
