@@ -299,6 +299,8 @@ class RTV(object):
                 else:
                     mapToChange = winner.GetMapName()
                     self._serverData.interface.SvSay(self._messagePrefix + f"Switching map to {mapToChange}!");
+                    #self._serverData.interface.SvSound("sound/sup/barney/ba_later.wav") -> Optionally uncomment for custom server sounds, << MBAssets4//OR//mb2_sup_assets/sound/sup >>
+                    #sleep(4)
                     sleep(1)
                     self._serverData.interface.MapReload(mapToChange);
                     self._rtvCooldown.Set(self._config.cfg["successTimeout"])
