@@ -14,8 +14,14 @@ if %errorlevel% neq 0 (
 
 echo Python version is acceptable (3.12.0 or newer)
 
+REM Navigate to bin for autostarting
+cd bin
+
+REM Check if MBIIDed.x86.exe is running, start it if not...
+python ./autostart_win.py
+
 REM Navigate to the project directory
-cd ../../
+cd ../../../
 
 REM Set the virtual environment path
 set "venvp=./venv/Scripts/activate.bat"
