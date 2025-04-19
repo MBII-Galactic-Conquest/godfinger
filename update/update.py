@@ -167,6 +167,8 @@ def extract_7z():
         print("       git lfs pull")
         print("       OR download a fresh copy of '7z_portable.zip' from the Releases page.")
         print("       https://github.com/MBII-Galactic-Conquest/godfinger/releases")
+        print(" ")
+        remove_temp_files();
         input("Press Enter to exit...")
         sys.exit(1)
 
