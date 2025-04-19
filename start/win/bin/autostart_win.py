@@ -60,11 +60,30 @@ while depth < max_depth:
     if os.path.exists(os.path.join(current_dir, target_file)):
         full_path = os.path.join(current_dir, target_file)
         print(f"[AUTO-START] Found {target_file} at: {full_path}")
-        
+
+        args = [
+            full_path,
+            "--debug",
+            "+set", "g_log", "server.log",
+            "+set", "g_logExplicit", "3",
+            "+set", "g_logClientInfo", "1",
+            "+set", "g_logSync", "4",
+            "+set", "com_logChat", "2",
+            "+set", "dedicated", "2",
+            "+set", "fs_game", "MBII",
+            "+exec", "server.cfg",
+            "+set", "net_port", "29070"
+        ]
+
         # Check if the process is running
         if not is_process_running(target_file):
             print(f"[AUTO-START] {target_file} is not running. Launching...")
-            subprocess.Popen([full_path])  # Start the file
+            if os.name == "nt":
+                # On Windows, start in a new console
+                subprocess.Popen(args, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            else:
+                # On Unix, run in background detached from terminal
+                subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
             time.sleep(5)  # Wait for 5 seconds
         else:
             print(f"[AUTO-START] {target_file} is already running.")
