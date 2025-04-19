@@ -1,5 +1,4 @@
 #!/bin/bash
-cd ../../
 
 check_python_version() {
     REQUIRED_VERSION="3.12.0"
@@ -32,13 +31,18 @@ else
     exit 1
 fi
 
-# Ensure scripts have execute permissions before running them
+cd ../../
+
 chmod +x ./cleanup.sh
 chmod +x ./update/update.py
 chmod +x ./godfinger.py
 
 if test -f venv/bin/activate; then
     source venv/bin/activate
+    cd start/linux_macOS/bin
+    chmod +x ./autostart_linux_macOS.py
+    $PYTHON_CMD ./autostart_linux_macOS.py
+    cd ../../../
     cd ./update
     $PYTHON_CMD ./update.py
     cd ../
@@ -46,6 +50,6 @@ if test -f venv/bin/activate; then
     $PYTHON_CMD ./godfinger.py --debug
     read -p "Press Enter to continue..."
 else
-    echo "Virtual environment does not exist or was created improperly, please run prepare.bat in the prepare directory. Aborting."
+    echo "Virtual environment does not exist or was created improperly, please run prepare.sh in the prepare directory. Aborting."
     read -p "Press enter to exit..."
 fi
