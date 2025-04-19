@@ -31,10 +31,7 @@ else
     exit 1
 fi
 
-cd bin
-chmod +x ./autostart_linux_macOS.py
-$PYTHON_CMD ./autostart_linux_macOS.py
-cd ../../../
+cd ../../
 
 chmod +x ./cleanup.sh
 chmod +x ./update/update.py
@@ -42,6 +39,10 @@ chmod +x ./godfinger.py
 
 if test -f venv/bin/activate; then
     source venv/bin/activate
+    cd start/linux_macOS/bin
+    chmod +x ./autostart_linux_macOS.py
+    $PYTHON_CMD ./autostart_linux_macOS.py
+    cd ../../../
     cd ./update
     $PYTHON_CMD ./update.py
     cd ../
