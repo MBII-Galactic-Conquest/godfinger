@@ -185,6 +185,7 @@ def update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, is
         save_json(config_file_path, commit_hash)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
+        PluginInstance._serverData.interface.SvSound("sound/sup/message.mp3")
         
         if isGFBuilding == True and UPDATE_NEEDED == False and GODFINGER in repo_name and gfBuildBranch in branch_name:
             PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
@@ -265,7 +266,7 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
 
     script_path = os.path.abspath(os.path.join(os.getcwd(), svnPostHookFile)) if svnPostHookFile else None
     
-    if isSVNBuilding and UPDATE_NEEDED == True:
+    if isSVNBuilding:
         if not os.path.exists(script_path):
             Log.error(f"SVN Post Hook file not found.")
             return
@@ -323,17 +324,59 @@ def run_script(script_path, simulated_inputs):
 def CheckForGITUpdate(isGFBuilding):
     global UPDATE_NEEDED
     timeoutSeconds = 10
-    
-    if isGFBuilding and UPDATE_NEEDED == True:
+
+    if isGFBuilding == True and UPDATE_NEEDED == False:
+        Log.info("isGFBuilding is enabled. Checking automatically for latest deployment HEADs...")
+
+
+        # Run deployments_noinput.py
+        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".deployments_noinput.py"))
+        #print(f"Debug: Checking deployments script at {deploy_script}")
+        run_script(deploy_script, ["", "", ""])
+
+        # Now, execute cleanup script based on the OS
+        cleanup_script = os.path.abspath("cleanup.bat" if platform.system() == "Windows" else "cleanup.sh")
+        #print(f"Debug: Cleanup script path: {cleanup_script}")
+
+        try:
+            result = subprocess.run(
+                [cleanup_script],
+                input="Y\n",
+                text=True,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+            #print(f"Debug: Cleanup return code: {result.returncode}")
+            #print(f"Debug: Cleanup stdout: {result.stdout}")
+            #print(f"Debug: Cleanup stderr: {result.stderr}")
+
+            if result.returncode == 0:
+                Log.info(f"Cleanup script ({cleanup_script}) executed successfully.")
+            else:
+                Log.error(f"Error executing cleanup script: {result.stderr}")
+        
+        except Exception as e:
+            Log.error(f"Exception occurred while running cleanup script: {e}")
+            #print(f"Debug: Exception: {e}")
+
+        # Force Godfinger to restart after update by crashing it
+        Log.info("Auto-deploy process executed with predefined inputs, restarting in ten seconds...")
+        PluginInstance._serverData.API.Restart(timeoutSeconds)
+    else:
+        pass;
+
+    if isGFBuilding == True and UPDATE_NEEDED == True:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
         # Run update_noinput.py
-        update_script = os.path.abspath(os.path.join(os.getcwd(), "update", "update_noinput.py"))
+        update_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".update_noinput.py"))
         #print(f"Debug: Checking update script at {update_script}")
         run_script(update_script, ["Y", "Y", "Y"])
 
         # Run deployments_noinput.py with the same logic
-        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", "deployments_noinput.py"))
+        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".deployments_noinput.py"))
         #print(f"Debug: Checking deployments script at {deploy_script}")
         run_script(deploy_script, ["", "", ""])
 
@@ -364,7 +407,7 @@ def CheckForGITUpdate(isGFBuilding):
             Log.error(f"Exception occurred while running cleanup script: {e}")
             #print(f"Debug: Exception: {e}")
         
-        # Force Godfinger to restart after update by crashing it
+        # Force Godfinger to restart after update
         Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
         PluginInstance._serverData.API.Restart(timeoutSeconds)
     else:

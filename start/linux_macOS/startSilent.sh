@@ -37,8 +37,8 @@ chmod +x ./cleanup.sh
 chmod +x ./update/update.py
 chmod +x ./godfinger.py
 
-if test -f venv/Scripts/activate; then
-    source venv/Scripts/activate
+if test -f venv/bin/activate; then
+    source venv/bin/activate
     cd ./update
     $PYTHON_CMD ./update.py
     cd ../
