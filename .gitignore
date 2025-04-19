@@ -3,6 +3,8 @@ lib/private/*
 plugins/private/*
 !plugins/private/.keep
 
+!start/autostart.cfg
+
 tmp/*
 temp/*
 temporary/*
