@@ -3,8 +3,6 @@ lib/private/*
 plugins/private/*
 !plugins/private/.keep
 
-!start/autostart.cfg
-
 tmp/*
 temp/*
 temporary/*
@@ -22,6 +20,8 @@ update/key/*
 *.pyc
 __pycache__/*
 *.log
+
+!start/autostart.cfg
 
 godfingerCfg.json
 automessageCfg.json
