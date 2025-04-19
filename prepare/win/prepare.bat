@@ -32,7 +32,7 @@ if %errorlevel% neq 0 (
 )
 
 :: Run the noinput obscuring script
-echo Obscuring update & deployments noinput files, as they are not intended to be used...
+echo Obscuring update and deployments noinput files, as they are not intended to be used...
 call ./obscure_win.bat
 if %errorlevel% neq 0 (
     echo Error running obscure_win.bat. Press Enter to exit.
