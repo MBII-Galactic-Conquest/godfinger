@@ -157,9 +157,18 @@ def extract_git(git_archive_path):
 def extract_7z():
     print(f"[EXTRACT] Extracting {SEVEN_ZIP_ARCHIVE}...")
     os.makedirs(EXTRACT_DIR, exist_ok=True)
-    with zipfile.ZipFile(SEVEN_ZIP_ARCHIVE, 'r') as zip_ref:
-        zip_ref.extractall(EXTRACT_DIR)
-    print("[EXTRACT] Extraction complete.")
+    try:
+        with zipfile.ZipFile(SEVEN_ZIP_ARCHIVE, 'r') as zip_ref:
+            zip_ref.extractall(EXTRACT_DIR)
+        print("[EXTRACT] Extraction complete.")
+    except zipfile.BadZipFile:
+        print("[ERROR] The 7z Portable archive appears to be invalid or incomplete.")
+        print("[HINT] If you cloned this repo using Git LFS, make sure Git LFS is installed and run:")
+        print("       git lfs pull")
+        print("       OR download a fresh copy of '7z_portable.zip' from the Releases page.")
+        print("       https://github.com/MBII-Galactic-Conquest/godfinger/releases")
+        input("Press Enter to exit...")
+        sys.exit(1)
 
 def start():
     # Prompt user for update
