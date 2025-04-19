@@ -2,10 +2,46 @@ import os
 import time
 import psutil
 import subprocess
+import sys
 
 # === CONFIG ===
 target_file = "mbiided.i386"
 max_depth = 25
+
+# === Check autostart.cfg ===
+def should_autostart():
+    config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'autostart.cfg'))
+    
+    # Check if autostart.cfg exists, if not create it with '1' as the default value
+    if not os.path.exists(config_path):
+        print("[AUTO-START] autostart.cfg not found. Creating it with default value (1).")
+        try:
+            with open(config_path, 'w') as f:
+                # Writing comment and default value (1)
+                f.write("# This file controls whether the auto-start feature is enabled or disabled.\n")
+                f.write("# Value '1' means auto-start is enabled, and value '0' means it is disabled.\n")
+                f.write("# Default value is '1'.\n")
+                f.write("1\n")  # Default to 1
+        except Exception as e:
+            print(f"[ERROR] Failed to create autostart.cfg: {e}")
+            sys.exit(1)
+
+    # Read the value from the config file
+    try:
+        with open(config_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('#') or not line:
+                    continue
+                return line == '1'
+    except FileNotFoundError:
+        print("[AUTO-START] Failed to read autostart.cfg.")
+        return False
+
+    return False
+
+if not should_autostart():
+    sys.exit(0)
 
 # Get the current directory
 current_dir = os.getcwd()
