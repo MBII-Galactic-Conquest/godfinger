@@ -51,3 +51,4 @@ while depth < max_depth:
 # If we reach here, file isn't found within the depth limit
 if depth >= max_depth:
     print(f"[AUTO-START] Could not find {target_file} after {max_depth} attempts.")
+    print(f"[AUTO-START] Ensure godfinger installation is placed in a recursive subdirectory of JKA/GameData for automated starts.")
