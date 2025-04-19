@@ -10,8 +10,8 @@ TARGET_NAME = "Microsoft Visual C++ 2015-2022 Redistributable (x86)"
 # Path to local installer if available
 LOCAL_INSTALLER_PATH = "vc_redist.x86.exe"
 
-# Download URL from Microsoft (as of 2024)
-VC_REDIST_URL = "https://aka.ms/vs/17/release/vc_redist.x86.exe"
+# Download URL from Microsoft
+VC_REDIST_URL = "https://download.microsoft.com/download/2/e/6/2e61cfa4-993b-4dd4-91da-3737cd5cd6e3/vcredist_x86.exe"
 
 def is_vcredist_installed(name):
     # Check both registry locations
