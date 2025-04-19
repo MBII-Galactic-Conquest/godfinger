@@ -64,3 +64,5 @@ if exist "%venvp%" (
     echo Virtual environment does not exist or was created improperly, please run prepare.bat in root dir, aborting.
     pause
 )
+
+pause

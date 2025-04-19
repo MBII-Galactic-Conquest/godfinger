@@ -11,15 +11,15 @@ import json
 
 # Repository details
 REPO_URL = "https://github.com/MBII-Galactic-Conquest/godfinger"
-REPO_PATH = "../"
+REPO_PATH = os.path.abspath(os.path.join(".."))
 CFG_FILE_PATH = "commit.cfg"
 UPDATE_CFG_FILE = "updateCfg.json"
 COMMIT_ENV_FILE = "commit.env"
 
 # Directory for extracting 7z files
-EXTRACT_DIR = "../temp"
+EXTRACT_DIR = os.path.abspath(os.path.join("../temp"))
 SEVEN_ZIP_EXECUTABLE = os.path.join(EXTRACT_DIR, '7-ZipPortable', 'App', '7-Zip', '7z.exe')
-SEVEN_ZIP_ARCHIVE = "../lib/other/win/7z_portable.zip"
+SEVEN_ZIP_ARCHIVE = os.path.abspath(os.path.join("../lib/other/win/7z_portable.zip"))
 GIT_ARCHIVE = "PortableGit-2.48.1-64-bit.7z.exe"
 GIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.48.1.windows.1/PortableGit-2.48.1-64-bit.7z.exe"
 
@@ -157,9 +157,20 @@ def extract_git(git_archive_path):
 def extract_7z():
     print(f"[EXTRACT] Extracting {SEVEN_ZIP_ARCHIVE}...")
     os.makedirs(EXTRACT_DIR, exist_ok=True)
-    with zipfile.ZipFile(SEVEN_ZIP_ARCHIVE, 'r') as zip_ref:
-        zip_ref.extractall(EXTRACT_DIR)
-    print("[EXTRACT] Extraction complete.")
+    try:
+        with zipfile.ZipFile(SEVEN_ZIP_ARCHIVE, 'r') as zip_ref:
+            zip_ref.extractall(EXTRACT_DIR)
+        print("[EXTRACT] Extraction complete.")
+    except zipfile.BadZipFile:
+        print("[ERROR] The 7z Portable archive appears to be invalid or incomplete.")
+        print("[HINT] If you cloned this repo using Git LFS, make sure Git LFS is installed and run:")
+        print("       git lfs pull")
+        print("       OR download a fresh copy of '7z_portable.zip' from the Releases page.")
+        print("       https://github.com/MBII-Galactic-Conquest/godfinger/releases")
+        print(" ")
+        remove_temp_files();
+        input("Press Enter to exit...")
+        sys.exit(1)
 
 def start():
     # Prompt user for update
@@ -206,11 +217,39 @@ def fetch_deploy():
 
 # Function to clone the repository if it doesn't exist
 def clone_repo_if_needed():
-    if os.path.isdir(os.path.join(REPO_PATH, ".git")):
-        print("[GITHUB] Repo exists.")
+    git_dir = os.path.join(REPO_PATH, ".git")
+
+    if os.path.isdir(git_dir):
+        print("[GITHUB] Repo already initialized.")
         return
-    print("[GITHUB] Cloning repository...")
-    subprocess.run([GIT_EXECUTABLE, "clone", "--branch", BRANCH_NAME, REPO_URL, REPO_PATH], check=True)
+
+    if os.path.exists(REPO_PATH) and os.listdir(REPO_PATH):
+        print(f"[WARNING] Directory '{REPO_PATH}' exists and is not a Git repo.")
+        print("[GITHUB] Forcibly initializing Git repository in existing directory...")
+
+        try:
+            # Make sure the path exists
+            os.makedirs(REPO_PATH, exist_ok=True)
+
+            # Initialize and fetch
+            subprocess.run([GIT_EXECUTABLE, "init"], cwd=REPO_PATH, check=True)
+            subprocess.run([GIT_EXECUTABLE, "remote", "add", "origin", REPO_URL], cwd=REPO_PATH, check=True)
+            subprocess.run([GIT_EXECUTABLE, "fetch", "--depth", "1", "origin", BRANCH_NAME], cwd=REPO_PATH, check=True)
+            subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{BRANCH_NAME}"], cwd=REPO_PATH, check=True)
+            print("[GITHUB] Repository forcibly initialized and reset to remote branch.")
+
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] Git operation failed: {e}")
+            sys.exit(1)
+
+    else:
+        print("[GITHUB] Cloning repository...")
+        try:
+            subprocess.run([GIT_EXECUTABLE, "clone", "--branch", BRANCH_NAME, REPO_URL, REPO_PATH], check=True)
+            print("[GITHUB] Clone successful.")
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] Git clone failed: {e}")
+            sys.exit(1)
 
 # Sync repository (force update to latest commit)
 def sync_repo(commit_hash=None):
