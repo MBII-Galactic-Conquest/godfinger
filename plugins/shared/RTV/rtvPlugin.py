@@ -23,79 +23,110 @@ DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
 
 CONFIG_FALLBACK = \
 """{
-    "mapBanList" : 
-    [
-        "fifa",
-        "tmnt",
-        "SOM_ptf_Sdestroyer",
-        "SOM_Sdestroyer",
-        "SOM_theed",
-        "pb2_citadel",
-        "pb2_cloudcity",
-        "pb2_ctf_bespin",
-        "pb2_ctf_imperial",
-        "pb2_ctf_rift",
-        "pb2_ctf_theed",
-        "pb2_dotf",
-        "pb2_kashyyyk",
-        "pb2_ptf_jeditemple",
-        "pb2_ptf_sdestroyer",
-        "pb2_reactor",
-        "pb2_sdestroyer",
-        "pb_dotf",
-        "pb_sdestroyer",
-        "som_dotf",
-        "som_snowfacility",
-        "pb3_reactor",
-        "uM_Canyon_guns",
-        "uM_Taspir_rockets",
-        "uM_birdmino",
-        "uM_crazyrace2",
-        "um_bouncy",
-        "um_crazyrace",
-        "um_ctf_gib_bespin",
-        "um_ctf_gib_coruscant",
-        "um_ctf_gib_narshaddaa",
-        "um_ctf_gib_narshaddaa",
-        "um_football",
-        "um_jawarace",
-        "um_nightmare",
-        "um_prisonraid_v4",
-        "um_rockettennis",
-        "um_rockettennis",
-        "um_spacerace",
-        "um_swooprace",
-        "um_xwing",
-        "mb2_sailbarge",
-        "mb2_veh_destroyer"
-    ],
-    "mapBanListWhitelist" : false,
-    
-    "emptyServerMap" : 
-    {
-        "enabled" : true,
-        "map" : "gc_intermission"
-    },
-    
-    "successTimeout" : 1800,
-    "failureTimeout" : 60,
-    "enableRecentlyPlayedMaps" : 1800,
-
     "MBIIPath": "your/mbii/path/here",
     "MessagePrefix": "^5[RTV]^7: ",
     "RTVPrefix": "!",
     "requirePrefix" : false,
-    "allowNominateCurrentMap" : false,
-    "voteTime" : 20,
-
+    "floodProtection" :
+    {
+        "enabled" : false,
+        "seconds" : 0
+    },
+    "rtv" : 
+    {
+        "enabled" : true,
+        "voteTime" : 20,
+        "mapBanList" : 
+        [
+            "fifa",
+            "tmnt",
+            "SOM_ptf_Sdestroyer",
+            "SOM_Sdestroyer",
+            "SOM_theed",
+            "pb2_citadel",
+            "pb2_cloudcity",
+            "pb2_ctf_bespin",
+            "pb2_ctf_imperial",
+            "pb2_ctf_rift",
+            "pb2_ctf_theed",
+            "pb2_dotf",
+            "pb2_kashyyyk",
+            "pb2_ptf_jeditemple",
+            "pb2_ptf_sdestroyer",
+            "pb2_reactor",
+            "pb2_sdestroyer",
+            "pb_dotf",
+            "pb_sdestroyer",
+            "som_dotf",
+            "som_snowfacility",
+            "pb3_reactor",
+            "uM_Canyon_guns",
+            "uM_Taspir_rockets",
+            "uM_birdmino",
+            "uM_crazyrace2",
+            "um_bouncy",
+            "um_crazyrace",
+            "um_ctf_gib_bespin",
+            "um_ctf_gib_coruscant",
+            "um_ctf_gib_narshaddaa",
+            "um_ctf_gib_narshaddaa",
+            "um_football",
+            "um_jawarace",
+            "um_nightmare",
+            "um_prisonraid_v4",
+            "um_rockettennis",
+            "um_rockettennis",
+            "um_spacerace",
+            "um_swooprace",
+            "um_xwing",
+            "mb2_sailbarge",
+            "mb2_veh_destroyer"
+        ],
+        "mapBanListWhitelist" : false,
+        "allowNominateCurrentMap" : false,
+        "emptyServerMap" : 
+        {
+            "enabled" : true,
+            "map" : "gc_intermission"
+        },
+        "timeLimit" : 
+        {
+            "enabled" : false,
+            "seconds" : 0
+        },
+        "roundLimit" : 
+        {
+            "enabled" : false,
+            "seconds" : 0
+        },
+        "successTimeout" : 60,
+        "failureTimeout" : 60,
+        "disableRecentlyPlayedMaps" : 1800,
+        "skipVoting" : false,
+        "changeImmediately" : false
+    },
     "rtm" : 
     {
         "enabled" : true,
+        "voteTime" : 20,
         "modes_enabled" : ["Open", "Legends", "Duel", "Full Authentic"],
+        "timeLimit" : 
+        {
+            "enabled" : false,
+            "seconds" : 0
+        },
+        "roundLimit" : 
+        {
+            "enabled" : false,
+            "seconds" : 0
+        },
         "successTimeout" : 60,
-        "failureTimeout" : 60
+        "failureTimeout" : 60,
+        "skipVoting" : false,
+        "changeImmediately" : false
     }
 }
+
 """
 
 MBMODE_ID_MAP = {
@@ -136,13 +167,13 @@ class MapContainer(object):
     def __init__(self, mapArray : list[Map], pluginInstance):
         self._mapCount = 0
         self._mapDict = {}
-        mapBanList = pluginInstance._config.cfg["mapBanList"]
+        mapBanList = pluginInstance._config.cfg["rtv"]["mapBanList"]
         for m in mapArray:
             self._mapDict[m.GetMapName()] = m
         for m in list(self._mapDict.keys()):
             mLower = m.lower()
-            if (mLower in mapBanList and pluginInstance._config.cfg["mapBanListWhitelist"] == False) \
-            or (mLower not in mapBanList and pluginInstance._config.cfg["mapBanListWhitelist"] == True):
+            if (mLower in mapBanList and pluginInstance._config.cfg["rtv"]["mapBanListWhitelist"] == False) \
+            or (mLower not in mapBanList and pluginInstance._config.cfg["rtv"]["mapBanListWhitelist"] == True):
                 del self._mapDict[m]
         self._mapCount = len(self._mapDict.keys())
     
@@ -167,7 +198,7 @@ class MapContainer(object):
         return None
 
 class RTVVote(object):
-    def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["voteTime"], announceCount = 1):
+    def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtv"]["voteTime"], announceCount = 1):
         self._voteOptions : list[Map] = voteOptions
         self._voteTime = voteTime
         self._voteStartTime = None
@@ -203,7 +234,7 @@ class RTVVote(object):
         return [self._voteOptions[x - 1] for x in winners] if countMax > 0 else []
 
 class RTMVote(RTVVote):
-    def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["voteTime"], announceCount=1):
+    def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtm"]["voteTime"], announceCount=1):
         super().__init__(voteOptions, voteTime, announceCount)
 
 class RTV(object):
@@ -303,14 +334,14 @@ class RTV(object):
                     #sleep(4)
                     sleep(1)
                     self._serverData.interface.MapReload(mapToChange);
-                    self._rtvCooldown.Set(self._config.cfg["successTimeout"])
+                    self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             else:
                 if type(self._currentVote) == RTMVote:
                     self._serverData.interface.SvSay(self._messagePrefix + f"Voted to not change mode.");
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
                     self._serverData.interface.SvSay(self._messagePrefix + f"Voted to not change map.");
-                    self._rtvCooldown.Set(self._config.cfg["successTimeout"])
+                    self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             self._currentVote = None
         elif len(winners) > 1:
             voteOptions = [winner for winner in winners]
@@ -325,7 +356,7 @@ class RTV(object):
             if type(self._currentVote) == RTMVote:
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
             else:
-                self._rtvCooldown.Set(self._config.cfg["failureTimeout"])
+                self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
     
     def HandleChatCommand(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
         command = cmdArgs[0]
@@ -365,7 +396,7 @@ class RTV(object):
             for nom in self._nominations:
                 voteChoices.append(nom.GetMap())
             choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations))
-            while (self._mapName in [x.GetMapName() for x in choices] and self._config.cfg["allowNominateCurrentMap"] == True) or ((True in [x.GetMap() in choices for x in self._nominations]) and (not len(choices) <= self._mapContainer.GetMapCount())):
+            while (self._mapName in [x.GetMapName() for x in choices] and self._config.cfg["rtv"]["allowNominateCurrentMap"] == True) or ((True in [x.GetMap() in choices for x in self._nominations]) and (not len(choices) <= self._mapContainer.GetMapCount())):
                 choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations))
             self._nominations.clear()
             voteChoices.extend([x for x in choices])
@@ -460,7 +491,7 @@ class RTV(object):
             capture = True
             mapToNom = cmdArgs[1]
             playerHasNomination = eventPlayer in [x.GetPlayer() for x in self._nominations]
-            if self._mapContainer.FindMapWithName(mapToNom) != None and len(self._nominations) < 5 and not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and not playerHasNomination and (self._config.cfg["allowNominateCurrentMap"] == False or (self._config.cfg["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
+            if self._mapContainer.FindMapWithName(mapToNom) != None and len(self._nominations) < 5 and not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and not playerHasNomination and (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
                 mapObj = self._mapContainer.FindMapWithName(mapToNom)
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
                 self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {mapToNom} for RTV!")
@@ -473,7 +504,7 @@ class RTV(object):
                     failReason = "map already nominated"
                 elif playerHasNomination:
                     failReason = "player has already nominated map"
-                elif (self._config.cfg["allowNominateCurrentMap"] == True and mapToNom == self._mapName):
+                elif (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom == self._mapName):
                     failReason = "server does not allow nomination of current map"
                 else:
                     failReason = "unknown reason"
