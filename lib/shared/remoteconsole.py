@@ -1,4 +1,3 @@
-
 import socket;
 import sys;
 import time;
@@ -171,8 +170,11 @@ class RCON(object):
     def MbMode(self, cmd):
         return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i" % (self._password, cmd))
     
-    def ClientMute(self, player_id):
-        return self.Request(b"\xff\xff\xff\xffrcon %b mute %i" % (self._password, player_id))
+    def ClientMute(self, player_id : int, minutes : int = 10):
+        """ Mutes the client with the given ID for the given number of minutes, or 10 minutes if no duration is given. The number of minutes must be between 1-60, inclusive. """
+        if 0 < minutes <= 60:   # rcon mute must be between
+            return self.Request(b"\xff\xff\xff\xffrcon %b mute %i %i" % (self._password, player_id))
+        return None
   
     def ClientUnmute(self, player_id):
         return self.Request(b"\xff\xff\xff\xffrcon %b unmute %i" % (self._password, player_id));
