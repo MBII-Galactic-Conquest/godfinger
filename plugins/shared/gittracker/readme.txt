@@ -13,11 +13,13 @@ ENSURE YOU MODIFY YOUR gtConfig.json,
   "repositories": [
     {
       "repository": "user/repo",
-      "branch": "main"
+      "branch": "main",
+      "token": "None"
     },
     {
       "repository": "user/repo",
-      "branch": "main"
+      "branch": "main",
+      "token": "None"
     }
   ],
   "refresh_interval": 60,
