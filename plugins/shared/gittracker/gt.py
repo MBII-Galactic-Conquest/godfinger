@@ -23,6 +23,7 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), "gtConfig.json");
 PLACEHOLDER = "placeholder"
 PLACEHOLDER_PATH = "path/to/bat/or/sh"
 PLACEHOLDER_REPO = "placeholder/placeholder"
+PLACEHOLDER_TOKEN = "placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
 
@@ -81,11 +82,13 @@ def create_config_placeholder():
             "repositories": [
                 {
                     "repository": PLACEHOLDER_REPO,
-                    "branch": PLACEHOLDER_BRANCH
+                    "branch": PLACEHOLDER_BRANCH,
+                    "token": PLACEHOLDER_TOKEN
                 },
                 {
                     "repository": PLACEHOLDER_REPO,
-                    "branch": PLACEHOLDER_BRANCH
+                    "branch": PLACEHOLDER_BRANCH,
+                    "token": PLACEHOLDER_TOKEN
                 }
             ],
             "refresh_interval": 60,
@@ -107,7 +110,9 @@ def load_config():
         config = json.load(f)
 
     for repo in config.get("repositories", []):
-        if repo["repository"] == PLACEHOLDER or repo["branch"] == PLACEHOLDER:
+        if (repo["repository"] == PLACEHOLDER_REPO or
+            repo["branch"] == PLACEHOLDER_BRANCH or
+            repo["token"] == PLACEHOLDER_TOKEN):
             print("\nPlaceholders detected in gtConfig.json. Please update the file.")
             sys.exit(0)
 
@@ -195,14 +200,23 @@ def update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, is
     else:
         return
 
-def get_latest_commit_info(repo_url: str, branch: str):
+def get_latest_commit_info(repo_url: str, branch: str, token: str):
     try:
         repo_name = repo_url.replace("https://github.com/", "").replace("http://github.com/", "")
         api_url = GITHUB_API_URL.format(repo_name, branch)
         
         #Log.info(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
 
-        response = requests.get(api_url)
+        if token == "" or token == " " or token == "None":
+            token = None
+
+        if token is not None:
+            headers = {
+                "Authorization": f"token {token}"
+            }
+            response = requests.get(api_url, headers=headers)
+        else:
+            response = requests.get(api_url)
 
         if response.status_code == 403:
             Log.info(response.headers.get('X-RateLimit-Remaining'))
@@ -238,8 +252,9 @@ def monitor_commits():
                 #Log.info(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
                 repo_url = repo["repository"]
                 branch_name = repo["branch"]
+                token = repo["token"]
 
-                commit_hash, commit_message = get_latest_commit_info(repo_url, branch_name)
+                commit_hash, commit_message = get_latest_commit_info(repo_url, branch_name, token)
 
                 if commit_hash and commit_message:
                     #Log.info(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
