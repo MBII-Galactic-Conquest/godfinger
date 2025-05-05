@@ -9,7 +9,7 @@ NOTE: Sessions will not start if the player-vs-player ratio is uneven. (!= 3v4, 
 
 Type !queue for a readout of commands:
 
-!queue join - join, or create a supremacy PUG queue
+!queue join - join, or create a PUG queue
 !queue leave - leave the PUG queue
 !queue start - when minimum players are reached, it checks for equal divisible ratios (4v4, 5v5, 6v6...) and allows players to begin the PUG session without an admin present.
 !queue status - readout of the current queue status, and involved players in queue.
