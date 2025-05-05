@@ -21,6 +21,8 @@ update/key/*
 __pycache__/*
 *.log
 
+!start/autostart.cfg
+
 godfingerCfg.json
 automessageCfg.json
 vpnmonitorCfg.json
