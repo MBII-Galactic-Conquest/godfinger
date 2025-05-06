@@ -150,11 +150,39 @@ def start():
 
 # Function to clone the repository if it doesn't exist
 def clone_repo_if_needed():
-    if os.path.isdir(os.path.join(REPO_PATH, ".git")):
-        print("[GITHUB] Repo exists.")
+    git_dir = os.path.join(REPO_PATH, ".git")
+
+    if os.path.isdir(git_dir):
+        print("[GITHUB] Repo already initialized.")
         return
-    print("[GITHUB] Cloning repository...")
-    subprocess.run([GIT_EXECUTABLE, "clone", "--branch", BRANCH_NAME, REPO_URL, REPO_PATH], check=True)
+
+    if os.path.exists(REPO_PATH) and os.listdir(REPO_PATH):
+        print(f"[WARNING] Directory '{REPO_PATH}' exists and is not a Git repo.")
+        print("[GITHUB] Forcibly initializing Git repository in existing directory...")
+
+        try:
+            # Make sure the path exists
+            os.makedirs(REPO_PATH, exist_ok=True)
+
+            # Initialize and fetch
+            subprocess.run([GIT_EXECUTABLE, "init"], cwd=REPO_PATH, check=True)
+            subprocess.run([GIT_EXECUTABLE, "remote", "add", "origin", REPO_URL], cwd=REPO_PATH, check=True)
+            subprocess.run([GIT_EXECUTABLE, "fetch", "--depth", "1", "origin", BRANCH_NAME], cwd=REPO_PATH, check=True)
+            subprocess.run([GIT_EXECUTABLE, "reset", "--hard", f"origin/{BRANCH_NAME}"], cwd=REPO_PATH, check=True)
+            print("[GITHUB] Repository forcibly initialized and reset to remote branch.")
+
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] Git operation failed: {e}")
+            sys.exit(1)
+
+    else:
+        print("[GITHUB] Cloning repository...")
+        try:
+            subprocess.run([GIT_EXECUTABLE, "clone", "--branch", BRANCH_NAME, REPO_URL, REPO_PATH], check=True)
+            print("[GITHUB] Clone successful.")
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] Git clone failed: {e}")
+            sys.exit(1)
 
 # Sync repository (force update to latest commit)
 def sync_repo(commit_hash=None):
