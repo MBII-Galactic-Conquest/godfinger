@@ -97,7 +97,7 @@ CONFIG_FALLBACK = \
         "roundLimit" : 
         {
             "enabled" : false,
-            "seconds" : 0
+            "rounds" : 0
         },
         "minimumVotePercent" :
         {
@@ -123,7 +123,7 @@ CONFIG_FALLBACK = \
         "roundLimit" : 
         {
             "enabled" : false,
-            "seconds" : 0
+            "rounds" : 0
         },
         "minimumVotePercent" :
         {
@@ -308,6 +308,7 @@ class RTV(object):
         self._rtvRecentMapTimeout = Timeout()
         self._rtvToSwitch = None
         self._rtmToSwitch = None
+        self._roundTimer = 0
 
     def _getAllPlayers(self):
         return self._players
@@ -386,7 +387,7 @@ class RTV(object):
             else:
                 self._StartRTVVote(voteOptions)
         elif len(winners) == 0:
-            self._serverData.interface.SvSay(self._messagePrefix + "Vote ended with no votes, keeping everything the same!");
+            self._serverData.interface.SvSay(self._messagePrefix + "Vote ended with no voters, keeping everything the same!");
             # TODO: This will cause a crash with a vote with 0 options, shouldn't occur in practice
             if type(self._currentVote) == RTMVote:
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
@@ -685,6 +686,15 @@ class RTV(object):
         return False
 
     def OnServerInit(self, data):
+        self._roundTimer += 1
+        votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        if not self._currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
+            if self._config.cfg["rtv"]["roundLimit"]["enabled"] == True and self._roundTimer > self._config.cfg["rtv"]["roundLimit"]["rounds"]:
+                self._StartRTVVote()
+                self._roundTimer = 0
+            elif self._config.cfg["rtm"]["roundLimit"]["enabled"] == True and self._roundTimer > self._config.cfg["rtm"]["roundLimit"]["rounds"]:
+                self._StartRTMVote()
+                self._roundTimer = 0
         # self._SwitchRT* sets their corresponding ToSwitch variable to None
         if self._rtvToSwitch != None:
             self._SwitchRTV(self._rtvToSwitch)
