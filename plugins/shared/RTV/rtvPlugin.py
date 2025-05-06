@@ -227,8 +227,8 @@ class RTVVote(object):
             if voterId in self._playerVotes[i]:
                 self._playerVotes[i].remove(voterId)
         self._playerVotes[voterOption+1].append(voterId)
-        if DEFAULT_CFG.cfg[voteType]["skipVoting"] == True:
-            votesLeft = len(SERVER_DATA.API.GetAllClients()) - self.GetVoterCount()
+        if PluginInstance._config.cfg[voteType]["skipVoting"] == True:
+            votesLeft = len(PluginInstance._serverData.API.GetAllClients()) - self.GetVoterCount()
             if len(self._playerVotes[voterOption+1]) > votesLeft:
                 self._voteStartTime = 0     # instantly finish vote
         print(f"player {voterId} voted for {voterOption+1}")
