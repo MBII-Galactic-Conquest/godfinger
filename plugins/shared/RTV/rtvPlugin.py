@@ -99,6 +99,11 @@ CONFIG_FALLBACK = \
             "enabled" : false,
             "seconds" : 0
         },
+        "minimumVotePercent" :
+        {
+            "enabled" : true,
+            "percent" : 0.1
+        },
         "successTimeout" : 60,
         "failureTimeout" : 60,
         "disableRecentlyPlayedMaps" : 1800,
@@ -119,6 +124,11 @@ CONFIG_FALLBACK = \
         {
             "enabled" : false,
             "seconds" : 0
+        },
+        "minimumVotePercent" :
+        {
+            "enabled" : false,
+            "percent" : 0
         },
         "successTimeout" : 60,
         "failureTimeout" : 60,
@@ -212,10 +222,15 @@ class RTVVote(object):
         self._voteStartTime = time()
 
     def HandleVoter(self, voterId, voterOption):
+        voteType = "rtm" if type(self) == RTMVote else "rtv"
         for i in self._playerVotes:
             if voterId in self._playerVotes[i]:
                 self._playerVotes[i].remove(voterId)
         self._playerVotes[voterOption+1].append(voterId)
+        if DEFAULT_CFG.cfg[voteType]["skipVoting"] == True:
+            votesLeft = len(SERVER_DATA.API.GetAllClients()) - self.GetVoterCount()
+            if len(self._playerVotes[voterOption+1]) > votesLeft:
+                self._voteStartTime = 0     # instantly finish vote
         print(f"player {voterId} voted for {voterOption+1}")
         return True
     
@@ -232,6 +247,14 @@ class RTVVote(object):
             elif len(self._playerVotes[i]) == countMax:
                 winners.append(i)
         return [self._voteOptions[x - 1] for x in winners] if countMax > 0 else []
+
+    def GetVoterCount(self):
+        n = 0
+        for i in self._playerVotes:
+            for _ in self._playerVotes[i]:
+                n += 1
+        return n
+
 
 class RTMVote(RTVVote):
     def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtm"]["voteTime"], announceCount=1):
@@ -283,6 +306,8 @@ class RTV(object):
         self._rtmCooldown = Timeout()
         self._rtvRecentMap = None
         self._rtvRecentMapTimeout = Timeout()
+        self._rtvToSwitch = None
+        self._rtmToSwitch = None
 
     def _getAllPlayers(self):
         return self._players
@@ -291,7 +316,7 @@ class RTV(object):
         if self._currentVote != None:
             if time() - self._currentVote._voteStartTime >= self._currentVote._voteTime:
                 self._OnVoteFinish()
-            elif floor(time()) % 30 == 0 and not self._currentVote._hasAnnounced:
+            elif floor(time() - self._currentVote._voteStartTime) == self._currentVote._voteTime // 2 and not self._currentVote._hasAnnounced:
                 self._currentVote._hasAnnounced = True
                 self._AnnounceVote()
 
@@ -311,29 +336,39 @@ class RTV(object):
     
     def _OnVoteFinish(self):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        voteType = "rtm" if type(self._currentVote) == RTMVote else "rtv"
         if votesInProgress == None:
             self._serverData.SetServerVar("votesInProgress", [])
         else:
             if "RTV" in votesInProgress:
                 votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
+        # Check for vote percentage threshold if applicable
+        if self._config.cfg[voteType]["minimumVotePercent"]["enabled"] and (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < self._config.cfg[voteType]["minimumVotePercent"]["percent"]:
+            self._serverData.interface.SvSay(self._messagePrefix + f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVotePercent']['percent'] * 100} percent)")
+            self._currentVote = None
+            if type(self._currentVote) == RTMVote:
+                self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
+            else:
+                self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
+            return None
         winners = self._currentVote.GetWinners()
         if len(winners) == 1:
             winner = winners[0]
             if winner.GetMapName() != "Don't Change":
                 if type(self._currentVote) == RTMVote:
-                    modeToChange = MBMODE_ID_MAP[winner.GetMapName().lower().replace(' ', '')]
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Switching game mode to {winner.GetMapName()}!")
-                    sleep(1)
-                    self._serverData.interface.MbMode(modeToChange)
+                    if self._config.cfg["rtm"]["changeImmediately"] == True:
+                        self._SwitchRTM(winner)
+                    else:
+                        self._rtmToSwitch = winner
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing mode to {ColorizeText(winner.GetMapName(), 'lblue')} next round!")
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
-                    mapToChange = winner.GetMapName()
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Switching map to {mapToChange}!");
-                    #self._serverData.interface.SvSound("sound/sup/barney/ba_later.wav") -> Optionally uncomment for custom server sounds, << MBAssets4//OR//mb2_sup_assets/sound/sup >>
-                    #sleep(4)
-                    sleep(1)
-                    self._serverData.interface.MapReload(mapToChange);
+                    if self._config.cfg["rtv"]["changeImmediately"] == True:
+                        self._SwitchRTV(winner)
+                    else:
+                        self._rtvToSwitch = winner
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing map to {ColorizeText(winner.GetMapName(), 'lblue')} next round!")
                     self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             else:
                 if type(self._currentVote) == RTMVote:
@@ -357,6 +392,24 @@ class RTV(object):
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
             else:
                 self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
+
+    def _SwitchRTM(self, winner : Map, doSleep=True):
+        self._rtmToSwitch = None
+        modeToChange = MBMODE_ID_MAP[winner.GetMapName().lower().replace(' ', '')]
+        self._serverData.interface.SvSay(self._messagePrefix + f"Switching game mode to {ColorizeText(winner.GetMapName(), 'lblue')}!")
+        if doSleep:
+            sleep(1)
+        self._serverData.interface.MbMode(modeToChange)
+    
+    def _SwitchRTV(self, winner : Map, doSleep=True):
+        self._rtvToSwitch = None
+        mapToChange = winner.GetMapName()
+        self._serverData.interface.SvSay(self._messagePrefix + f"Switching map to {ColorizeText(mapToChange, 'lblue')}!");
+        #self._serverData.interface.SvSound("sound/sup/barney/ba_later.wav") -> Optionally uncomment for custom server sounds, << MBAssets4//OR//mb2_sup_assets/sound/sup >>
+        #sleep(4)
+        if doSleep:
+            sleep(1)
+        self._serverData.interface.MapReload(mapToChange);
     
     def HandleChatCommand(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
         command = cmdArgs[0]
@@ -372,7 +425,7 @@ class RTV(object):
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if self._serverData.GetServerVar("campaignMode") == True:
                 self._serverData.interface.SvSay(self._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!");
                 return capture
@@ -433,7 +486,7 @@ class RTV(object):
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if self._config.cfg["rtm"]["enabled"] == False:
                 self._serverData.interface.SvSay(self._messagePrefix + "This server has RTM disabled.");
                 return capture
@@ -455,7 +508,7 @@ class RTV(object):
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.remove(eventPlayerId)
                 self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._voteThreshold)})")
@@ -470,7 +523,7 @@ class RTV(object):
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if self._serverData.GetServerVar("campaignMode") == True:
                 self._serverData.interface.SvSay(self._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
                 return capture
@@ -632,6 +685,11 @@ class RTV(object):
         return False
 
     def OnServerInit(self, data):
+        # self._SwitchRT* sets their corresponding ToSwitch variable to None
+        if self._rtvToSwitch != None:
+            self._SwitchRTV(self._rtvToSwitch)
+        elif self._rtmToSwitch != None:
+            self._SwitchRTM(self._rtmToSwitch)
         return False
 
     def OnServerShutdown(self):
