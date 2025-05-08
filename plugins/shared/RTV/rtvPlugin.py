@@ -36,6 +36,7 @@ CONFIG_FALLBACK = \
     {
         "enabled" : true,
         "voteTime" : 20,
+        "voteRequiredRatio" : 0.5,
         "mapBanList" : 
         [
             "fifa",
@@ -114,6 +115,7 @@ CONFIG_FALLBACK = \
     {
         "enabled" : true,
         "voteTime" : 20,
+        "voteRequiredRatio" : 0.5,
         "modes_enabled" : ["Open", "Legends", "Duel", "Full Authentic"],
         "timeLimit" : 
         {
@@ -212,7 +214,6 @@ class RTVVote(object):
         self._voteOptions : list[Map] = voteOptions
         self._voteTime = voteTime
         self._voteStartTime = None
-        self._voteThreshold = 0.5
         self._playerVotes = {}
         self._hasAnnounced = False
     
@@ -267,7 +268,6 @@ class RTV(object):
         self._serverData : serverdata.ServerData = serverData
         self._wantsToRTV : list[int] = []
         self._nominations : list[RTVNomination] = []
-        self._voteThreshold : int = 0.5
         self._currentVote = None
         self._messagePrefix : str = self._config.cfg["MessagePrefix"]
         self._mapContainer = MapContainer(GetAllMaps(), self)
@@ -435,10 +435,10 @@ class RTV(object):
                 return capture
             if not eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.append(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._voteThreshold)})")
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._voteThreshold)})")
-            if len(self._wantsToRTV) >= ceil(len(self._players) * self._voteThreshold):
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+            if len(self._wantsToRTV) >= ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio']):
                 self._StartRTVVote()
         return capture
 
@@ -496,10 +496,10 @@ class RTV(object):
                 return capture
             if not eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.append(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._voteThreshold)})")
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._voteThreshold)})")
-            if len(self._wantsToRTM) >= ceil(len(self._players) * self._voteThreshold):
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+            if len(self._wantsToRTM) >= ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio']):
                 self._StartRTMVote()
         return capture
 
@@ -512,9 +512,9 @@ class RTV(object):
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.remove(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._voteThreshold)})")
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already didn't want to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._voteThreshold)})")
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already didn't want to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
         return capture
         
 
@@ -530,9 +530,9 @@ class RTV(object):
                 return capture
             if eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.remove(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._voteThreshold)})")
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already doesn't want to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._voteThreshold)})")
+                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already doesn't want to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
         return capture
 
     def HandleMapNom(self, player : player.Player, teamId : int, cmdArgs : list[str]):
