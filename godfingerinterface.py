@@ -541,7 +541,7 @@ class PtyInterface(AServerInterface):
     class SvSayProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -555,7 +555,7 @@ class PtyInterface(AServerInterface):
     class SayProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -569,7 +569,7 @@ class PtyInterface(AServerInterface):
     class SvTellProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -771,7 +771,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "svsay %s"%strs[i];
-                proc = PtyInterface.SvSayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SvSayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;
@@ -782,7 +782,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "say %s"%strs[i];
-                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;
@@ -793,7 +793,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "svtell %i %s"%(pid, strs[i]);
-                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;

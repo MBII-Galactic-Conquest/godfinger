@@ -34,5 +34,5 @@ def ColorizeText(text, colorName, originalColorCode = "default"):
 def HighlightSubstr(text, startIndex, endIndex, colorCode, originalColorCode="default"):
     return text[:startIndex] + COLOR_CODES[colorCode] + text[startIndex:endIndex] + COLOR_CODES[originalColorCode] + text[endIndex:]
 
-def stripColorCodes(text) -> str:
+def StripColorCodes(text) -> str:
     return re.sub("(\\^\\d)", '', text)
