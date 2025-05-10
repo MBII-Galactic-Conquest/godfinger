@@ -167,7 +167,14 @@ class RCON(object):
             clientId = bytes(clientId, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b svtell %b %b" % (self._password, clientId, msg));
 
-    def MbMode(self, cmd):
+    def MbMode(self, cmd, mapToChange=None):
+        """ Changes to the given MbMode (0 = Open, 1 = Semi Authentic, 2 = Full Authentic, 3 = Duel, 4 = Legends). If mapToChange is provided, also changes to that map. """
+        if mapToChange == None:
+            mapToChange = ""
+        if not type(cmd) == bytes:
+            cmd = bytes(cmd, "UTF-8")
+        if not type(mapToChange) == bytes and mapToChange != "":
+            mapToChange = bytes(mapToChange, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i" % (self._password, cmd))
     
     def ClientMute(self, player_id : int, minutes : int = 10):
