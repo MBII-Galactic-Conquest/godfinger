@@ -12,7 +12,7 @@ import lib.shared.config as config
 import lib.shared.player as player
 import lib.shared.serverdata as serverdata
 import lib.shared.teams as teams
-from lib.shared.colors import ColorizeText, HighlightSubstr
+from lib.shared.colors import ColorizeText, HighlightSubstr, StripColorCodes
 from lib.shared.player import Player
 from lib.shared.timeout import Timeout
 
@@ -783,6 +783,11 @@ def OnStart():
     PluginInstance._mapName = serverMap
     if not PluginInstance.Start():
         return False;
+    if PluginInstance._config.cfg["kickProtectedNames"] == True:
+        for i in PluginInstance._serverData.API.GetAllClients():
+            nameStripped = StripColorCodes(i.GetName().lower())
+            if nameStripped == "admin" or nameStripped == "server":
+                PluginInstance._serverData.interface.ClientKick(i.GetId())
     loadTime = time() - startTime
     PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"RTV started in {loadTime:.2f} seconds!")
     return True; # indicate plugin start success
