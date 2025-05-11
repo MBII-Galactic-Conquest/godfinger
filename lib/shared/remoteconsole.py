@@ -175,7 +175,7 @@ class RCON(object):
             cmd = bytes(cmd, "UTF-8")
         if not type(mapToChange) == bytes and mapToChange != "":
             mapToChange = bytes(mapToChange, "UTF-8")
-        return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i" % (self._password, cmd))
+        return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i %b" % (self._password, cmd, mapToChange))
     
     def ClientMute(self, player_id : int, minutes : int = 10):
         """ Mutes the client with the given ID for the given number of minutes, or 10 minutes if no duration is given. The number of minutes must be between 1-60, inclusive. """
