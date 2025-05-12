@@ -682,6 +682,17 @@ class RTV(object):
                 Log.warning(f"Player ID {dcPlayerId} does not exist in RTV players but there was an attempt to remove it")
         return False
     
+    def OnEmptyServer(self, data, isStartup):
+        doMap = self._config.cfg["rtv"]["emptyServerMap"]["enabled"]
+        doMode = self._config.cfg["rtm"]["emptyServerMode"]["enabled"]
+        if doMap and doMode:
+            self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]], self._config.cfg["rtv"]["emptyServerMap"]["map"])
+        elif doMap:
+            self._serverData.interface.MapReload(self._config.cfg["rtv"]["emptyServerMap"]["map"])
+        elif doMode:
+            self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]])
+        return False
+
     def OnClientChange(self, eventClient, eventData):
         return False
 
@@ -877,6 +888,8 @@ def OnEvent(event) -> bool:
         return PluginInstance.OnMapChange(event.mapName, event.oldMapName);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return PluginInstance.OnSmsay(event.playerName, event.smodID, event.adminIP, event.message)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
+        return PluginInstance.OnEmptyServer(event.data, event.isStartup)    
     return False
 
 # Helper function to get all map names from currently installed PK3 files located in MBII directory and base directory next to MBII

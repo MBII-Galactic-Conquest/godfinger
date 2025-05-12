@@ -56,7 +56,7 @@ class IServerInterface():
     def TeamSay(self, players, team, vstrStorage, msg):
         return "Not implemented";
 
-    def MbMode(self, mode : int) -> str:
+    def MbMode(self, mode : int, mapToChange : str = None) -> str:
         return "Not implemented";
     
     def ClientMute(self, pid : int) -> str:
@@ -233,9 +233,9 @@ class RconInterface(AServerInterface):
         if self.IsOpened():
             return self._rcon.BatchExecute(vstrStorage, cmdList, sleepBetweenChunks, cleanUp);
 
-    def MbMode(self, mode : int) -> str:
+    def MbMode(self, mode : int, mapToChange : str = None) -> str:
         if self.IsOpened():
-            return self._rcon.MbMode(mode);
+            return self._rcon.MbMode(mode, mapToChange);
         return None;
     
     def ClientMute(self, pid : int) -> str:
