@@ -197,11 +197,16 @@ class MapContainer(object):
 
     def GetRandomMaps(self, num, blacklist=None) -> list[Map]:
         if num > self._mapCount:
-            return sample(list(self._mapDict.values()), k=self._mapCount)
+            l = sample(list(self._mapDict.values()), k=self._mapCount)
+            while len([x for x in l if x.GetMapName().lower() in blacklist]) > 0:
+                l = sample(list(self._mapDict.values()), k=self._mapCount)
         elif num < 0:
-            return []
+            l = []
         else:
-            return sample(list(self._mapDict.values()), k=num)
+            l = sample(list(self._mapDict.values()), k=num)
+            while len([x for x in l if x in blacklist]) > 0:
+                l = sample(list(self._mapDict.values()), k=num)
+        return l
 
     def FindMapWithName(self, name) -> Map | None:
         for m in self._mapDict:
@@ -304,8 +309,7 @@ class RTV(object):
         self._wantsToRTM = []
         self._rtvCooldown = Timeout()
         self._rtmCooldown = Timeout()
-        self._rtvRecentMap = None
-        self._rtvRecentMapTimeout = Timeout()
+        self._rtvRecentMaps : list[tuple(Map, Timeout)] = []
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
@@ -314,12 +318,17 @@ class RTV(object):
         return self._players
     
     def _doLoop(self):
+        # check vote status
         if self._currentVote != None:
             if time() - self._currentVote._voteStartTime >= self._currentVote._voteTime:
                 self._OnVoteFinish()
             elif floor(time() - self._currentVote._voteStartTime) == self._currentVote._voteTime // 2 and not self._currentVote._hasAnnounced:
                 self._currentVote._hasAnnounced = True
                 self._AnnounceVote()
+        # check recent map timers
+        for i in self._rtvRecentMaps:
+            if i[1].IsSet() == False:
+                self._rtvRecentMaps.remove(i)
 
     def _AnnounceVote(self):
         saystr = ""
@@ -365,6 +374,9 @@ class RTV(object):
                         self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing mode to {ColorizeText(winner.GetMapName(), 'lblue')} next round!")
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
+                    t = Timeout()
+                    t.Set(self._config.cfg["rtv"]["disableRecentlyPlayedMaps"])
+                    self._rtvRecentMaps.append((winner.GetMapName(), t))
                     if self._config.cfg["rtv"]["changeImmediately"] == True:
                         self._SwitchRTV(winner)
                     else:
@@ -449,7 +461,7 @@ class RTV(object):
         if choices == None:
             for nom in self._nominations:
                 voteChoices.append(nom.GetMap())
-            choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations))
+            choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=[x[0] for x in self._rtvRecentMaps])
             while (self._mapName in [x.GetMapName() for x in choices] and self._config.cfg["rtv"]["allowNominateCurrentMap"] == True) or ((True in [x.GetMap() in choices for x in self._nominations]) and (not len(choices) <= self._mapContainer.GetMapCount())):
                 choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations))
             self._nominations.clear()
@@ -593,7 +605,7 @@ class RTV(object):
                 else:
                     self._serverData.interface.Say(self._messagePrefix + f"Index out of range! (1-{len(pages)})")
             else:
-                self._serverData.interface.Say(self._messagePrefix + f"Invalid index ^2{cmdArgs[1]}^7!")
+                self._serverData.interface.Say(self._messagePrefix + f"Invalid index {ColorizeText(cmdArgs[1], 'lblue')}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -620,12 +632,12 @@ class RTV(object):
             if len(mapStr) > 0:
                 mapPages.append(mapStr[:-2])
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + f"Search ^5{searchQuery}^7 returned no results.")
+                self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + f"Search {ColorizeText(searchQuery, 'lblue')} returned no results.")
             elif len(mapPages) == 1:
-                self._serverData.interface.Say(self._messagePrefix + f"{str(totalResults)} results for ^5{searchQuery}^7: {mapPages[0]}")
+                self._serverData.interface.Say(self._messagePrefix + f"{str(totalResults)} results for {ColorizeText(searchQuery, 'lblue')}: {mapPages[0]}")
             elif len(mapPages) > 1:
                 # mapPages.reverse()
-                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} results for ^5{searchQuery}^7:"]
+                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} results for {ColorizeText(searchQuery, 'lblue')}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
         return capture
