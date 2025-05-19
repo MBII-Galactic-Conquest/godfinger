@@ -220,7 +220,7 @@ class RTVVote(object):
         self._voteTime = voteTime
         self._voteStartTime = None
         self._playerVotes = {}
-        self._hasAnnounced = False
+        self._announceTimer = Timeout()
     
     def  _Start(self):
         for i in range(len(self._voteOptions)):
@@ -320,10 +320,11 @@ class RTV(object):
     def _doLoop(self):
         # check vote status
         if self._currentVote != None:
+            voteType = "rtm" if type(self._currentVote) == RTMVote else "rtv"
             if time() - self._currentVote._voteStartTime >= self._currentVote._voteTime:
                 self._OnVoteFinish()
-            elif floor(time() - self._currentVote._voteStartTime) == self._currentVote._voteTime // 2 and not self._currentVote._hasAnnounced:
-                self._currentVote._hasAnnounced = True
+            elif self._currentVote._announceTimer.IsSet() == False:
+                self._currentVote._announceTimer.Set(self._config.cfg[voteType]["voteAnnounceTimer"])
                 self._AnnounceVote()
         # check recent map timers
         for i in self._rtvRecentMaps:
@@ -474,7 +475,7 @@ class RTV(object):
         self._OnVoteStart()
         self._currentVote._Start()
         self._serverData.interface.SvSay(self._messagePrefix + f"{ColorizeText('RTV', 'lblue')} has started! Vote will complete in {ColorizeText(str(self._currentVote._voteTime), 'lblue')} seconds.")
-        self._AnnounceVote()
+        # self._AnnounceVote()
 
     def _StartRTMVote(self, choices=None):
         self._wantsToRTM.clear()
@@ -491,7 +492,7 @@ class RTV(object):
         self._OnVoteStart()
         self._currentVote._Start()
         self._serverData.interface.SvSay(self._messagePrefix + f"{ColorizeText('RTM', 'lblue')} has started! Vote will complete in {ColorizeText(str(self._currentVote._voteTime), 'lblue')} seconds.")
-        self._AnnounceVote()
+        # self._AnnounceVote()
 
     def HandleRTM(self, player: player.Player, teamId : int, cmdArgs : list[str]):
         capture = True
