@@ -557,10 +557,17 @@ class RTV(object):
             capture = True
             mapToNom = cmdArgs[1]
             playerHasNomination = eventPlayer in [x.GetPlayer() for x in self._nominations]
-            if self._mapContainer.FindMapWithName(mapToNom) != None and len(self._nominations) < 5 and not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and not playerHasNomination and (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
+            if self._mapContainer.FindMapWithName(mapToNom) != None and len(self._nominations) < 5 and not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
                 mapObj = self._mapContainer.FindMapWithName(mapToNom)
+                if playerHasNomination:
+                    for i in self._nominations:
+                        if i.GetPlayer() == eventPlayer:
+                            self._nominations.remove(i)
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
-                self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {mapToNom} for RTV!")
+                if playerHasNomination:
+                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 changed their nomination to {mapToNom}!")
+                else:
+                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {mapToNom} for RTV!")
             else:
                 if not self._mapContainer.FindMapWithName(mapToNom):
                     failReason = "map was not found"
@@ -568,8 +575,6 @@ class RTV(object):
                     failReason = "nomination list full"
                 elif self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations]:
                     failReason = "map already nominated"
-                elif playerHasNomination:
-                    failReason = "player has already nominated map"
                 elif (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom == self._mapName):
                     failReason = "server does not allow nomination of current map"
                 else:
