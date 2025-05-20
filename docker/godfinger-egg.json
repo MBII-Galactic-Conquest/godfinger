@@ -49,7 +49,7 @@
       "name": "GODFINGER_HOME",
       "description": "Root folder inside container",
       "env_variable": "GODFINGER_HOME",
-      "default_value": "/app",
+      "default_value": "/app/jediacademy/godfinger",
       "user_viewable": true,
       "user_editable": false,
       "rules": "required|string"

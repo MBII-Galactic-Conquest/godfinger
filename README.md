@@ -171,6 +171,10 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 
 > [!IMPORTANT]
 > ### **Utilizing Docker Containers**
+>
+> > Ensure you have [docker](https://docs.docker.com/get-started/get-docker/) installed before continuing.</br>
+> > `sudo apt install -y docker.io && pip install docker`
+>
 > ```
 > You may utilize docker containers to isolate godfinger sessions on UNIX.
 > The godfinger system does not support local instancing, so docker is encouraged.
@@ -196,8 +200,12 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > ```
 >
-> > Ensure you have [docker](https://docs.docker.com/get-started/get-docker/) installed before continuing.</br>
-> > `sudo apt install -y docker.io && pip install docker`
+> **We do not support pirated versions of Jedi Academy, please support the official release.<br>Distribute legal copies inside your containers when making your local images.**</br>
+>
+> When installing and configuring your own docker image, ensure Jedi Academy is installed in your container inside `/app/jediacademy.`<br>Ensuring recursive access to necessary linux server binaries for godfinger to run.<br>
+> `docker cp /path/to/JKA <container_name_or_id>:/app/jediacademy`
+>
+> Alternatively, you can pursue other methods to include [Jedi Academy linux binaries](https://gist.github.com/Wildcarde/41fd9f182fd8dc191c1c) natively.
 >
 
 </br>
