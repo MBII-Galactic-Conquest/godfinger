@@ -233,5 +233,14 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > Ensure `Jedi Academy` & `Moviebattles II` is installed in a parent subdirectory called `dockerize/`<br>Recursive access to necessary linux server binaries is required for godfinger to run in automated containerized environments.<br>
 >
+> ```
+> dockerize/
+> └── gamedata/
+> :   └── MBII/
+> :
+> godfinger/
+> └── RWD/
+> ```
+>
 > You will have to create your own `volumes`, or `svn post hooks` to serve as configstores for automation purposes.<br>Godfinger may still encounter exceptions requiring `config files` & `environment variables` to run without first time error.
 >
