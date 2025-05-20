@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  godfinger:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: godfinger_server
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "29070:29070/udp"
+      - "29070:29070/tcp"
+    restart: unless-stopped
+    tty: true

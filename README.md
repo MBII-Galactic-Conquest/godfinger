@@ -170,6 +170,41 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 </br>
 
 > [!IMPORTANT]
+> ### **Utilizing Docker Containers**
+> ```
+> You may utilize docker containers to isolate godfinger sessions on UNIX.
+> The godfinger system does not support local instancing, so docker is encouraged.
+>
+> 1) Installing Manually
+> Ensure you are in the godfinger RWD, one level above the docker/ folder...
+> `docker build -f docker/Dockerfile -t godfinger .`
+>
+> Run the Godfinger container...
+> `docker run --rm -it -v $(pwd)/data:/app/data -p 29070:29070/udp -p 29070:29070/tcp godfinger`
+>
+> 2) Automated Local Install
+> `chmod +x docker/build-image.sh`
+> `./build-image.sh`
+>
+> 3) Pterodactyl Egg
+> Access the Pterodactyl Panel as Admin,
+> Admin Panel → Nests,
+> Create a New Nest,
+> Eggs → Create Egg,
+> Import docker/godfinger-egg.json,
+> Select Godfinger Egg and apply your Docker Image...
+>
+> ```
+>
+> > Ensure you have [docker](https://docs.docker.com/get-started/get-docker/) installed before continuing.</br>
+> > `pip install docker`
+>
+
+</br>
+
+</br>
+
+> [!IMPORTANT]
 > ### **Deploying Private Codebases**
 >
 > You may deploy your own codebases, using [deploy keys](https://docs.gitlab.com/user/project/deploy_keys/), a feature of the Godfinger update system.
