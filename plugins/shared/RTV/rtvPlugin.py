@@ -566,9 +566,9 @@ class RTV(object):
                             self._nominations.remove(i)
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
                 if playerHasNomination:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 changed their nomination to {mapToNom}!")
+                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 changed their nomination to {ColorizeText(mapToNom, 'lblue')}!")
                 else:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {mapToNom} for RTV!")
+                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {ColorizeText(mapToNom, 'lblue')} for RTV!")
             else:
                 if not self._mapContainer.FindMapWithName(mapToNom):
                     failReason = "map was not found"
@@ -868,6 +868,7 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
     return True; # indicate plugin load success
 
 def API_StartRTVVote():
+    Log.debug("Received external RTV vote request")
     global PluginInstance
     currentVote = PluginInstance._voteContext.GetCurrentVote()
     votesInProgress = PluginInstance._serverData.GetServerVar("votesInProgress")
@@ -876,7 +877,7 @@ def API_StartRTVVote():
             PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
             return False
         else:
-            PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "Smod forced RTV vote")
+            # PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "External RTV vote")
             PluginInstance._StartRTVVote()
             return True
     return False
