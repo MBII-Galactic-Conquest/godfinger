@@ -239,6 +239,11 @@ async def password_command(ctx):
 async def password_alias(ctx):
     await password_command(ctx)
 
+async def queue_server_empty(content):
+    channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+    if channel:
+        await channel.send(content)
+
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     logMode = logging.INFO;
@@ -279,9 +284,56 @@ def OnLoop():
 def OnFinish():
     pass
 
-# Called from the system on some event raising
+# Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
-    return False
+    #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
+    if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
+        global player_queue
+        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+
+        if player_queue:
+            Log.info("Server is empty, clearing the active PUG queue.")
+            last_join_time = None
+            asyncio.run_coroutine_threadsafe(
+                queue_server_empty(
+                    "**All players have disconnected from the game server.**\n> Clearing the active PUG queue..."
+                ),
+                bot.loop
+            )
+            player_queue.clear()
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT:
+        return False;
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER_SPAWN:
+        return False;
+
+    return False;
 
 # === Run the Bot ===
 def run_bot():
