@@ -10,7 +10,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Ensure Jedi Academy & Moviebattles II is installed in docker/volume
+# Ensure Jedi Academy & Moviebattles II is installed in RWD/../dockerize
 echo "Checking for Jedi Academy installation..."
 docker run --rm -it \
   -v ../../dockerize:/app/jediacademy \
