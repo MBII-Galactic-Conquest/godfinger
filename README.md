@@ -197,7 +197,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > ```
 >
 > > Ensure you have [docker](https://docs.docker.com/get-started/get-docker/) installed before continuing.</br>
-> > `pip install docker`
+> > `sudo apt install -y docker.io && pip install docker`
 >
 
 </br>
