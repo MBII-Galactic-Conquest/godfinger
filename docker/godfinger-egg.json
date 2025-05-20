@@ -43,7 +43,7 @@
     "*.zip",
     "*.bak"
   ],
-  "startup": "bash -c 'if [ ! -f /app/.prepared ]; then ./start/linux_macOS/prepare.sh && touch /app/.prepared; fi && ./start/linux_macOS/startDebugSilent.sh'",
+  "startup": "bash -c 'if [ ! -f /app/jediacademy/godfinger/.prepared ]; then ./start/linux_macOS/prepare.sh && touch /app/jediacademy/godfinger/.prepared; fi && ./start/linux_macOS/startDebugSilent.sh'",
   "environment": [
     {
       "name": "GODFINGER_HOME",
