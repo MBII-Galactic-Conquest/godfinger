@@ -207,8 +207,6 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > docker build -f docker/Dockerfile -t godfinger .
 >
-> Run the Godfinger container with prerequisites...
->
 > docker run --rm -it \
 > -v $(pwd)/../dockerize:/app/jediacademy \
 > -v $(pwd):/app/jediacademy/gamedata/godfinger \
