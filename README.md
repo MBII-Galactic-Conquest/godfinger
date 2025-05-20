@@ -177,14 +177,14 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > 1) Installing Manually
 > Ensure you are in the godfinger RWD, one level above the docker/ folder...
-> `docker build -f docker/Dockerfile -t godfinger .`
+> docker build -f docker/Dockerfile -t godfinger .
 >
 > Run the Godfinger container...
-> `docker run --rm -it -v $(pwd)/data:/app/data -p 29070:29070/udp -p 29070:29070/tcp godfinger`
+> docker run --rm -it -v $(pwd)/data:/app/data -p 29070:29070/udp -p 29070:29070/tcp godfinger
 >
 > 2) Automated Local Install
-> `chmod +x docker/build-image.sh`
-> `./build-image.sh`
+> chmod +x docker/build-image.sh
+> ./build-image.sh
 >
 > 3) Pterodactyl Egg
 > Access the Pterodactyl Panel as Admin,
