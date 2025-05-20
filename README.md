@@ -244,3 +244,13 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > You will have to create your own `volumes`, or `svn post hooks` to serve as configstores for automation purposes.<br>Godfinger may still encounter exceptions requiring `config files` & `environment variables` to run without first time error.
 >
+> ```
+> godfinger/
+> ├── godfingerCFG.json
+> └── plugins/
+>     ├── shared/
+>     └── myplugin/
+>         ├── pluginCFG.json
+>         └── envfile.env
+> ```
+>
