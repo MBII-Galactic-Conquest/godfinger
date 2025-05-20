@@ -183,8 +183,13 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > Ensure you are in the godfinger RWD, one level above the docker/ folder...
 > docker build -f docker/Dockerfile -t godfinger .
 >
-> Run the Godfinger container...
-> docker run --rm -it -v $(pwd)/data:/app/data -p 29070:29070/udp -p 29070:29070/tcp godfinger
+> Run the Godfinger container with prerequisites...
+> docker run --rm -it \
+> -v $(pwd)/../dockerize:/app/jediacademy \
+> -v $(pwd):/app/jediacademy/gamedata/godfinger \
+> -p 29070:29070/udp \
+> -p 29070:29070/tcp \
+> godfinger
 >
 > 2) Automated Local Install
 > chmod +x docker/build-image.sh
@@ -200,12 +205,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > ```
 >
-> **We do not support pirated versions of Jedi Academy, please support the official release.<br>Distribute legal copies inside your containers when making your local images.**</br>
->
-> When installing and configuring your own docker image, ensure Jedi Academy is installed in your container inside `/app/jediacademy.`<br>Ensuring recursive access to necessary linux server binaries for godfinger to run.<br>
-> `docker cp /path/to/JKA <container_name_or_id>:/app/jediacademy`
->
-> Alternatively, you can pursue other methods to include [Jedi Academy linux binaries](https://gist.github.com/Wildcarde/41fd9f182fd8dc191c1c) natively.
+> When configuring your own docker image, ensure Jedi Academy & Moviebattles II is installed in a parent subdirectory called `dockerize/`<br>Ensuring recursive access to necessary linux server binaries for godfinger to run in automated containerized environments.<br>
 >
 
 </br>

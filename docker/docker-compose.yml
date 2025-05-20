@@ -7,7 +7,8 @@ services:
       dockerfile: docker/Dockerfile
     container_name: godfinger_server
     volumes:
-      - ./data:/app/jediacademy/godfinger/data
+      - ../../dockerize:/app/jediacademy/
+      - ..:/app/jediacademy/gamedata/godfinger
     ports:
       - "29070:29070/udp"
       - "29070:29070/tcp"

@@ -1,5 +1,4 @@
 #!/bin/bash
-# run_docker.sh - build and run godfinger docker container without .env file
 
 IMAGE_NAME="godfinger"
 
@@ -11,7 +10,14 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# Ensure Jedi Academy & Moviebattles II is installed in docker/volume
+echo "Checking for Jedi Academy installation..."
+docker run --rm -it \
+  -v ../../dockerize:/app/jediacademy \
+  $IMAGE_NAME "$@"
+
+# Now migrate the script extension system
 echo "Running Docker container..."
 docker run --rm -it \
-  -v ../data:/app/data \
+  -v ..:/app/jediacademy/gamedata/godfinger \
   $IMAGE_NAME "$@"

@@ -43,13 +43,22 @@
     "*.zip",
     "*.bak"
   ],
-  "startup": "bash -c 'if [ ! -f /app/jediacademy/godfinger/.prepared ]; then ./start/linux_macOS/prepare.sh && touch /app/jediacademy/godfinger/.prepared; fi && ./start/linux_macOS/startDebugSilent.sh'",
+  "startup": "bash -c 'if [ ! -f {{JEDIACADEMY_HOME}}/gamedata/godfinger/.prepared ]; then {{JEDIACADEMY_HOME}}/gamedata/godfinger/start/linux_macOS/prepare.sh && touch {{JEDIACADEMY_HOME}}/gamedata/godfinger/.prepared; fi && {{JEDIACADEMY_HOME}}/gamedata/godfinger/start/linux_macOS/startDebugSilent.sh'",
   "environment": [
     {
       "name": "GODFINGER_HOME",
       "description": "Root folder inside container",
       "env_variable": "GODFINGER_HOME",
-      "default_value": "/app/jediacademy/godfinger",
+      "default_value": "/app/jediacademy/gamedata/godfinger",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|string"
+    },
+    {
+      "name": "JEDIACADEMY_HOME",
+      "description": "Jedi Academy installation folder inside container",
+      "env_variable": "JEDIACADEMY_HOME",
+      "default_value": "/app/jediacademy",
       "user_viewable": true,
       "user_editable": false,
       "rules": "required|string"
