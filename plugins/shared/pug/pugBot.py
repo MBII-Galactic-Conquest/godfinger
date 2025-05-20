@@ -303,6 +303,7 @@ def OnEvent(event) -> bool:
 
         if player_queue:
             Log.info("Server is empty, clearing the active PUG queue.")
+            last_join_time = None
             asyncio.run_coroutine_threadsafe(
                 queue_server_empty(
                     "**All players have disconnected from the game server.**\n> Clearing the active PUG queue..."
