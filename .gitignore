@@ -21,6 +21,7 @@ update/key/*
 __pycache__/*
 *.log
 
+!docker/godfinger-egg.json
 !start/autostart.cfg
 
 godfingerCfg.json

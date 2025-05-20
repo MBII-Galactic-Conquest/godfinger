@@ -1,0 +1,82 @@
+{
+  "_comment": "Godfinger Egg for Pterodactyl",
+  "name": "Godfinger Egg",
+  "author": "MBII Galactic Conquest Team",
+  "description": "Godfinger Python Script Extension System",
+  "docker_images": [
+    "python:3.11-slim"
+  ],
+  "file_denylist": [
+    "lib/private/*",
+    "!lib/private/.keep",
+    "plugins/private/*",
+    "!plugins/private/.keep",
+    "tmp/*",
+    "temp/*",
+    "temporary/*",
+    "update/deploy/*",
+    "!update/deploy/.keep",
+    "update/key/*",
+    "!update/key/.keep",
+    "*.code-workspace",
+    "*.json",
+    "*.cfg",
+    "*.env",
+    "*.pyc",
+    "__pycache__/*",
+    "*.log",
+    "!start/autostart.cfg",
+    "godfingerCfg.json",
+    "automessageCfg.json",
+    "vpnmonitorCfg.json",
+    "automodCfg.json",
+    "gtConfig.json",
+    "*.db",
+    "*.DB",
+    "ignored/*",
+    "venv/*",
+    "docker/",
+    "data/",
+    ".DS_Store",
+    "*.pkl",
+    "*.pk3",
+    "*.zip",
+    "*.bak"
+  ],
+  "startup": "bash -c 'if [ ! -f /app/.prepared ]; then ./start/linux_macOS/prepare.sh && touch /app/.prepared; fi && ./start/linux_macOS/startDebugSilent.sh'",
+  "environment": [
+    {
+      "name": "GODFINGER_HOME",
+      "description": "Root folder inside container",
+      "env_variable": "GODFINGER_HOME",
+      "default_value": "/app",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|string"
+    }
+  ],
+  "config": {
+    "files": {},
+    "startup": {
+      "done": "Listening on port"
+    },
+    "logs": {
+      "custom": false,
+      "location": "logs",
+      "log": "latest.log"
+    }
+  },
+  "ports": [
+    {
+      "name": "game_udp",
+      "protocol": "udp",
+      "default": 29070
+    },
+    {
+      "name": "game_tcp",
+      "protocol": "tcp",
+      "default": 29070
+    }
+  ],
+  "variables": []
+}
