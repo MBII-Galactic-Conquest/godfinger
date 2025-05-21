@@ -14,10 +14,10 @@ RUN apt-get update && apt-get install -y \
 
 COPY . ${GODFINGER_HOME}
 
-RUN chmod +x start/linux_macOS/prepare.sh start/linux_macOS/startDebugSilent.sh
+RUN chmod +x quickstart_linux_macOS.sh start/linux_macOS/prepare.sh
 
 CMD bash -c '\
   if [ ! -f .prepared ]; then \
     ./start/linux_macOS/prepare.sh && touch .prepared; \
   fi && \
-  ./start/linux_macOS/startDebugSilent.sh'
+  ./quickstart_linux_macOS.sh'

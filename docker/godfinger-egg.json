@@ -43,7 +43,7 @@
     "*.zip",
     "*.bak"
   ],
-  "startup": "bash -c 'if [ ! -f {{JEDIACADEMY_HOME}}/gamedata/godfinger/.prepared ]; then {{JEDIACADEMY_HOME}}/gamedata/godfinger/start/linux_macOS/prepare.sh && touch {{JEDIACADEMY_HOME}}/gamedata/godfinger/.prepared; fi && {{JEDIACADEMY_HOME}}/gamedata/godfinger/start/linux_macOS/startDebugSilent.sh'",
+  "startup": "bash -c 'if [ ! -f {{JEDIACADEMY_HOME}}/gamedata/godfinger/.prepared ]; then {{JEDIACADEMY_HOME}}/gamedata/godfinger/start/linux_macOS/prepare.sh && touch {{JEDIACADEMY_HOME}}/gamedata/godfinger/.prepared; fi && {{JEDIACADEMY_HOME}}/gamedata/godfinger/quickstart_linux_macOS.sh'",
   "environment": [
     {
       "name": "GODFINGER_HOME",
