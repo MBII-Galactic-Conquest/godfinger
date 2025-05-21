@@ -8,7 +8,7 @@ WORKDIR ${GODFINGER_HOME}
 RUN apt-get update && apt-get install -y \
     git \
     sqlite3 \
-	docker.io \
+    docker.io \
     bash \
     && rm -rf /var/lib/apt/lists/*
 

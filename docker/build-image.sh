@@ -16,4 +16,5 @@ echo "Running Docker container..."
 docker run --rm -it \
     -v ../../dockerize:/app/jediacademy \
     -v ..:/app/jediacademy/gamedata/godfinger \
+    -v ../../configstore_godfinger:/app/jediacademy/gamedata/godfinger \
     $IMAGE_NAME "$@"

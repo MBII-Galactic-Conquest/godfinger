@@ -9,6 +9,7 @@ services:
     volumes:
       - ../../dockerize:/app/jediacademy/
       - ..:/app/jediacademy/gamedata/godfinger
+      - ../../configstore_godfinger:/app/jediacademy/gamedata/godfinger
     ports:
       - "29070:29070/udp"
       - "29070:29070/tcp"

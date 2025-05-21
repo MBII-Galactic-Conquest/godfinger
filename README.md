@@ -210,6 +210,7 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > docker run --rm -it \
 > -v $(pwd)/../dockerize:/app/jediacademy \
 > -v $(pwd):/app/jediacademy/gamedata/godfinger \
+> -v $(pwd)/../configstore_godfinger:/app/jediacademy/gamedata/godfinger \
 > -p 29070:29070/udp \
 > -p 29070:29070/tcp \
 > godfinger
@@ -231,6 +232,8 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > ```
 >
+> <br>
+>
 > Ensure `Jedi Academy` & `Moviebattles II` is installed in a parent subdirectory called `dockerize/`<br>Recursive access to necessary linux server binaries is required for godfinger to run in automated containerized environments.<br>
 >
 > ```
@@ -239,18 +242,25 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > :   └── MBII/
 > :
 > godfinger/
-> └── RWD/
+> └── $(RWD/)
 > ```
 >
-> You will have to create your own `volumes`, or `svn post hooks` to serve as configstores for automation purposes.<br>Godfinger may still encounter exceptions requiring `config files` & `environment variables` to run without first time error.
+> <br>
+>
+> You will have to create your own `volumes`, or `svn post hooks` to serve as configstores for automation purposes.<br>Godfinger will still encounter exceptions requiring `config files` & `environment variables` to run without first time error.
+>
+> Ensure your configstore is placed in a parent subdirectory, called `configstore_godfinger/` mirroring pathing for the project.
 >
 > ```
-> godfinger/
+> configstore_godfinger/
 > ├── godfingerCFG.json
 > └── plugins/
->     ├── shared/
->     └── myplugin/
->         ├── pluginCFG.json
->         └── envfile.env
+> :    ├── shared/
+> :    └── myplugin/
+> :        ├── pluginCFG.json
+> :        └── envfile.env
+> :
+> godfinger/
+> └── $(RWD/)
 > ```
 >
