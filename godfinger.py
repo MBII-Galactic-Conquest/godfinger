@@ -636,7 +636,7 @@ class MBIIServer:
         Log.debug("Exit log entry %s", textified);
         scoreLine = None
         playerScores = {}
-        for m in self._logMessagesQueue.queue:
+        for m in self._svInterface.GetMessages().queue:
             if m.startswith("red:"):
                 scoreLine = m
             elif m.startswith("score:"):
