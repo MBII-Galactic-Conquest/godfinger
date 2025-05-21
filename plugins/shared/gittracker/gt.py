@@ -17,12 +17,11 @@ SERVER_DATA = None;
 GODFINGER = "godfinger"
 Log = logging.getLogger(__name__);
 
-## Requires that your REPOSITORY is publicly visible ##
-
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "gtConfig.json");
 PLACEHOLDER = "placeholder"
 PLACEHOLDER_PATH = "path/to/bat/or/sh"
 PLACEHOLDER_REPO = "placeholder/placeholder"
+PLACEHOLDER_TOKEN = "placeholder"
 PLACEHOLDER_BRANCH = "placeholder"
 GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
 
@@ -81,11 +80,13 @@ def create_config_placeholder():
             "repositories": [
                 {
                     "repository": PLACEHOLDER_REPO,
-                    "branch": PLACEHOLDER_BRANCH
+                    "branch": PLACEHOLDER_BRANCH,
+                    "token": PLACEHOLDER_TOKEN
                 },
                 {
                     "repository": PLACEHOLDER_REPO,
-                    "branch": PLACEHOLDER_BRANCH
+                    "branch": PLACEHOLDER_BRANCH,
+                    "token": PLACEHOLDER_TOKEN
                 }
             ],
             "refresh_interval": 60,
@@ -107,7 +108,9 @@ def load_config():
         config = json.load(f)
 
     for repo in config.get("repositories", []):
-        if repo["repository"] == PLACEHOLDER or repo["branch"] == PLACEHOLDER:
+        if (repo["repository"] == PLACEHOLDER_REPO or
+            repo["branch"] == PLACEHOLDER_BRANCH or
+            repo["token"] == PLACEHOLDER_TOKEN):
             print("\nPlaceholders detected in gtConfig.json. Please update the file.")
             sys.exit(0)
 
@@ -185,6 +188,7 @@ def update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, is
         save_json(config_file_path, commit_hash)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
         PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
+        PluginInstance._serverData.interface.SvSound("sound/sup/message.mp3")
         
         if isGFBuilding == True and UPDATE_NEEDED == False and GODFINGER in repo_name and gfBuildBranch in branch_name:
             PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
@@ -194,14 +198,23 @@ def update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, is
     else:
         return
 
-def get_latest_commit_info(repo_url: str, branch: str):
+def get_latest_commit_info(repo_url: str, branch: str, token: str):
     try:
         repo_name = repo_url.replace("https://github.com/", "").replace("http://github.com/", "")
         api_url = GITHUB_API_URL.format(repo_name, branch)
         
         #Log.info(f"Requesting commit info from GitHub API for {repo_name}, branch '{branch}'...")
 
-        response = requests.get(api_url)
+        if token == "" or token == " " or token == "None":
+            token = None
+
+        if token is not None:
+            headers = {
+                "Authorization": f"token {token}"
+            }
+            response = requests.get(api_url, headers=headers)
+        else:
+            response = requests.get(api_url)
 
         if response.status_code == 403:
             Log.info(response.headers.get('X-RateLimit-Remaining'))
@@ -237,8 +250,9 @@ def monitor_commits():
                 #Log.info(f"Checking repository {i}: {repo['repository']} on branch {repo['branch']}")
                 repo_url = repo["repository"]
                 branch_name = repo["branch"]
+                token = repo["token"]
 
-                commit_hash, commit_message = get_latest_commit_info(repo_url, branch_name)
+                commit_hash, commit_message = get_latest_commit_info(repo_url, branch_name, token)
 
                 if commit_hash and commit_message:
                     #Log.info(f"\nNew commit detected for repository {i} ('{branch_name}') in '{repo_url}':")
@@ -265,9 +279,13 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
 
     script_path = os.path.abspath(os.path.join(os.getcwd(), svnPostHookFile)) if svnPostHookFile else None
     
-    if isSVNBuilding and UPDATE_NEEDED == True:
+    if isSVNBuilding:
         if not os.path.exists(script_path):
+            if svnPostHookFile == PLACEHOLDER:
+                return
             Log.error(f"SVN Post Hook file not found.")
+            return
+        if svnPostHookFile == PLACEHOLDER:
             return
         try:
             if script_path.endswith('.bat') and os.name == 'nt':  # Windows
@@ -323,24 +341,21 @@ def run_script(script_path, simulated_inputs):
 def CheckForGITUpdate(isGFBuilding):
     global UPDATE_NEEDED
     timeoutSeconds = 10
-    
-    if isGFBuilding and UPDATE_NEEDED == True:
+
+    if isGFBuilding and UPDATE_NEEDED:
         Log.info("Godfinger change detected with isGFBuilding enabled. Triggering update...")
 
-        # Run update_noinput.py
-        update_script = os.path.abspath(os.path.join(os.getcwd(), "update", "update_noinput.py"))
-        #print(f"Debug: Checking update script at {update_script}")
+        # Run .update_noinput.py
+        update_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".update_noinput.py"))
         run_script(update_script, ["Y", "Y", "Y"])
 
-        # Run deployments_noinput.py with the same logic
-        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", "deployments_noinput.py"))
-        #print(f"Debug: Checking deployments script at {deploy_script}")
+        # Run .deployments_noinput.py with the same logic
+        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".deployments_noinput.py"))
         run_script(deploy_script, ["", "", ""])
 
-        # Now, execute cleanup script based on the OS
+        # Execute cleanup script based on the OS
         cleanup_script = os.path.abspath("cleanup.bat" if platform.system() == "Windows" else "cleanup.sh")
-        #print(f"Debug: Cleanup script path: {cleanup_script}")
-        
+
         try:
             result = subprocess.run(
                 [cleanup_script],
@@ -351,9 +366,6 @@ def CheckForGITUpdate(isGFBuilding):
                 stderr=subprocess.PIPE,
                 check=True
             )
-            #print(f"Debug: Cleanup return code: {result.returncode}")
-            #print(f"Debug: Cleanup stdout: {result.stdout}")
-            #print(f"Debug: Cleanup stderr: {result.stderr}")
 
             if result.returncode == 0:
                 Log.info(f"Cleanup script ({cleanup_script}) executed successfully.")
@@ -362,13 +374,43 @@ def CheckForGITUpdate(isGFBuilding):
         
         except Exception as e:
             Log.error(f"Exception occurred while running cleanup script: {e}")
-            #print(f"Debug: Exception: {e}")
         
-        # Force Godfinger to restart after update by crashing it
+        # Force Godfinger to restart after update
         Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
         PluginInstance._serverData.API.Restart(timeoutSeconds)
-    else:
-        pass;
+
+    elif isGFBuilding and not UPDATE_NEEDED:
+        Log.info("isGFBuilding is enabled. Checking automatically for latest deployment HEADs...")
+
+        # Run .deployments_noinput.py
+        deploy_script = os.path.abspath(os.path.join(os.getcwd(), "update", ".deployments_noinput.py"))
+        run_script(deploy_script, ["", "", ""])
+
+        # Execute cleanup script based on the OS
+        cleanup_script = os.path.abspath("cleanup.bat" if platform.system() == "Windows" else "cleanup.sh")
+
+        try:
+            result = subprocess.run(
+                [cleanup_script],
+                input="Y\n",
+                text=True,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+
+            if result.returncode == 0:
+                Log.info(f"Cleanup script ({cleanup_script}) executed successfully.")
+            else:
+                Log.error(f"Error executing cleanup script: {result.stderr}")
+        
+        except Exception as e:
+            Log.error(f"Exception occurred while running cleanup script: {e}")
+        
+        # Force Godfinger to restart after update
+        Log.info("Auto-deploy process executed with predefined inputs, restarting in ten seconds...")
+        PluginInstance._serverData.API.Restart(timeoutSeconds)
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:

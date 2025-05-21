@@ -31,6 +31,24 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+:: Check if MSVC.x86 is installed
+echo Verifying MSVC.x86 installation for MBII dedicated binaries...
+START /WAIT python ./msvc_win.py
+if %errorlevel% neq 0 (
+    echo Error running msvc_win.py. Press Enter to exit.
+    pause
+    exit /b
+)
+
+:: Run the noinput obscuring script
+echo Obscuring update and deployments noinput files, as they are not intended to be used...
+call ./obscure_win.bat
+if %errorlevel% neq 0 (
+    echo Error running obscure_win.bat. Press Enter to exit.
+    pause
+    exit /b
+)
+
 :: Wait for user input before exiting
 goto end
 
