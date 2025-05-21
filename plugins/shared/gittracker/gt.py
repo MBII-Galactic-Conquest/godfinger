@@ -17,8 +17,6 @@ SERVER_DATA = None;
 GODFINGER = "godfinger"
 Log = logging.getLogger(__name__);
 
-## Requires that your REPOSITORY is publicly visible ##
-
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "gtConfig.json");
 PLACEHOLDER = "placeholder"
 PLACEHOLDER_PATH = "path/to/bat/or/sh"
