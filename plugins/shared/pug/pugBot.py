@@ -163,6 +163,7 @@ async def queue_join(ctx):
 
 @queue.command(name='leave')
 async def queue_leave(ctx):
+    global player_queue, last_queue_clear_time
     if ctx.channel.id != ALLOWED_CHANNEL_ID:
         return
 
