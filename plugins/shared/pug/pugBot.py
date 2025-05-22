@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import threading
 import time
+import json
 import asyncio
 import os
 
@@ -40,7 +41,10 @@ ALLOWED_CHANNEL_ID=
 SERVER_PASSWORD=password
 
 # Persistence Configuration
-COOLDOWN_FILE=".cooldown"
+COOLDOWN_FILE=.cooldown
+
+# Miscellaneous Configuration
+EMBED_IMAGE=
             """)
         load_dotenv(dotenv_path=env_file)
 
@@ -52,7 +56,7 @@ COOLDOWN_FILE=".cooldown"
 env_vars_to_reset = [
     "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", "NEW_QUEUE_COOLDOWN", 
     "BOT_TOKEN", "PUG_ROLE_ID", "ADMIN_ROLE_ID", 
-    "ALLOWED_CHANNEL_ID", "SERVER_PASSWORD", "COOLDOWN_FILE"
+    "ALLOWED_CHANNEL_ID", "SERVER_PASSWORD", "COOLDOWN_FILE", "EMBED_IMAGE"
 ]
 
 def reset_env_vars(vars_list):
@@ -91,6 +95,8 @@ SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
 
 COOLDOWN_FILE = os.getenv("COOLDOWN_FILE")
 
+EMBED_IMAGE = os.getenv("EMBED_IMAGE")
+
 def create_cooldown_file():
     """Creates an empty cooldown file to signal an active cooldown."""
     try:
@@ -112,6 +118,16 @@ def clear_cooldown_file():
             Log.info(f"Cooldown file {COOLDOWN_FILE} removed.")
         except OSError as e:
             Log.error(f"Error removing cooldown file {COOLDOWN_FILE}: {e}")
+
+def check_embed_image_exists():
+    global EMBED_IMAGE
+    """Checks if the image for embed use exists."""
+    if not EMBED_IMAGE or EMBED_IMAGE.strip() == "":
+        EMBED_IMAGE = None
+        return None
+    else:
+        EMBED_IMAGE = EMBED_IMAGE.strip()
+    return EMBED_IMAGE
 
 # === Queue State ===
 player_queue = []
@@ -150,7 +166,7 @@ async def on_ready():
 @bot.group()
 async def queue(ctx):
     if ctx.invoked_subcommand is None:
-        await ctx.send("Available subcommands: `join`, `leave`, `status`, `start`, `forcestart`, `forcejoin`.")
+        await ctx.send("Available subcommands: `join`, `leave`, `status`, `start`, `password`, `forcestart`, `forcejoin`.")
 
 @queue.command(name='join')
 async def queue_join(ctx):
@@ -170,7 +186,7 @@ async def queue_join(ctx):
             remaining_cooldown = int(NEW_QUEUE_COOLDOWN - time_since_clear)
             minutes, seconds = divmod(remaining_cooldown, 60)
             await ctx.send(
-                f"**A new queue cannot be started yet!**\n> Please wait `({minutes:02d}:{seconds:02d})`."
+                f"**A new queue cannot be started yet!**\n> Please wait `({minutes:02d}:{seconds:02d})`"
             )
             return
 
@@ -303,13 +319,17 @@ async def start_queue(channel):
     global player_queue, last_queue_clear_time
     role_mention = f"<@&{PUG_ROLE_ID}>"
 
-    message = "**Queue started!**\n"
-    message += f"> {role_mention}\n\n"
+    if check_embed_image_exists:
+        await send_match_start_embed();
+    else:
+        message = "**Queue started!**\n"
+        message += f"> {role_mention}\n\n"
 
-    # Enumerate and list users
-    message += "\n".join([f"{i+1}. {user.mention}" for i, user in enumerate(player_queue)])
+        # Enumerate and list users
+        message += "\n".join([f"{i+1}. {user.mention}" for i, user in enumerate(player_queue)])
 
-    await channel.send(message)
+        await channel.send(message)
+
     player_queue.clear()
     last_queue_clear_time = datetime.utcnow()
 
@@ -318,16 +338,89 @@ async def start_queue(channel):
 async def password_command(ctx):
     if ctx.channel.id != ALLOWED_CHANNEL_ID:
         return
+    if not SERVER_PASSWORD or SERVER_PASSWORD == " ":
+        await ctx.send(f"**There is no password for this PUG session.**")
+        return
     await ctx.send(f"Server password: `{SERVER_PASSWORD}`")
 
 @bot.command(name='password')
 async def password_alias(ctx):
     await password_command(ctx)
 
+async def send_match_start_embed():
+    global EMBED_IMAGE, player_queue
+    channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+    role_mention = f"<@&{PUG_ROLE_ID}>"
+
+    image_url = EMBED_IMAGE
+    Log.info(f"Attempting to send match start embed with image from URL: {image_url} to channel ID: {channel.id}")
+
+    if not channel:
+        Log.error(f"Channel object is None for ID {ALLOWED_CHANNEL_ID}. Cannot send embed.")
+        return
+    try:
+        if player_queue:
+            embed_description = "**Players in Queue:**\n"
+            embed_description += "\n".join([f"{i+1}. {user.mention}" for i, user in enumerate(player_queue)])
+        else:
+            embed_description = "**No players currently in queue.**"
+
+        embed = discord.Embed(
+            title="PUG Match Starting!",
+            description=f"{embed_description}",
+            color=discord.Color.default()
+        )
+        embed.set_image(url=image_url)
+        embed.set_footer(text="‎ ")
+
+        Log.info(f"Sending embed with image to channel {channel.id}.")
+        await channel.send(embed=embed)
+        await channel.send(f"> {role_mention}\n")
+        Log.info(f"Embed with image from {image_url} successfully sent to channel {channel.id}.")
+
+    except Exception as e:
+        error_msg = f"An unexpected error occurred while sending the embed with image: {e}"
+        await channel.send(f"An unexpected error occurred while sending the match start image: {e}")
+        Log.error(error_msg, exc_info=True)
+
 async def queue_server_empty(content):
     channel = bot.get_channel(ALLOWED_CHANNEL_ID)
     if channel:
         await channel.send(content)
+
+def check_if_gittracker_used():
+    base_dir = os.path.join(os.path.dirname(__file__))
+    # Path is: current_dir/../../../godfingerCfg.json
+    cfg_path = os.path.normpath(os.path.join(base_dir, '..', '..', '..', 'godfingerCfg.json'))
+
+    Log.info(f"Checking for 'gittracker' in config file: {cfg_path}")
+
+    if not os.path.exists(cfg_path):
+        Log.warning(f"Config file not found at: {cfg_path}")
+        return False
+
+    try:
+        with open(cfg_path, 'r') as f:
+            config_data = json.load(f)
+
+        if "Plugins" in config_data and isinstance(config_data["Plugins"], list):
+            for plugin_entry in config_data["Plugins"]:
+                if isinstance(plugin_entry, dict) and "path" in plugin_entry:
+                    if "gittracker" in plugin_entry["path"]:
+                        Log.info("'gittracker' found in a plugin path within godfingerCfg.json.")
+                        return True
+            Log.info("'gittracker' not found in any plugin path within godfingerCfg.json.")
+            return False
+        else:
+            Log.warning("No 'Plugins' list found or 'Plugins' is not a list in godfingerCfg.json.")
+            return False
+
+    except json.JSONDecodeError as e:
+        Log.error(f"Error decoding godfingerCfg.json at {cfg_path}: {e}", exc_info=True)
+        return False
+    except Exception as e:
+        Log.error(f"An unexpected error occurred while reading godfingerCfg.json at {cfg_path}: {e}", exc_info=True)
+        return False
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
@@ -395,8 +488,7 @@ def OnEvent(event) -> bool:
         channel = bot.get_channel(ALLOWED_CHANNEL_ID)
 
         if player_queue:
-            Log.info("Server is empty, clearing the active PUG queue.")
-            last_join_time = None
+            Log.info("Server is empty, clearing the active PUG queue and applying cooldown.")
             asyncio.run_coroutine_threadsafe(
                 queue_server_empty(
                     "**All players have disconnected from the game server.**\n> Clearing the active PUG queue..."
@@ -405,7 +497,9 @@ def OnEvent(event) -> bool:
             )
             player_queue.clear()
             last_queue_clear_time = datetime.utcnow()
-            create_cooldown_file();
+
+            if check_if_gittracker_used():
+                create_cooldown_file()
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
