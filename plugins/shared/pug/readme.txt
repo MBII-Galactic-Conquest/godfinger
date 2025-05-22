@@ -23,6 +23,7 @@ pugConfig.env
 QUEUE_TIMEOUT=1800  # 30 minutes in seconds
 MAX_QUEUE_SIZE=10 <--- Maximum to start a queue is a 5v5.
 MIN_QUEUE_SIZE=6 <--- Minimum to start a queue is a 3v3.
+NEW_QUEUE_COOLDOWN=300 <--- 5 minutes cooldown to start a new queue, to prevent spam.
 
 # Discord Configuration
 BOT_TOKEN= <--- Your BOT access TOKEN, keep private!

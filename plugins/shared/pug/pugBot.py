@@ -30,6 +30,7 @@ def check_and_create_env():
 QUEUE_TIMEOUT=1800  # 30 minutes in seconds
 MAX_QUEUE_SIZE=10
 MIN_QUEUE_SIZE=6
+NEW_QUEUE_COOLDOWN=300 # 5 minutes in seconds
 
 # Discord Configuration
 BOT_TOKEN=
@@ -46,7 +47,7 @@ SERVER_PASSWORD=password
 
 # List of environment variables to reset
 env_vars_to_reset = [
-    "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", 
+    "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", "NEW_QUEUE_COOLDOWN", 
     "BOT_TOKEN", "PUG_ROLE_ID", "ADMIN_ROLE_ID", 
     "ALLOWED_CHANNEL_ID", "SERVER_PASSWORD"
 ]
@@ -77,6 +78,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 QUEUE_TIMEOUT = int(os.getenv("QUEUE_TIMEOUT"))
 MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE"))
 MIN_QUEUE_SIZE = int(os.getenv("MIN_QUEUE_SIZE"))
+NEW_QUEUE_COOLDOWN = int(os.getenv("NEW_QUEUE_COOLDOWN"))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Keep as str
 PUG_ROLE_ID = int(os.getenv("PUG_ROLE_ID"))
@@ -88,6 +90,7 @@ SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
 player_queue = []
 queue_created_time = None
 last_join_time = None
+last_queue_clear_time = None
 
 class pugBotPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
@@ -97,7 +100,7 @@ class pugBotPlugin(object):
 
 @tasks.loop(seconds=30)
 async def monitor_queue_task():
-    global player_queue, last_join_time
+    global player_queue, last_join_time, last_queue_clear_time
 
     if not player_queue or not last_join_time:
         return
@@ -107,6 +110,8 @@ async def monitor_queue_task():
         if channel:
             await channel.send("**Queue timed out due to inactivity!**\n> Clearing queue...")
         player_queue.clear()
+        last_queue_clear_time = datetime.utcnow()
+        last_join_time = None
 
 @bot.event
 async def on_ready():
@@ -122,7 +127,7 @@ async def queue(ctx):
 
 @queue.command(name='join')
 async def queue_join(ctx):
-    global player_queue, queue_created_time, last_join_time
+    global player_queue, queue_created_time, last_join_time, last_queue_clear_time
 
     if ctx.channel.id != ALLOWED_CHANNEL_ID:
         return
@@ -131,6 +136,16 @@ async def queue_join(ctx):
     if user in player_queue:
         await ctx.send(f"{user.mention}, you're already in the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`)")
         return
+
+    if last_queue_clear_time:
+        time_since_clear = (datetime.utcnow() - last_queue_clear_time).total_seconds()
+        if time_since_clear < NEW_QUEUE_COOLDOWN:
+            remaining_cooldown = int(NEW_QUEUE_COOLDOWN - time_since_clear)
+            minutes, seconds = divmod(remaining_cooldown, 60)
+            await ctx.send(
+                f"**A new queue cannot be started yet!**\n> Please wait `({minutes:02d}:{seconds:02d})`."
+            )
+            return
 
     if not player_queue:
         queue_created_time = datetime.utcnow()
@@ -157,6 +172,7 @@ async def queue_leave(ctx):
 
         if not player_queue:
             await ctx.send(f"{user.mention} has left the queue!\n> **The queue is now empty and has been cancelled.**")
+            last_queue_clear_time = datetime.utcnow()
         else:
             needed = MAX_QUEUE_SIZE - len(player_queue)
             await ctx.send(f"{user.mention} has left the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
@@ -169,12 +185,22 @@ async def queue_status(ctx):
         return
 
     if not player_queue:
+        if last_queue_clear_time:
+            time_since_clear = (datetime.utcnow() - last_queue_clear_time).total_seconds()
+            if time_since_clear < NEW_QUEUE_COOLDOWN:
+                remaining_cooldown = int(NEW_QUEUE_COOLDOWN - time_since_clear)
+                minutes, seconds = divmod(remaining_cooldown, 60)
+                await ctx.send(
+                    f"**The queue is currently empty!**\n"
+                    f"> Next queue can be started in `({minutes:02d}:{seconds:02d})`."
+                )
+                return
+        
         await ctx.send("**The queue is currently empty!**")
     else:
         names = [user.mention for user in player_queue]
         formatted_names = "\n".join([f"{i+1}. {name}" for i, name in enumerate(names)])
 
-        # Time remaining calculation
         time_left_str = ""
         if last_join_time:
             time_elapsed = (datetime.utcnow() - last_join_time).total_seconds()
@@ -216,7 +242,7 @@ async def force_start(ctx):
     await start_queue(ctx.channel)
 
 async def start_queue(channel):
-    global player_queue
+    global player_queue, last_queue_clear_time
     role_mention = f"<@&{PUG_ROLE_ID}>"
 
     message = "**Queue started!**\n"
@@ -227,6 +253,7 @@ async def start_queue(channel):
 
     await channel.send(message)
     player_queue.clear()
+    last_queue_clear_time = datetime.utcnow()
 
 # === Miscellaneous Commands ===
 @bot.command(name='pw')
@@ -298,7 +325,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
-        global player_queue
+        global player_queue, last_queue_clear_time
         channel = bot.get_channel(ALLOWED_CHANNEL_ID)
 
         if player_queue:
@@ -311,6 +338,7 @@ def OnEvent(event) -> bool:
                 bot.loop
             )
             player_queue.clear()
+            last_queue_clear_time = datetime.utcnow()
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
