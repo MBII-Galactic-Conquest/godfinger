@@ -14,6 +14,7 @@ Type !queue for a readout of commands:
 !queue start - when minimum players are reached, it checks for equal divisible ratios (4v4, 5v5, 6v6...) and allows players to begin the PUG session without an admin present.
 !queue status - readout of the current queue status, and involved players in queue.
 !queue forcestart - this allows PUG Mods/Captains to forcefully start the queue.
+!queue forcejoin - this allows PUG Mods/Captains to forcefully override queue cooldowns.
 !password|!pw - obtain the PUG password.
 
 
@@ -31,3 +32,9 @@ PUG_ROLE_ID= <--- Role to PING for when queues start.
 ADMIN_ROLE_ID= <--- PUG Mod/Admin role for overriding queues.
 ALLOWED_CHANNEL_ID= <--- Required channel ID where PUG queues are handled.
 SERVER_PASSWORD=password <--- Change to your sessions password.
+
+# Persistence Configuration
+COOLDOWN_FILE=.cooldown <--- Needed for persisting across GF restarts.
+
+# Miscellaneous Configuration
+EMBED_IMAGE= <--- Place an IMGUR link here to use for your embeds.
