@@ -38,6 +38,9 @@ PUG_ROLE_ID=
 ADMIN_ROLE_ID=
 ALLOWED_CHANNEL_ID=
 SERVER_PASSWORD=password
+
+# Persistence Configuration
+COOLDOWN_FILE=".cooldown"
             """)
         load_dotenv(dotenv_path=env_file)
 
@@ -49,7 +52,7 @@ SERVER_PASSWORD=password
 env_vars_to_reset = [
     "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", "NEW_QUEUE_COOLDOWN", 
     "BOT_TOKEN", "PUG_ROLE_ID", "ADMIN_ROLE_ID", 
-    "ALLOWED_CHANNEL_ID", "SERVER_PASSWORD"
+    "ALLOWED_CHANNEL_ID", "SERVER_PASSWORD", "COOLDOWN_FILE"
 ]
 
 def reset_env_vars(vars_list):
@@ -85,6 +88,30 @@ PUG_ROLE_ID = int(os.getenv("PUG_ROLE_ID"))
 ADMIN_ROLE_ID = int(os.getenv("ADMIN_ROLE_ID"))
 ALLOWED_CHANNEL_ID = int(os.getenv("ALLOWED_CHANNEL_ID"))
 SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
+
+COOLDOWN_FILE = os.getenv("COOLDOWN_FILE")
+
+def create_cooldown_file():
+    """Creates an empty cooldown file to signal an active cooldown."""
+    try:
+        with open(COOLDOWN_FILE, 'w') as f:
+            f.write("")
+        Log.info(f"Cooldown file {COOLDOWN_FILE} created.")
+    except IOError as e:
+        Log.error(f"Error creating cooldown file {COOLDOWN_FILE}: {e}")
+
+def check_cooldown_file_exists():
+    """Checks if the cooldown file exists."""
+    return os.path.exists(COOLDOWN_FILE)
+
+def clear_cooldown_file():
+    """Removes the cooldown file."""
+    if os.path.exists(COOLDOWN_FILE):
+        try:
+            os.remove(COOLDOWN_FILE)
+            Log.info(f"Cooldown file {COOLDOWN_FILE} removed.")
+        except OSError as e:
+            Log.error(f"Error removing cooldown file {COOLDOWN_FILE}: {e}")
 
 # === Queue State ===
 player_queue = []
@@ -123,7 +150,7 @@ async def on_ready():
 @bot.group()
 async def queue(ctx):
     if ctx.invoked_subcommand is None:
-        await ctx.send("Available subcommands: `join`, `leave`, `status`, `start`, `forcestart`.")
+        await ctx.send("Available subcommands: `join`, `leave`, `status`, `start`, `forcestart`, `forcejoin`.")
 
 @queue.command(name='join')
 async def queue_join(ctx):
@@ -151,6 +178,36 @@ async def queue_join(ctx):
         queue_created_time = datetime.utcnow()
         pug_mention = f"<@&{PUG_ROLE_ID}>"
         await ctx.send(f"{user.mention} started a new queue! {pug_mention}\n> `{MIN_QUEUE_SIZE}` players required to `!queue start` without admin.")
+
+    player_queue.append(user)
+    last_join_time = datetime.utcnow()
+
+    needed = MAX_QUEUE_SIZE - len(player_queue)
+    await ctx.send(f"{user.mention} has joined the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
+
+    if len(player_queue) >= MAX_QUEUE_SIZE:
+        await start_queue(ctx.channel)
+
+@queue.command(name='forcejoin')
+async def queue_forcejoin(ctx):
+    global player_queue, queue_created_time, last_join_time
+
+    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+        return
+
+    if ADMIN_ROLE_ID not in [role.id for role in ctx.author.roles]:
+        await ctx.send("**You don't have permission to use this command!**")
+        return
+
+    user = ctx.author
+    if user in player_queue:
+        await ctx.send(f"{user.mention}, you're already in the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`)")
+        return
+
+    if not player_queue:
+        queue_created_time = datetime.utcnow()
+        pug_mention = f"<@&{PUG_ROLE_ID}>"
+        await ctx.send(f"{user.mention} force-started a new queue! {pug_mention}")
 
     player_queue.append(user)
     last_join_time = datetime.utcnow()
@@ -274,6 +331,7 @@ async def queue_server_empty(content):
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
+    global last_queue_clear_time
     logMode = logging.INFO;
     if serverData.args.debug:
         logMode = logging.DEBUG;
@@ -293,6 +351,13 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
         pass;
     global PluginInstance;
     PluginInstance = pugBotPlugin(serverData)
+
+    if check_cooldown_file_exists():
+        last_queue_clear_time = datetime.utcnow()
+        Log.info(f"Persistent cooldown file found. Applying full {NEW_QUEUE_COOLDOWN}s cooldown from bot startup.")
+        clear_cooldown_file();
+    else:
+        Log.info("No persistent cooldown file found, proceeding as normal.")
 
     return True; # indicate plugin load success
 
@@ -340,6 +405,7 @@ def OnEvent(event) -> bool:
             )
             player_queue.clear()
             last_queue_clear_time = datetime.utcnow()
+            create_cooldown_file();
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
