@@ -244,6 +244,7 @@ class RTVVote(object):
         return self._voteOptions
 
     def GetWinners(self):
+        voteType = "rtm" if type(self) == RTMVote else "rtv"
         winners = []
         countMax = 0
         for i in self._playerVotes:
@@ -252,14 +253,16 @@ class RTVVote(object):
                 countMax = len(self._playerVotes[i])
             elif len(self._playerVotes[i]) == countMax:
                 winners.append(i)
+        # if second turn voting is enabled, allow a second winner if the first winner did not get at least 50% of the total voters
+        if PluginInstance._config.cfg[voteType]["secondTurnVoting"] == True and len(winners) == 1 and len(self._playerVotes[winners[0]]) <= (self.GetVoterCount() // 2):
+            sortedByVote = list(self._playerVotes)
+            sortedByVote.sort(key = lambda a : len(self._playerVotes[a]))
+            sortedByVote.reverse()  # list is initially sorted with lowest values first
+            winners.append(sortedByVote[1])
         return [self._voteOptions[x - 1] for x in winners] if countMax > 0 else []
 
     def GetVoterCount(self):
-        n = 0
-        for i in self._playerVotes:
-            for _ in self._playerVotes[i]:
-                n += 1
-        return n
+        return sum([len(self._playerVotes[x]) for x in self._playerVotes])
 
 
 class RTMVote(RTVVote):
