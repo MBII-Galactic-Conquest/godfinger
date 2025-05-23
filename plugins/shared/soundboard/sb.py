@@ -25,6 +25,10 @@ class soundBoardPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[SB]", "lblue") + ": "
+        self.player_join_sound_path = None
+        self.player_leave_sound_path = None
+        self.message_global_sound_path = None
+        self.player_start_sound_path = None
 
 class ClientInfo():
   def __init__(self):
@@ -117,7 +121,7 @@ def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     if PLAYERSTART_SOUND_PATH == "void":
         return;
 
-    if ID in ClientsData:  # check if client is present ( shouldnt be negative anyway )
+    if ID in ClientsData:   # check if client is present ( shouldnt be negative anyway )
         if ClientsData[ID].hasBeenGreeted == False: # check if client wasnt greeted yet
             PluginInstance._serverData.interface.ClientSound(f"{PLAYERSTART_SOUND_PATH}", ID)
             Log.info(f"{PLAYERSTART_SOUND_PATH} has been played to Client {ID}...")
@@ -172,7 +176,10 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     global PluginInstance
-    SV_LoadJson()
+    (PluginInstance.player_join_sound_path,
+     PluginInstance.player_leave_sound_path,
+     PluginInstance.message_global_sound_path,
+     PluginInstance.player_start_sound_path) = SV_LoadJson()
     startTime = time.time()
     loadTime = time.time() - startTime
     PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"Soundboard started in {loadTime:.2f} seconds!")
@@ -190,20 +197,20 @@ def OnFinish():
 def OnEvent(event) -> bool:
     #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
-        SV_MessageGlobal();
+        SV_MessageGlobal(PluginInstance.message_global_sound_path);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
         CL_OnConnect(event.client);
-        SV_PlayerJoin();
+        SV_PlayerJoin(PluginInstance.player_join_sound_path);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
-        CL_PlayerStart(event.client);
+        CL_PlayerStart(PluginInstance.player_start_sound_path, event.client);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         CL_OnDisconnect(event.client);
-        SV_PlayerLeave();
+        SV_PlayerLeave(PluginInstance.player_leave_sound_path);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
         return False;
