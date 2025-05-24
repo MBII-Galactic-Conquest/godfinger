@@ -109,6 +109,13 @@ def SV_MessageGlobal(MESSAGEGLOBAL_SOUND_PATH):
 
     return;
 
+def SV_MapChange():
+    global PluginInstance
+
+    ClientsData.clear()
+
+    return;
+
 def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     global PluginInstance
 
@@ -225,6 +232,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
+        SV_MapChange();
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return False;
