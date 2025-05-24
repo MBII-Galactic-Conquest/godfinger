@@ -109,20 +109,18 @@ def SV_MessageGlobal(MESSAGEGLOBAL_SOUND_PATH):
 
     return;
 
-def SV_MapChange(cl : client.Client):
-    global PluginInstance
+def SV_EmptyAllClients():
+    global ClientsData
 
-    ID = cl.GetID()
+    ClientsData.clear()
 
-    for ID in ClientsData:
-        ClientsData[ID].hasBeenGreeted = False
-
-    return;
+    return ClientsData;
 
 def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     global PluginInstance
 
     ID = cl.GetId()
+    NAME = cl.GetName()
 
     if PLAYERSTART_SOUND_PATH is None or PLAYERSTART_SOUND_PATH == "" or PLAYERSTART_SOUND_PATH == PLACEHOLDER:
         Log.error(f"{PLAYERSTART_SOUND_PATH} is null or using placeholder, exiting...")
@@ -135,6 +133,7 @@ def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
         if ClientsData[ID].hasBeenGreeted == False: # check if client wasnt greeted yet
             PluginInstance._serverData.interface.ClientSound(f"{PLAYERSTART_SOUND_PATH}", ID)
             Log.info(f"{PLAYERSTART_SOUND_PATH} has been played to Client {ID}...")
+            PluginInstance._serverData.interface.SvSay(f"{NAME} ^7has made it into the server.")
             ClientsData[ID].hasBeenGreeted = True; # we greeted them, now the above check wont pass again
     else:
         return;
@@ -227,6 +226,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
+        SV_EmptyAllClients();
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
         return False;
@@ -235,7 +235,6 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
-        SV_MapChange(event.client);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return False;
