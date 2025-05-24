@@ -109,10 +109,13 @@ def SV_MessageGlobal(MESSAGEGLOBAL_SOUND_PATH):
 
     return;
 
-def SV_MapChange():
+def SV_MapChange(cl : client.Client):
     global PluginInstance
 
-    ClientsData.clear()
+    ID = cl.GetID()
+
+    for ID in ClientsData:
+        ClientsData[ID].hasBeenGreeted = False
 
     return;
 
@@ -232,7 +235,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
-        SV_MapChange();
+        SV_MapChange(event.client);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return False;
