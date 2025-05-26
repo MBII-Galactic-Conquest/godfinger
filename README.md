@@ -186,3 +186,81 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >    ],
 > ```
 >
+
+</br>
+
+</br>
+
+> [!IMPORTANT]
+> ### **Utilizing Docker Containers**
+>
+> > Ensure you have [docker](https://docs.docker.com/get-started/get-docker/) installed before continuing</br>
+> > `sudo apt install -y docker.io && pip install docker`
+>
+> You may utilize docker containers to isolate godfinger sessions on UNIX.<br>
+> The godfinger system does not support local instancing, so docker is encouraged.
+>
+> ```
+> 1) Installing Manually:
+>
+> Ensure you are in the godfinger RWD, one level above the docker/ folder...
+>
+> docker build -f docker/Dockerfile -t godfinger .
+>
+> docker run --rm -it \
+> -v $(pwd)/../dockerize:/app/jediacademy \
+> -v $(pwd):/app/jediacademy/gamedata/godfinger \
+> -v $(pwd)/../configstore_godfinger:/app/jediacademy/gamedata/godfinger \
+> -p 29070:29070/udp \
+> -p 29070:29070/tcp \
+> godfinger
+>
+> 2) Automated Local Install:
+>
+> chmod +x docker/build-image.sh
+> cd docker/
+> ./build-image.sh
+>
+> 3) Pterodactyl Egg:
+>
+> Access the Pterodactyl Panel as Admin,
+> Admin Panel → Nests,
+> Create a New Nest,
+> Eggs → Create Egg,
+> Import docker/godfinger-egg.json,
+> Select Godfinger Egg and apply your Docker Image...
+>
+> ```
+>
+> <br>
+>
+> Ensure `Jedi Academy` & `Moviebattles II` is installed in a parent subdirectory called `dockerize/`<br>Recursive access to necessary linux server binaries is required for godfinger to run in automated containerized environments.<br>
+>
+> ```
+> dockerize/
+> └── gamedata/
+> :   └── MBII/
+> :
+> godfinger/
+> └── $(RWD/)
+> ```
+>
+> <br>
+>
+> You will have to create your own `volumes`, or `svn post hooks` to serve as configstores for automation purposes.<br>Godfinger will still encounter exceptions requiring `config files` & `environment variables` to run without first time error.
+>
+> Ensure your configstore is placed in a parent subdirectory, called `configstore_godfinger/` mirroring pathing for the project.
+>
+> ```
+> configstore_godfinger/
+> ├── godfingerCFG.json
+> └── plugins/
+> :    ├── shared/
+> :    └── myplugin/
+> :        ├── pluginCFG.json
+> :        └── envfile.env
+> :
+> godfinger/
+> └── $(RWD/)
+> ```
+>
