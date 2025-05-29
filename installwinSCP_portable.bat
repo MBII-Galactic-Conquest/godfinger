@@ -11,7 +11,7 @@ setlocal EnableDelayedExpansion
 
 :: ========================================= ::
 
-set /p confirm="Do you wish to install a portable version of WinSCP in your virtual environment? (Y/N): "
+set /p confirm="Do you wish to install a portable version of WinSCP in your virtual environment? (8MB archived, 25MB extracted) (Y/N): "
 if /i "%confirm%" neq "Y" (
     echo Operation cancelled. Portable WinSCP aborted...
     exit /b
@@ -37,7 +37,7 @@ goto :eof
 
 :main_installation_logic
 REM --- Configuration ---
-SET "WINSCP_URL=https://cdn.winscp.net/files/WinSCP-6.5.1-Portable.zip?secure=2iBYjc_nNY82xJh4AZWDgw==,1748513142"
+SET "WINSCP_URL=https://sourceforge.net/projects/winscp/files/WinSCP/6.5.1/WinSCP-6.5.1-Portable.zip/download"
 SET "WINSCP_ZIP_FILENAME=WinSCP-6.5.1-Portable.zip"
 SET "TARGET_DIR=venv\portable_WinSCP"
 SET "SYNC_SCRIPT_NAME=winscp_sync_gamedata.bat"
