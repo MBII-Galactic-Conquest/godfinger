@@ -85,11 +85,11 @@ class gitTrackerPlugin(object):
                 # same as above
                 tuple(["gfupdate", "update"]) : ("!<gfupdate | update> - forcibly run godfinger updates and deployments while restarting", self.HandleUpdate),
                 tuple(["gfrestart", "restart"]) : ("!<gfrestart | restart> - forcibly restart the godfinger script system, without updates", self.HandleRestart),
-                tuple(["hardupdate", "hardupdate"]) : ("<0/1> - when set to 1, determines if the mbiided process is forcibly restarted when forcing updates", self.HandleHardUpdate)
+                tuple(["hardupdate", "hardupdate"]) : ("<0/1> - when set to 1, determines if the mbiided process is forcibly restarted when forcing updates", self.HandleHardUpdate),
+                tuple(["build", "build"]) : ("!<build <git|svn|winscp> [true|false]> - Check or set build status for git, svn, or winscp", self.HandleBuilding)
             }
     
     def HandleUpdate(self, playerName, smodID, adminIP, cmdArgs, cl : client.Client):
-
         NAME = cl.GetName()
 
         self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger update.")
@@ -141,6 +141,72 @@ class gitTrackerPlugin(object):
             self._serverData.interface.SvTell(ID, message)
             Log.warning(f"{playerName} tried to set hardupdate with non-numeric value '{cmdArgs[1]}'.")
             return False
+
+    def HandleBuilding(self, playerName, smodID, adminIP, cmdArgs, cl : client.Client):
+        ID = cl.GetId()
+
+        Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) used build command.")
+
+        if len(cmdArgs) < 2:
+            message = f"{self._messagePrefix}^1Usage: ^5!build ^9<git|svn|winscp> ^2[true|false]"
+            self._serverData.interface.SvTell(ID, message)
+            Log.warning(f"{playerName} used !build without enough arguments.")
+            return False
+
+        component = cmdArgs[1].lower()
+        config_key = None
+
+        if component == "git" or "Git" or "GIT":
+            config_key = "isGFBuilding"
+        elif component == "svn" or "Svn" or "SVN":
+            config_key = "isSVNBuilding"
+        elif component == "winscp" or "WinSCP" or "WINSCP":
+            config_key = "isWinSCPBuilding"
+        else:
+            message = f"{self._messagePrefix}^1Invalid build component: '{component}'. ^7Use ^5git^7, ^5svn^7, or ^5winscp^7."
+            self._serverData.interface.SvTell(ID, message)
+            Log.warning(f"{playerName} tried to set build for an unknown component: '{component}'.")
+            return False
+        
+        current_config = load_config()
+        if not current_config:
+            Log.error(f"Failed to load configuration for !build command.")
+            self._serverData.interface.SvTell(ID, f"{self._messagePrefix}^1Error: Could not load configuration.")
+            return False
+
+        # If a value is provided
+        if len(cmdArgs) >= 3:
+            value_str = cmdArgs[2].lower()
+            new_value = None
+            if value_str == "true" or "True" or "TRUE":
+                new_value = True
+            elif value_str == "false" or "False" or "FALSE":
+                new_value = False
+            else:
+                message = f"{self._messagePrefix}^1Invalid value '{value_str}'. ^7Please use ^5true ^7or ^5false."
+                self._serverData.interface.SvTell(ID, message)
+                Log.warning(f"{playerName} tried to set build status to an invalid value '{value_str}'.")
+                return False
+            
+            # Update the config in memory
+            current_config[config_key] = new_value
+            
+            if write_config(current_config):
+                message = f"{self._messagePrefix}Build status for ^5{component}^7 set to: ^5{new_value}"
+                self._serverData.interface.SvTell(ID, message)
+                Log.info(f"{playerName} set build status for {component} to {new_value}.")
+                return True
+            else:
+                self._serverData.interface.SvTell(ID, f"{self._messagePrefix}^1Error saving configuration.")
+                Log.error(f"{playerName} failed to save config for !build {component} {new_value}.")
+                return False
+        else:
+            # If no value is provided, just tell the current status
+            current_status = current_config.get(config_key, False) # Default to False if key somehow missing
+            message = f"{self._messagePrefix}Build status for ^5{component}^7 is: ^5{current_status}"
+            self._serverData.interface.SvTell(ID, message)
+            Log.info(f"{playerName} checked build status for {component} (current: {current_status}).")
+            return True
 
     def HandleSmodCommand(self, playerName, smodID, adminIP, cmdArgs):
         command = cmdArgs[0]
@@ -224,6 +290,16 @@ def load_config():
         "isSVNBuilding": config.get("isSVNBuilding"),
         "isGFBuilding": config.get("isGFBuilding"),
     }
+
+def write_config(config_data):
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config_data, f, indent=2)
+        Log.info(f"Configuration saved to {CONFIG_FILE}")
+        return True
+    except Exception as e:
+        Log.error(f"Failed to save configuration to {CONFIG_FILE}: {e}")
+        return False
 
 def get_json_file_name(repo_url, branch_name):
     repo_name = repo_url.split('/')[-1]
@@ -551,7 +627,6 @@ def CheckForGITUpdate(isGFBuilding):
         PluginInstance._serverData.API.Restart(timeoutSeconds)
 
 def quickstart_win():
-    Log.info("Running quickstart_win...")
     rwd = get_godfinger_rwd()
     script_path = os.path.join(rwd, "quickstart_win.bat")
     Log.info(f"Attempting to run Windows quickstart script: {script_path}")
