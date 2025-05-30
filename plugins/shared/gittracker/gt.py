@@ -31,6 +31,8 @@ GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
 UPDATE_NEEDED = False
 FALSE_VAR = False
 
+MANUALLY_UPDATED = False
+
 def get_godfinger_rwd():
     return os.path.dirname(os.path.abspath(__file__))
 
@@ -89,21 +91,31 @@ class gitTrackerPlugin(object):
                 tuple(["build", "build"]) : ("!<build <git|svn|winscp> [true|false]> - Check or set build status for git, svn, or winscp", self.HandleBuilding)
             }
     
-    def HandleUpdate(self, playerName, smodID, adminIP, cmdArgs, cl : client.Client):
-        NAME = cl.GetName()
+    def HandleUpdate(self, playerName, smodID, adminIP, cmdArgs):
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
 
-        self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger update.")
-        Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested godfinger update.")
+        if self._hardUpdateSetting == 1:
+            self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a hard restart!")
+            Log.warning(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested a hard restart!!")
+        else:
+            self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger update.")
+            Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested godfinger update.")
 
         ForceUpdate(hard_update_override=self._hardUpdateSetting)
 
         self._serverData.interface.SvSay(self._messagePrefix + "^2Godfinger update process completed.")
         return True
 
-    def HandleRestart(self, playerName, smodID, adminIP, cmdArgs, cl : client.Client):
+    def HandleRestart(self, playerName, smodID, adminIP, cmdArgs):
         timeoutSeconds = 10
 
-        NAME = cl.GetName()
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
 
         self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger restart.")
 
@@ -111,10 +123,14 @@ class gitTrackerPlugin(object):
         self._serverData.API.Restart(timeoutSeconds)
         return True
 
-    def HandleHardUpdate(self, playerName, smodID, adminIP, cmdArgs, cl : client.Client):
+    def HandleHardUpdate(self, playerName, smodID, adminIP, cmdArgs):
         # cmdArgs will be something like ['!hardupdate', '0'] or ['!hardupdate', '1'] or ['!hardupdate']
+        global MANUALLY_UPDATED
 
-        ID = cl.GetId()
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
 
         if len(cmdArgs) < 2:
             message = f"{self._messagePrefix}Current hard update mode: ^5{self._hardUpdateSetting} ^7Usage: ^5!hardupdate <0|1>"
@@ -129,6 +145,12 @@ class gitTrackerPlugin(object):
                 message = f"{self._messagePrefix}Hard update mode set to: ^5{self._hardUpdateSetting}"
                 self._serverData.interface.SvTell(ID, message)
                 Log.info(f"{playerName} set hardupdate mode to {value}.")
+                if value == 1:
+                    MANUALLY_UPDATED = True
+                    return MANUALLY_UPDATED
+                if value == 0:
+                    MANUALLY_UPDATED = False
+                    return MANUALLY_UPDATED
                 return True
             else:
                 # If it's a number but not 0 or 1
@@ -142,13 +164,16 @@ class gitTrackerPlugin(object):
             Log.warning(f"{playerName} tried to set hardupdate with non-numeric value '{cmdArgs[1]}'.")
             return False
 
-    def HandleBuilding(self, playerName, smodID, adminIP, cmdArgs, cl : client.Client):
-        ID = cl.GetId()
+    def HandleBuilding(self, playerName, smodID, adminIP, cmdArgs):
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
 
         Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) used build command.")
 
         if len(cmdArgs) < 2:
-            message = f"{self._messagePrefix}^1Usage: ^5!build ^9<git|svn|winscp> ^2[true|false]"
+            message = f"{self._messagePrefix}^7Usage: ^5!build ^9<git|svn|winscp> ^3[true|false]"
             self._serverData.interface.SvTell(ID, message)
             Log.warning(f"{playerName} used !build without enough arguments.")
             return False
@@ -156,11 +181,11 @@ class gitTrackerPlugin(object):
         component = cmdArgs[1].lower()
         config_key = None
 
-        if component == "git" or "Git" or "GIT":
+        if component == "git":
             config_key = "isGFBuilding"
-        elif component == "svn" or "Svn" or "SVN":
+        elif component == "svn":
             config_key = "isSVNBuilding"
-        elif component == "winscp" or "WinSCP" or "WINSCP":
+        elif component == "winscp":
             config_key = "isWinSCPBuilding"
         else:
             message = f"{self._messagePrefix}^1Invalid build component: '{component}'. ^7Use ^5git^7, ^5svn^7, or ^5winscp^7."
@@ -178,9 +203,9 @@ class gitTrackerPlugin(object):
         if len(cmdArgs) >= 3:
             value_str = cmdArgs[2].lower()
             new_value = None
-            if value_str == "true" or "True" or "TRUE":
+            if value_str == "true":
                 new_value = True
-            elif value_str == "false" or "False" or "FALSE":
+            elif value_str == "false":
                 new_value = False
             else:
                 message = f"{self._messagePrefix}^1Invalid value '{value_str}'. ^7Please use ^5true ^7or ^5false."
@@ -207,6 +232,25 @@ class gitTrackerPlugin(object):
             self._serverData.interface.SvTell(ID, message)
             Log.info(f"{playerName} checked build status for {component} (current: {current_status}).")
             return True
+
+    def fetch_client_info(self, playerName, smodID):
+        connected_clients = None
+        try:
+            connected_clients = self._serverData.API.GetAllClients()
+            Log.debug(f"Successfully retrieved all connected clients.")
+        except AttributeError:
+            Log.error("ServerData.API does not have a GetAllClients() method. "
+                      "Cannot reliably find client by name for SvTell via iteration.")
+            return smodID, playerName
+        except Exception as e:
+            Log.error(f"An unexpected error occurred while trying to get all clients: {e}")
+            return smodID, playerName
+
+        for cl in connected_clients:
+            ID = cl.GetId()
+            NAME = cl.GetName()
+
+        return ID, NAME
 
     def HandleSmodCommand(self, playerName, smodID, adminIP, cmdArgs):
         command = cmdArgs[0]
@@ -553,7 +597,7 @@ def run_script(script_path, simulated_inputs):
         #print(f"Debug: Exception: {e}")
 
 def CheckForGITUpdate(isGFBuilding):
-    global UPDATE_NEEDED
+    global UPDATE_NEEDED, MANUALLY_UPDATED
     timeoutSeconds = 10
 
     if isGFBuilding and UPDATE_NEEDED:
@@ -588,10 +632,13 @@ def CheckForGITUpdate(isGFBuilding):
         
         except Exception as e:
             Log.error(f"Exception occurred while running cleanup script: {e}")
-        
-        # Force Godfinger to restart after update
-        Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
-        PluginInstance._serverData.API.Restart(timeoutSeconds)
+
+        if not MANUALLY_UPDATED:
+            # Force Godfinger to restart after update
+            Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
+            PluginInstance._serverData.API.Restart(timeoutSeconds)
+        else:
+            pass;
 
     elif isGFBuilding and not UPDATE_NEEDED:
         Log.info("isGFBuilding is enabled. Checking automatically for latest deployment HEADs...")
@@ -621,10 +668,13 @@ def CheckForGITUpdate(isGFBuilding):
         
         except Exception as e:
             Log.error(f"Exception occurred while running cleanup script: {e}")
-        
-        # Force Godfinger to restart after update
-        Log.info("Auto-deploy process executed with predefined inputs, restarting in ten seconds...")
-        PluginInstance._serverData.API.Restart(timeoutSeconds)
+
+        if not MANUALLY_UPDATED:
+            # Force Godfinger to restart after update
+            Log.info("Auto-deploy process executed with predefined inputs, restarting in ten seconds...")
+            PluginInstance._serverData.API.Restart(timeoutSeconds)
+        else:
+            pass;
 
 def quickstart_win():
     rwd = get_godfinger_rwd()
@@ -658,82 +708,74 @@ def quickstart_linux_macOS():
         Log.error(f"Failed to launch Linux/macOS quickstart script: {e}")
 
 def ForceUpdate(hard_update_override):
-    global UPDATE_NEEDED
+    global UPDATE_NEEDED, MANUALLY_UPDATED
 
-    # Let's tell it an update is desperately needed
-    UPDATE_NEEDED = True
+    rwd = get_godfinger_rwd()
 
+    # Timeout for API.Restart calls
     timeoutSeconds = 10
+
+    # An update is needed
+    if not UPDATE_NEEDED and MANUALLY_UPDATED:
+        UPDATE_NEEDED = True
+        MANUALLY_UPDATED = True
 
     # Let's access what's stored in config
     _, _, _, svnPostHookFile, winSCPScriptFile, isWinSCPBuilding, isSVNBuilding, isGFBuilding = load_config()
 
+    # Run all update checks
     CheckForSVNUpdate(isSVNBuilding, svnPostHookFile)
     CheckForWinSCPUpdate(isWinSCPBuilding, winSCPScriptFile)
     CheckForGITUpdate(isGFBuilding)
 
+    # An update is no longer needed
+    if UPDATE_NEEDED and MANUALLY_UPDATED:
+        UPDATE_NEEDED = False
+        MANUALLY_UPDATED = False
+
     if hard_update_override == 1:
-        Log.info("hard_update_override is 1. Attempting to close mbiided processes...")
-        process_name = ""
-        if os.name == 'nt' or sys.platform.startswith('win'):
-            process_name = "mbiided.x86.exe"
-            Log.info(f"Detected Windows. Looking for process: {process_name}")
-        elif os.name != 'nt' or not sys.platform.startswith('win'):
-            process_name = "mbiided.i386"
-            Log.info(f"Detected Linux/macOS. Looking for process: {process_name}")
+        if execute_hard_restart(rwd):
+            Log.info("Manual server restart launched. Exiting current Godfinger & MBIIdedicated server process.")
+            sys.exit(0)
         else:
-            Log.error(f"Unsupported operating system: {sys.platform}")
-            try:
-                PluginInstance._serverData.API.Restart(timeoutSeconds)
-            except Exception as e:
-                log.error(f"API Restart failed: {e}. Attempting quickstart...")
-                if os.name == 'nt' or sys.platform.startswith('win'):
-                    quickstart_win()
-                else:
-                    quickstart_linux_macOS()
-
-        if process_name:
-            found_and_closed = False
-            for proc in psutil.process_iter(['pid', 'name']):
-                if proc.info['name'] == process_name:
-                    Log.info(f"Found process {process_name} with PID: {proc.info['pid']}. Attempting to terminate...")
-                    try:
-                        p = psutil.Process(proc.info['pid'])
-                        p.terminate()
-                        p.wait(timeout=5)
-                        if p.is_running():
-                            Log.info(f"Process {process_name} (PID: {proc.info['pid']} did not terminate gracefully.")
-                            p.kill()
-                        Log.info(f"Succesfully closed process {process_name}.")
-                        found_and_closed = True
-                        break
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
-                        Log.error(f"Error terminating process {process_name} (PID: {proc.info['pid']}): {e}")
-                    except Exception as e:
-                        Log.error(f"An unexpected error occured while closing process {process_name}: {e}")
-
-            if not found_and_closed:
-                Log.info(f"Process {process_name} not found, or already closed.")
-
-        try:
-            Log.info("Attempting API Restart after process check...")
-            PluginInstance._serverData.API.Restart(timeoutSeconds)
-        except Exception as e:
-            Log.error(f"API Restart failed: {e}. Attempting quickstart...")
-            if os.name == 'nt' or sys.platform.startswith('win'):
-                quickstart_win()
-            else:
-                quickstart_linux_macOS()
+            Log.error("Manual server restart was not possible.")
+            sys.exit(1)
     else:
-        Log.info("hard_update_override is not 1. Proceeding with normal API restart.")
-        try:
-            PluginInstance._serverData.API.Restart(timeoutSeconds)
-        except Exception as e:
-            Log.error(f"API Restart failed: {e}. This should not happen if hard_update_override is not 1 and no specific process is being closed.")
+        PluginInstance._serverData.API.Restart(timeoutSeconds)
 
-    # An update is no longer needed, though Godfinger should be far restarted by now!
-    UPDATE_NEEDED = False
+    return UPDATE_NEEDED, MANUALLY_UPDATED
 
+def execute_hard_restart(rwd):
+
+    Log.debug("Manual restart attempted...")
+
+    godfinger_dir = os.getcwd()
+    manual_restart_script_path = os.path.abspath(os.path.join(godfinger_dir, 'lib', 'other', '.hardrestart.py'))
+
+    if not os.path.exists(manual_restart_script_path):
+        Log.error(f"Manual restart script not found: {manual_restart_script_path}. Cannot proceed with restart.")
+        return False
+
+    Log.info(f"Invoking manual restart script: {manual_restart_script_path}")
+    
+    try:
+        if os.name == 'nt' or sys.platform.startswith('win'):
+            command_string = f'cmd /c start "" "{PYTHON_CMD}" "{manual_restart_script_path}"'
+            
+            subprocess.Popen(
+                command_string,
+                shell=True,
+                creationflags=subprocess.DETACHED_PROCESS
+            )
+        else:
+            # For Linux/macOS, direct execution is usually sufficient
+            subprocess.Popen([PYTHON_CMD, manual_restart_script_path])
+        
+        Log.info("Manual restart script initiated successfully.")
+        return True
+    except Exception as e:
+        Log.error(f"Failed to invoke manual restart script: {e}")
+        return False
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
