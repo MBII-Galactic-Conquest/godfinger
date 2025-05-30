@@ -98,10 +98,10 @@ class gitTrackerPlugin(object):
             return False
 
         if self._hardUpdateSetting == 1:
-            self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a hard restart!")
+            self._serverData.interface.SvSay(self._messagePrefix + f"^1SMOD has requested a hard restart!!")
             Log.warning(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested a hard restart!!")
         else:
-            self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger update.")
+            self._serverData.interface.SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger update.")
             Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested godfinger update.")
 
         ForceUpdate(hard_update_override=self._hardUpdateSetting)
@@ -117,7 +117,7 @@ class gitTrackerPlugin(object):
             Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
             return False
 
-        self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger restart.")
+        self._serverData.interface.SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger restart.")
 
         Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) force restarted godfinger...")
         self._serverData.API.Restart(timeoutSeconds)
@@ -134,7 +134,7 @@ class gitTrackerPlugin(object):
 
         if len(cmdArgs) < 2:
             message = f"{self._messagePrefix}Current hard update mode: ^5{self._hardUpdateSetting} ^7Usage: ^5!hardupdate <0|1>"
-            self._serverData.interface.SvTell(ID, message)
+            self._serverData.interface.SmSay(message)
             Log.info(f"{playerName} checked hardupdate setting (current: {self._hardUpdateSetting}).")
             return True
 
@@ -143,7 +143,7 @@ class gitTrackerPlugin(object):
             if value == 0 or value == 1:
                 self._hardUpdateSetting = value
                 message = f"{self._messagePrefix}Hard update mode set to: ^5{self._hardUpdateSetting}"
-                self._serverData.interface.SvTell(ID, message)
+                self._serverData.interface.SmSay(message)
                 Log.info(f"{playerName} set hardupdate mode to {value}.")
                 if value == 1:
                     MANUALLY_UPDATED = True
@@ -155,12 +155,12 @@ class gitTrackerPlugin(object):
             else:
                 # If it's a number but not 0 or 1
                 message = f"{self._messagePrefix}^1Invalid value '{value}'. ^7Please use ^50 ^7or ^51."
-                self._serverData.interface.SvTell(ID, message)
+                self._serverData.interface.SmSay(message)
                 Log.warning(f"{playerName} tried to set hardupdate to invalid value {value}.")
                 return False
         except ValueError:
             message = f"{self._messagePrefix}^1Invalid argument '{cmdArgs[1]}'. ^7Please use ^50 ^7or ^51."
-            self._serverData.interface.SvTell(ID, message)
+            self._serverData.interface.SmSay(message)
             Log.warning(f"{playerName} tried to set hardupdate with non-numeric value '{cmdArgs[1]}'.")
             return False
 
@@ -174,7 +174,7 @@ class gitTrackerPlugin(object):
 
         if len(cmdArgs) < 2:
             message = f"{self._messagePrefix}^7Usage: ^5!build ^9<git|svn|winscp> ^3[true|false]"
-            self._serverData.interface.SvTell(ID, message)
+            self._serverData.interface.SmSay(message)
             Log.warning(f"{playerName} used !build without enough arguments.")
             return False
 
@@ -189,14 +189,14 @@ class gitTrackerPlugin(object):
             config_key = "isWinSCPBuilding"
         else:
             message = f"{self._messagePrefix}^1Invalid build component: '{component}'. ^7Use ^5git^7, ^5svn^7, or ^5winscp^7."
-            self._serverData.interface.SvTell(ID, message)
+            self._serverData.interface.SmSay(message)
             Log.warning(f"{playerName} tried to set build for an unknown component: '{component}'.")
             return False
         
         current_config = load_config()
         if not current_config:
             Log.error(f"Failed to load configuration for !build command.")
-            self._serverData.interface.SvTell(ID, f"{self._messagePrefix}^1Error: Could not load configuration.")
+            self._serverData.interface.SmSay(f"{self._messagePrefix}^1Error: Could not load configuration.")
             return False
 
         # If a value is provided
@@ -209,7 +209,7 @@ class gitTrackerPlugin(object):
                 new_value = False
             else:
                 message = f"{self._messagePrefix}^1Invalid value '{value_str}'. ^7Please use ^5true ^7or ^5false."
-                self._serverData.interface.SvTell(ID, message)
+                self._serverData.interface.SmSay(message)
                 Log.warning(f"{playerName} tried to set build status to an invalid value '{value_str}'.")
                 return False
             
@@ -218,18 +218,18 @@ class gitTrackerPlugin(object):
             
             if write_config(current_config):
                 message = f"{self._messagePrefix}Build status for ^5{component}^7 set to: ^5{new_value}"
-                self._serverData.interface.SvTell(ID, message)
+                self._serverData.interface.SmSay(message)
                 Log.info(f"{playerName} set build status for {component} to {new_value}.")
                 return True
             else:
-                self._serverData.interface.SvTell(ID, f"{self._messagePrefix}^1Error saving configuration.")
+                self._serverData.interface.SmSay(f"{self._messagePrefix}^1Error saving configuration.")
                 Log.error(f"{playerName} failed to save config for !build {component} {new_value}.")
                 return False
         else:
             # If no value is provided, just tell the current status
             current_status = current_config.get(config_key, False) # Default to False if key somehow missing
             message = f"{self._messagePrefix}Build status for ^5{component}^7 is: ^5{current_status}"
-            self._serverData.interface.SvTell(ID, message)
+            self._serverData.interface.SmSay(message)
             Log.info(f"{playerName} checked build status for {component} (current: {current_status}).")
             return True
 
