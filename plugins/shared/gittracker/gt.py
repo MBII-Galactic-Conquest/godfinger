@@ -88,7 +88,7 @@ class gitTrackerPlugin(object):
                 tuple(["gfupdate", "update"]) : ("!<gfupdate | update> - forcibly run godfinger updates and deployments while restarting", self.HandleUpdate),
                 tuple(["gfrestart", "restart"]) : ("!<gfrestart | restart> - forcibly restart the godfinger script system, without updates", self.HandleRestart),
                 tuple(["hardupdate", "hardupdate"]) : ("<0/1> - when set to 1, determines if the mbiided process is forcibly restarted when forcing updates", self.HandleHardUpdate),
-                tuple(["build", "build"]) : ("!<build <git|svn|winscp> [true|false]> - Check or set build status for git, svn, or winscp", self.HandleBuilding)
+                tuple(["build", "build"]) : ("!<build <git|svn|winscp> [true|false]> - check or set build status for git, svn, or winscp", self.HandleBuilding)
             }
     
     def HandleUpdate(self, playerName, smodID, adminIP, cmdArgs):
@@ -98,15 +98,18 @@ class gitTrackerPlugin(object):
             return False
 
         if self._hardUpdateSetting == 1:
+            self._serverData.interface.SvSound("sound/sup/bloop.mp3")
             self._serverData.interface.SvSay(self._messagePrefix + f"^1SMOD has requested a hard restart!!")
             Log.warning(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested a hard restart!!")
         else:
+            self._serverData.interface.SvSound("sound/sup/bloop.mp3")
             self._serverData.interface.SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger update.")
             Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested godfinger update.")
 
-        ForceUpdate(hard_update_override=self._hardUpdateSetting)
+        ForceUpdate(self, hard_update_override=self._hardUpdateSetting)
 
         self._serverData.interface.SvSay(self._messagePrefix + "^2Godfinger update process completed.")
+        self._serverData.interface.SvSound("sound/sup/message.mp3")
         return True
 
     def HandleRestart(self, playerName, smodID, adminIP, cmdArgs):
@@ -117,6 +120,7 @@ class gitTrackerPlugin(object):
             Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
             return False
 
+        self._serverData.interface.SvSound("sound/sup/bloop.mp3")
         self._serverData.interface.SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger restart.")
 
         Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) force restarted godfinger...")
@@ -676,38 +680,7 @@ def CheckForGITUpdate(isGFBuilding):
         else:
             pass;
 
-def quickstart_win():
-    rwd = get_godfinger_rwd()
-    script_path = os.path.join(rwd, "quickstart_win.bat")
-    Log.info(f"Attempting to run Windows quickstart script: {script_path}")
-
-    if not os.path.exists(script_path):
-        Log.error(f"Windows quickstart script not found at: {script_path}")
-        return
-
-    try:
-        subprocess.Popen([script_path], shell=True)
-        Log.info("Windows quickstart script launched successfully.")
-    except Exception as e:
-        Log.error(f"Failed to launch Windows quickstart script: {e}")
-
-def quickstart_linux_macOS():
-    rwd = get_godfinger_rwd()
-    script_path = os.path.join(rwd, "quickstart_linux_macOS.sh")
-    Log.info(f"Attempting to run Linux/macOS quickstart script: {script_path}")
-
-    if not os.path.exists(script_path):
-        Log.error(f"Linux/macOS quickstart script not found at: {script_path}")
-        return
-
-    try:
-        os.chmod(script_path, 0o755)
-        subprocess.Popen([script_path], shell=True)
-        Log.info("Linux/macOS quickstart script launched successfully.")
-    except Exception as e:
-        Log.error(f"Failed to launch Linux/macOS quickstart script: {e}")
-
-def ForceUpdate(hard_update_override):
+def ForceUpdate(self, hard_update_override):
     global UPDATE_NEEDED, MANUALLY_UPDATED
 
     rwd = get_godfinger_rwd()
@@ -716,7 +689,7 @@ def ForceUpdate(hard_update_override):
     timeoutSeconds = 10
 
     # An update is needed
-    if not UPDATE_NEEDED and MANUALLY_UPDATED:
+    if not UPDATE_NEEDED or not MANUALLY_UPDATED:
         UPDATE_NEEDED = True
         MANUALLY_UPDATED = True
 
@@ -729,19 +702,21 @@ def ForceUpdate(hard_update_override):
     CheckForGITUpdate(isGFBuilding)
 
     # An update is no longer needed
-    if UPDATE_NEEDED and MANUALLY_UPDATED:
+    if UPDATE_NEEDED or MANUALLY_UPDATED:
         UPDATE_NEEDED = False
         MANUALLY_UPDATED = False
 
     if hard_update_override == 1:
         if execute_hard_restart(rwd):
             Log.info("Manual server restart launched. Exiting current Godfinger & MBIIdedicated server process.")
+            self._hardUpdateSetting = 0
             sys.exit(0)
         else:
             Log.error("Manual server restart was not possible.")
             sys.exit(1)
     else:
         PluginInstance._serverData.API.Restart(timeoutSeconds)
+        time.sleep(1)
 
     return UPDATE_NEEDED, MANUALLY_UPDATED
 
