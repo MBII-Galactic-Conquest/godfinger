@@ -3,12 +3,15 @@ import godfingerEvent;
 import pluginExports;
 import lib.shared.serverdata as serverdata
 import lib.shared.colors as colors
+import lib.shared.teams as teams
+import lib.shared.client as client
 import subprocess
 import json
 import sys
 import os
 import time
 import shutil
+import psutil
 import requests
 import threading
 import platform
@@ -27,6 +30,11 @@ GITHUB_API_URL = "https://api.github.com/repos/{}/commits?sha={}"
 
 UPDATE_NEEDED = False
 FALSE_VAR = False
+
+MANUALLY_UPDATED = False
+
+def get_godfinger_rwd():
+    return os.path.dirname(os.path.abspath(__file__))
 
 if os.name == 'nt':  # Windows
     GIT_PATH = shutil.which("git")
@@ -59,6 +67,206 @@ class gitTrackerPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[GT]", "lblue") + ": "
+        self._hardUpdateSetting = 0
+        self._commandList = \
+            {
+                # commands and aliases must be tuples because lists are unhashable apparently
+                # index 0 : tuple of aliases for each command
+                # index 1: tuple of help string and handler function
+                teams.TEAM_GLOBAL : {
+                },
+                teams.TEAM_EVIL : {
+                },
+                teams.TEAM_GOOD : {
+                },
+                teams.TEAM_SPEC : {
+                }
+            }
+        self._smodCommandList = \
+            {
+                # same as above
+                tuple(["gfupdate", "update"]) : ("!<gfupdate | update> - forcibly run godfinger updates and deployments while restarting", self.HandleUpdate),
+                tuple(["gfrestart", "restart"]) : ("!<gfrestart | restart> - forcibly restart the godfinger script system, without updates", self.HandleRestart),
+                tuple(["hardupdate", "hardupdate"]) : ("<0/1> - when set to 1, determines if the mbiided process is forcibly restarted when forcing updates", self.HandleHardUpdate),
+                tuple(["build", "build"]) : ("!<build <git|svn|winscp> [true|false]> - Check or set build status for git, svn, or winscp", self.HandleBuilding)
+            }
+    
+    def HandleUpdate(self, playerName, smodID, adminIP, cmdArgs):
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
+
+        if self._hardUpdateSetting == 1:
+            self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a hard restart!")
+            Log.warning(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested a hard restart!!")
+        else:
+            self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger update.")
+            Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested godfinger update.")
+
+        ForceUpdate(hard_update_override=self._hardUpdateSetting)
+
+        self._serverData.interface.SvSay(self._messagePrefix + "^2Godfinger update process completed.")
+        return True
+
+    def HandleRestart(self, playerName, smodID, adminIP, cmdArgs):
+        timeoutSeconds = 10
+
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
+
+        self._serverData.interface.SvSay(self._messagePrefix + f"{NAME} has requested a godfinger restart.")
+
+        Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) force restarted godfinger...")
+        self._serverData.API.Restart(timeoutSeconds)
+        return True
+
+    def HandleHardUpdate(self, playerName, smodID, adminIP, cmdArgs):
+        # cmdArgs will be something like ['!hardupdate', '0'] or ['!hardupdate', '1'] or ['!hardupdate']
+        global MANUALLY_UPDATED
+
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
+
+        if len(cmdArgs) < 2:
+            message = f"{self._messagePrefix}Current hard update mode: ^5{self._hardUpdateSetting} ^7Usage: ^5!hardupdate <0|1>"
+            self._serverData.interface.SvTell(ID, message)
+            Log.info(f"{playerName} checked hardupdate setting (current: {self._hardUpdateSetting}).")
+            return True
+
+        try:
+            value = int(cmdArgs[1])
+            if value == 0 or value == 1:
+                self._hardUpdateSetting = value
+                message = f"{self._messagePrefix}Hard update mode set to: ^5{self._hardUpdateSetting}"
+                self._serverData.interface.SvTell(ID, message)
+                Log.info(f"{playerName} set hardupdate mode to {value}.")
+                if value == 1:
+                    MANUALLY_UPDATED = True
+                    return MANUALLY_UPDATED
+                if value == 0:
+                    MANUALLY_UPDATED = False
+                    return MANUALLY_UPDATED
+                return True
+            else:
+                # If it's a number but not 0 or 1
+                message = f"{self._messagePrefix}^1Invalid value '{value}'. ^7Please use ^50 ^7or ^51."
+                self._serverData.interface.SvTell(ID, message)
+                Log.warning(f"{playerName} tried to set hardupdate to invalid value {value}.")
+                return False
+        except ValueError:
+            message = f"{self._messagePrefix}^1Invalid argument '{cmdArgs[1]}'. ^7Please use ^50 ^7or ^51."
+            self._serverData.interface.SvTell(ID, message)
+            Log.warning(f"{playerName} tried to set hardupdate with non-numeric value '{cmdArgs[1]}'.")
+            return False
+
+    def HandleBuilding(self, playerName, smodID, adminIP, cmdArgs):
+        ID, NAME = self.fetch_client_info(playerName, smodID)
+        if ID is None: 
+            Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
+            return False
+
+        Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) used build command.")
+
+        if len(cmdArgs) < 2:
+            message = f"{self._messagePrefix}^7Usage: ^5!build ^9<git|svn|winscp> ^3[true|false]"
+            self._serverData.interface.SvTell(ID, message)
+            Log.warning(f"{playerName} used !build without enough arguments.")
+            return False
+
+        component = cmdArgs[1].lower()
+        config_key = None
+
+        if component == "git":
+            config_key = "isGFBuilding"
+        elif component == "svn":
+            config_key = "isSVNBuilding"
+        elif component == "winscp":
+            config_key = "isWinSCPBuilding"
+        else:
+            message = f"{self._messagePrefix}^1Invalid build component: '{component}'. ^7Use ^5git^7, ^5svn^7, or ^5winscp^7."
+            self._serverData.interface.SvTell(ID, message)
+            Log.warning(f"{playerName} tried to set build for an unknown component: '{component}'.")
+            return False
+        
+        current_config = load_config()
+        if not current_config:
+            Log.error(f"Failed to load configuration for !build command.")
+            self._serverData.interface.SvTell(ID, f"{self._messagePrefix}^1Error: Could not load configuration.")
+            return False
+
+        # If a value is provided
+        if len(cmdArgs) >= 3:
+            value_str = cmdArgs[2].lower()
+            new_value = None
+            if value_str == "true":
+                new_value = True
+            elif value_str == "false":
+                new_value = False
+            else:
+                message = f"{self._messagePrefix}^1Invalid value '{value_str}'. ^7Please use ^5true ^7or ^5false."
+                self._serverData.interface.SvTell(ID, message)
+                Log.warning(f"{playerName} tried to set build status to an invalid value '{value_str}'.")
+                return False
+            
+            # Update the config in memory
+            current_config[config_key] = new_value
+            
+            if write_config(current_config):
+                message = f"{self._messagePrefix}Build status for ^5{component}^7 set to: ^5{new_value}"
+                self._serverData.interface.SvTell(ID, message)
+                Log.info(f"{playerName} set build status for {component} to {new_value}.")
+                return True
+            else:
+                self._serverData.interface.SvTell(ID, f"{self._messagePrefix}^1Error saving configuration.")
+                Log.error(f"{playerName} failed to save config for !build {component} {new_value}.")
+                return False
+        else:
+            # If no value is provided, just tell the current status
+            current_status = current_config.get(config_key, False) # Default to False if key somehow missing
+            message = f"{self._messagePrefix}Build status for ^5{component}^7 is: ^5{current_status}"
+            self._serverData.interface.SvTell(ID, message)
+            Log.info(f"{playerName} checked build status for {component} (current: {current_status}).")
+            return True
+
+    def fetch_client_info(self, playerName, smodID):
+        connected_clients = None
+        try:
+            connected_clients = self._serverData.API.GetAllClients()
+            Log.debug(f"Successfully retrieved all connected clients.")
+        except AttributeError:
+            Log.error("ServerData.API does not have a GetAllClients() method. "
+                      "Cannot reliably find client by name for SvTell via iteration.")
+            return smodID, playerName
+        except Exception as e:
+            Log.error(f"An unexpected error occurred while trying to get all clients: {e}")
+            return smodID, playerName
+
+        for cl in connected_clients:
+            ID = cl.GetId()
+            NAME = cl.GetName()
+
+        return ID, NAME
+
+    def HandleSmodCommand(self, playerName, smodID, adminIP, cmdArgs):
+        command = cmdArgs[0]
+        if command.startswith("!"):
+            # TODO: Make this an actual config option
+            if command.startswith("!"):
+                command = command[len("!"):]
+        for c in self._smodCommandList:
+            if command in c:
+                return self._smodCommandList[c][1](playerName, smodID, adminIP, cmdArgs)
+        return False
+
+    def OnSmsay(self, playerName, smodID, adminIP, message):
+        message = message.lower()
+        messageParse = message.split()
+        return self.HandleSmodCommand(playerName, smodID, adminIP, messageParse)
 
 def check_git_installed():
     global GIT_EXECUTABLE
@@ -92,6 +300,8 @@ def create_config_placeholder():
             "refresh_interval": 60,
             "gfBuildBranch": PLACEHOLDER_BRANCH,
             "svnPostHookFile": PLACEHOLDER_PATH,
+            "winSCPScriptFile": PLACEHOLDER_PATH,
+            "isWinSCPBuilding": FALSE_VAR,
             "isSVNBuilding": FALSE_VAR,
             "isGFBuilding": FALSE_VAR
         }
@@ -119,9 +329,21 @@ def load_config():
         "refresh_interval": config.get("refresh_interval"),
         "gfBuildBranch": config.get("gfBuildBranch"),
         "svnPostHookFile": config.get("svnPostHookFile"),
+        "winSCPScriptFile": config.get("winSCPScriptFile"),
+        "isWinSCPBuilding": config.get("isWinSCPBuilding"),
         "isSVNBuilding": config.get("isSVNBuilding"),
         "isGFBuilding": config.get("isGFBuilding"),
     }
+
+def write_config(config_data):
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config_data, f, indent=2)
+        Log.info(f"Configuration saved to {CONFIG_FILE}")
+        return True
+    except Exception as e:
+        Log.error(f"Failed to save configuration to {CONFIG_FILE}: {e}")
+        return False
 
 def get_json_file_name(repo_url, branch_name):
     repo_name = repo_url.split('/')[-1]
@@ -278,17 +500,20 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
 # Excellent for json configstores, private codebases, and other implements #
 
     script_path = os.path.abspath(os.path.join(os.getcwd(), svnPostHookFile)) if svnPostHookFile else None
-    
+
+    if svnPostHookFile == PLACEHOLDER_PATH:
+        return;
+
     if isSVNBuilding:
         if not os.path.exists(script_path):
             if svnPostHookFile == PLACEHOLDER:
                 return
-            Log.error(f"SVN Post Hook file not found.")
+            Log.info(f"SVN Post Hook file not found.")
             return
         if svnPostHookFile == PLACEHOLDER:
             return
         try:
-            if script_path.endswith('.bat') and os.name == 'nt':  # Windows
+            if script_path.endswith('.bat', '.script', '.cmd') and os.name == 'nt':  # Windows
                 subprocess.run(script_path, shell=True, check=True, input="")
             elif script_path.endswith('.sh') and os.name != 'nt':  # Linux/macOS
                 subprocess.run(["bash", script_path], check=True, input="")
@@ -297,6 +522,39 @@ def CheckForSVNUpdate(isSVNBuilding, svnPostHookFile):
             Log.info(f"Successfully executed SVN Update: {script_path}")
         except subprocess.CalledProcessError as e:
             Log.error(f"Error executing SVN Update: {e}")
+    else:
+        pass;
+
+def CheckForWinSCPUpdate(isWinSCPBuilding, winSCPScriptFile):
+    global UPDATE_NEEDED
+
+# Used to check for WinSCP FTP updates as well, using script hooks #
+# Excellent for syncing your server with the gamedata/ REMOTE #
+
+    script_path = os.path.abspath(os.path.join(os.getcwd(), winSCPScriptFile)) if winSCPScriptFile else None
+
+    if os.name != 'nt': # Windows
+        return;
+
+    if winSCPScriptFile == PLACEHOLDER_PATH:
+        return;
+
+    if isWinSCPBuilding:
+        if not os.path.exists(script_path):
+            if isWinSCPBuilding == PLACEHOLDER:
+                return
+            Log.info(f"WinSCP script file not found.")
+            return
+        if isWinSCPBuilding == PLACEHOLDER:
+            return
+        try:
+            if script_path.endswith('.bat', '.script', '.cmd') and os.name == 'nt':  # Windows
+                subprocess.run(script_path, shell=True, check=True, input="")
+            else:
+                Log.error("Unsupported script type or OS")
+            Log.info(f"Successfully executed WinSCP Update: {script_path}")
+        except subprocess.CalledProcessError as e:
+            Log.error(f"Error executing WinSCP Update: {e}")
     else:
         pass;
 
@@ -339,7 +597,7 @@ def run_script(script_path, simulated_inputs):
         #print(f"Debug: Exception: {e}")
 
 def CheckForGITUpdate(isGFBuilding):
-    global UPDATE_NEEDED
+    global UPDATE_NEEDED, MANUALLY_UPDATED
     timeoutSeconds = 10
 
     if isGFBuilding and UPDATE_NEEDED:
@@ -374,10 +632,13 @@ def CheckForGITUpdate(isGFBuilding):
         
         except Exception as e:
             Log.error(f"Exception occurred while running cleanup script: {e}")
-        
-        # Force Godfinger to restart after update
-        Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
-        PluginInstance._serverData.API.Restart(timeoutSeconds)
+
+        if not MANUALLY_UPDATED:
+            # Force Godfinger to restart after update
+            Log.info("Auto-update process executed with predefined inputs. Restarting godfinger in ten seconds...")
+            PluginInstance._serverData.API.Restart(timeoutSeconds)
+        else:
+            pass;
 
     elif isGFBuilding and not UPDATE_NEEDED:
         Log.info("isGFBuilding is enabled. Checking automatically for latest deployment HEADs...")
@@ -407,10 +668,114 @@ def CheckForGITUpdate(isGFBuilding):
         
         except Exception as e:
             Log.error(f"Exception occurred while running cleanup script: {e}")
-        
-        # Force Godfinger to restart after update
-        Log.info("Auto-deploy process executed with predefined inputs, restarting in ten seconds...")
+
+        if not MANUALLY_UPDATED:
+            # Force Godfinger to restart after update
+            Log.info("Auto-deploy process executed with predefined inputs, restarting in ten seconds...")
+            PluginInstance._serverData.API.Restart(timeoutSeconds)
+        else:
+            pass;
+
+def quickstart_win():
+    rwd = get_godfinger_rwd()
+    script_path = os.path.join(rwd, "quickstart_win.bat")
+    Log.info(f"Attempting to run Windows quickstart script: {script_path}")
+
+    if not os.path.exists(script_path):
+        Log.error(f"Windows quickstart script not found at: {script_path}")
+        return
+
+    try:
+        subprocess.Popen([script_path], shell=True)
+        Log.info("Windows quickstart script launched successfully.")
+    except Exception as e:
+        Log.error(f"Failed to launch Windows quickstart script: {e}")
+
+def quickstart_linux_macOS():
+    rwd = get_godfinger_rwd()
+    script_path = os.path.join(rwd, "quickstart_linux_macOS.sh")
+    Log.info(f"Attempting to run Linux/macOS quickstart script: {script_path}")
+
+    if not os.path.exists(script_path):
+        Log.error(f"Linux/macOS quickstart script not found at: {script_path}")
+        return
+
+    try:
+        os.chmod(script_path, 0o755)
+        subprocess.Popen([script_path], shell=True)
+        Log.info("Linux/macOS quickstart script launched successfully.")
+    except Exception as e:
+        Log.error(f"Failed to launch Linux/macOS quickstart script: {e}")
+
+def ForceUpdate(hard_update_override):
+    global UPDATE_NEEDED, MANUALLY_UPDATED
+
+    rwd = get_godfinger_rwd()
+
+    # Timeout for API.Restart calls
+    timeoutSeconds = 10
+
+    # An update is needed
+    if not UPDATE_NEEDED and MANUALLY_UPDATED:
+        UPDATE_NEEDED = True
+        MANUALLY_UPDATED = True
+
+    # Let's access what's stored in config
+    _, _, _, svnPostHookFile, winSCPScriptFile, isWinSCPBuilding, isSVNBuilding, isGFBuilding = load_config()
+
+    # Run all update checks
+    CheckForSVNUpdate(isSVNBuilding, svnPostHookFile)
+    CheckForWinSCPUpdate(isWinSCPBuilding, winSCPScriptFile)
+    CheckForGITUpdate(isGFBuilding)
+
+    # An update is no longer needed
+    if UPDATE_NEEDED and MANUALLY_UPDATED:
+        UPDATE_NEEDED = False
+        MANUALLY_UPDATED = False
+
+    if hard_update_override == 1:
+        if execute_hard_restart(rwd):
+            Log.info("Manual server restart launched. Exiting current Godfinger & MBIIdedicated server process.")
+            sys.exit(0)
+        else:
+            Log.error("Manual server restart was not possible.")
+            sys.exit(1)
+    else:
         PluginInstance._serverData.API.Restart(timeoutSeconds)
+
+    return UPDATE_NEEDED, MANUALLY_UPDATED
+
+def execute_hard_restart(rwd):
+
+    Log.debug("Manual restart attempted...")
+
+    godfinger_dir = os.getcwd()
+    manual_restart_script_path = os.path.abspath(os.path.join(godfinger_dir, 'lib', 'other', '.hardrestart.py'))
+
+    if not os.path.exists(manual_restart_script_path):
+        Log.error(f"Manual restart script not found: {manual_restart_script_path}. Cannot proceed with restart.")
+        return False
+
+    Log.info(f"Invoking manual restart script: {manual_restart_script_path}")
+    
+    try:
+        if os.name == 'nt' or sys.platform.startswith('win'):
+            command_string = f'cmd /c start "" "{PYTHON_CMD}" "{manual_restart_script_path}"'
+            
+            subprocess.Popen(
+                command_string,
+                shell=True,
+                creationflags=subprocess.DETACHED_PROCESS
+            )
+        else:
+            # For Linux/macOS, direct execution is usually sufficient
+            subprocess.Popen([PYTHON_CMD, manual_restart_script_path])
+        
+        Log.info("Manual restart script initiated successfully.")
+        return True
+    except Exception as e:
+        Log.error(f"Failed to invoke manual restart script: {e}")
+        return False
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
@@ -433,6 +798,26 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
         pass;
     global PluginInstance;
     PluginInstance = gitTrackerPlugin(serverData)
+
+    newVal = []
+    rCommands = SERVER_DATA.GetServerVar("registeredCommands")
+    if rCommands != None:
+        newVal.extend(rCommands)
+    for cmd in PluginInstance._commandList[teams.TEAM_GLOBAL]:
+        for alias in cmd:
+            if not alias.isdecimal():
+                newVal.append((alias, PluginInstance._commandList[teams.TEAM_GLOBAL][cmd][0]))
+    SERVER_DATA.SetServerVar("registeredCommands", newVal)
+
+    newVal = []
+    rCommands = SERVER_DATA.GetServerVar("registeredSmodCommands")
+    if rCommands != None:
+        newVal.extend(rCommands)
+    for cmd in PluginInstance._smodCommandList:
+        for alias in cmd:
+            if not alias.isdecimal():
+                newVal.append((alias, PluginInstance._smodCommandList[cmd][0]))
+    SERVER_DATA.SetServerVar("registeredSmodCommands", newVal)
 
     return True; # indicate plugin load success
 
@@ -469,8 +854,9 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
-        _, _, _, svnPostHookFile, isSVNBuilding, isGFBuilding = load_config()
+        _, _, _, svnPostHookFile, winSCPScriptFile, isWinSCPBuilding, isSVNBuilding, isGFBuilding = load_config()
         CheckForSVNUpdate(isSVNBuilding, svnPostHookFile)
+        CheckForWinSCPUpdate(isWinSCPBuilding, winSCPScriptFile)
         CheckForGITUpdate(isGFBuilding)
         UPDATE_NEEDED = False
         return UPDATE_NEEDED, False;
@@ -487,7 +873,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
-        return False;
+        return PluginInstance.OnSmsay(event.playerName, event.smodID, event.adminIP, event.message);
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT:
