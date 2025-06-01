@@ -192,6 +192,33 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 </br>
 
 > [!IMPORTANT]
+> ### **Using WinSCP Script Hooks**
+>
+> The godfinger system supports portable WinSCP script hook installation.
+> 
+> > You may sync your `gamedata/` directory on the `local` by pulling latest from the `REMOTE.`</br>Ensuring your latest .PK3 asset changes are synced to your game servers via `FTP.`</br></br>Running `installwinSCP_portable.bat` will install and generate a template `winscp_sync_gamedata.bat` file inside of your virtual environment, in `/venv/portable_winSCP.`
+>
+> You will have to modify the generated `winscp_sync_gamedata.bat` with the following:
+>
+> ```
+>
+> $ = your partition (e.g: D drive)
+>
+> SET "FTP_HOST=your_ftp_host.com"
+> SET "FTP_USER=your_ftp_username"
+> SET "FTP_PASS=your_ftp_password"
+> SET "REMOTE_FTP_PATH=/path/on/ftp/server/to/files" # Usually, $:/FTP/ being $:/FTP/Gamedata
+> # Do not touch local target path.
+>
+> ```
+>
+> **Using the [gittracker](https://github.com/MBII-Galactic-Conquest/godfinger/tree/main/plugins/shared/gittracker) plugin, read documentation, and set `isWinSCPBuilding` to `true`**
+
+</br>
+
+</br>
+
+> [!IMPORTANT]
 > ### **Utilizing Docker Containers**
 >
 > > Ensure you have [docker](https://docs.docker.com/get-started/get-docker/) installed before continuing</br>
