@@ -1,3 +1,4 @@
+from enum import Enum, auto
 import json
 import logging
 import os
@@ -158,16 +159,30 @@ if DEFAULT_CFG == None:
 
 Log = logging.getLogger(__name__);
 
+class MapPriorityType(Enum):
+    MAPTYPE_PRIMARY =  auto()
+    MAPTYPE_SECONDARY = auto()
+    MAPTYPE_NOCHANGE = auto()
+    MAPTYPE_AUTO = auto()
+
 class Map(object):
     def __init__(self, mapName, mapPath):
         self._mapName = mapName
         self._mapPath = mapPath
+        self._priority = MapPriorityType.MAPTYPE_AUTO
 
     def GetMapName(self) -> str:
         return self._mapName
     
     def GetMapPath(self) -> str:
         return self._mapPath
+
+    def GetPriority(self) -> int:
+        return self._priority
+
+    def SetPriority(self, val):
+        if val in [MapPriorityType.MAPTYPE_NOCHANGE, MapPriorityType.MAPTYPE_PRIMARY, MapPriorityType.MAPTYPE_SECONDARY, MapPriorityType.MAPTYPE_AUTO]:
+            self._priority = val
         
     def __str__(self):
         return "Map: " + self._mapName
@@ -179,13 +194,26 @@ class MapContainer(object):
     def __init__(self, mapArray : list[Map], pluginInstance):
         self._mapCount = 0
         self._mapDict = {}
-        mapBanList = pluginInstance._config.cfg["rtv"]["mapBanList"]
-        for m in mapArray:
-            self._mapDict[m.GetMapName()] = m
+        primaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["primaryMaps"]]
+        secondaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["secondaryMaps"]]
+        mapBanList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["mapBanList"]]
+        useSecondaryMaps = pluginInstance._config.cfg["rtv"]["useSecondaryMaps"]
+        automaticMaps = pluginInstance._config.cfg["rtv"]["automaticMaps"]
+        if automaticMaps:
+            for m in mapArray:
+                m.SetPriority(MapPriorityType.MAPTYPE_AUTO)
+                self._mapDict[m.GetMapName()] = m
+        else:
+            for m in mapArray:
+                if m.GetMapName().lower() in primaryMapList:
+                    m.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)
+                    self._mapDict[m.GetMapName()] = m
+                elif m.GetMapName().lower() in secondaryMapList and useSecondaryMaps > 0:
+                    m.SetPriority(MapPriorityType.MAPTYPE_SECONDARY)
+                    self._mapDict[m.GetMapName()] = m
         for m in list(self._mapDict.keys()):
             mLower = m.lower()
-            if (mLower in mapBanList and pluginInstance._config.cfg["rtv"]["mapBanListWhitelist"] == False) \
-            or (mLower not in mapBanList and pluginInstance._config.cfg["rtv"]["mapBanListWhitelist"] == True):
+            if (mLower in mapBanList):
                 del self._mapDict[m]
         self._mapCount = len(self._mapDict.keys())
     
@@ -196,6 +224,8 @@ class MapContainer(object):
         return self._mapCount
 
     def GetRandomMaps(self, num, blacklist=None) -> list[Map]:
+        if blacklist != None:
+            blacklist = [x.lower() for x in blacklist]
         if num > self._mapCount:
             l = sample(list(self._mapDict.values()), k=self._mapCount)
             while len([x for x in l if x.GetMapName().lower() in blacklist]) > 0:
@@ -204,7 +234,7 @@ class MapContainer(object):
             l = []
         else:
             l = sample(list(self._mapDict.values()), k=num)
-            while len([x for x in l if x in blacklist]) > 0:
+            while len([x for x in l if x.GetMapName().lower() in blacklist]) > 0:
                 l = sample(list(self._mapDict.values()), k=num)
         return l
 
@@ -353,9 +383,8 @@ class RTV(object):
         voteType = "rtm" if type(self._currentVote) == RTMVote else "rtv"
         if votesInProgress == None:
             self._serverData.SetServerVar("votesInProgress", [])
-        else:
-            if "RTV" in votesInProgress:
-                votesInProgress.remove("RTV")
+        elif "RTV" in votesInProgress:
+            votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
         # Check for vote percentage threshold if applicable
         if self._config.cfg[voteType]["minimumVotePercent"]["enabled"] and (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < self._config.cfg[voteType]["minimumVotePercent"]["percent"]:
@@ -367,6 +396,15 @@ class RTV(object):
                 self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
             return None
         winners = self._currentVote.GetWinners()
+        if voteType == "rtv" and not self._config.cfg["rtv"]["automaticMaps"] and self._config.cfg["rtv"]["mapTypePriority"]["enabled"]:
+            # Attempt to resolve through priority
+            priorityMap = {
+                MapPriorityType.MAPTYPE_NOCHANGE : self._config.cfg["rtv"]["mapTypePriority"]["nochange"],
+                MapPriorityType.MAPTYPE_PRIMARY : self._config.cfg["rtv"]["mapTypePriority"]["primary"],
+                MapPriorityType.MAPTYPE_SECONDARY : self._config.cfg["rtv"]["mapTypePriority"]["secondary"],
+            }
+            maxPrio = max(winners, key=lambda a : priorityMap[a.GetPriority()]).GetPriority()
+            winners = [winner for winner in winners if priorityMap[winner.GetPriority()] == priorityMap[maxPrio]]
         if len(winners) == 1:
             winner = winners[0]
             if winner.GetMapName() != "Don't Change":
@@ -409,6 +447,7 @@ class RTV(object):
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
             else:
                 self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
+            self._currentVote = None
 
     def _SwitchRTM(self, winner : Map, doSleep=True):
         self._rtmToSwitch = None
@@ -463,14 +502,19 @@ class RTV(object):
         voteChoices = []
         print("RTV start")
         if choices == None:
+            blacklist = [x[0] for x in self._rtvRecentMaps]
+            if self._config.cfg["rtv"]["useSecondaryMaps"] < 2:
+                blacklist.extend([x.GetMapName() for x in self._mapContainer.GetAllMaps() if x.GetPriority() == MapPriorityType.MAPTYPE_SECONDARY])
             for nom in self._nominations:
                 voteChoices.append(nom.GetMap())
-            choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=[x[0] for x in self._rtvRecentMaps])
+            choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=blacklist)
             while (self._mapName in [x.GetMapName() for x in choices] and self._config.cfg["rtv"]["allowNominateCurrentMap"] == True) or ((True in [x.GetMap() in choices for x in self._nominations]) and (not len(choices) <= self._mapContainer.GetMapCount())):
-                choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations))
+                choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=blacklist)
             self._nominations.clear()
             voteChoices.extend([x for x in choices])
-            voteChoices.append(Map("Don't Change", "N/A"))
+            noChangeMap = Map("Don't Change", "N/A")
+            noChangeMap.SetPriority(MapPriorityType.MAPTYPE_NOCHANGE)
+            voteChoices.append(noChangeMap)
         else:
             voteChoices = choices
         newVote = RTVVote(voteChoices)
@@ -487,7 +531,9 @@ class RTV(object):
         if choices == None:
             choices = self._config.cfg["rtm"]["modes_enabled"]
             voteChoices.extend([Map(x, "RTM") for x in choices])
-            voteChoices.append(Map("Don't Change", "RTM"))
+            noChangeMap = Map("Don't Change", "RTM")
+            noChangeMap.SetPriority(MapPriorityType.MAPTYPE_NOCHANGE)
+            voteChoices.append(noChangeMap)
         else:
             voteChoices = choices
         newVote = RTMVote(voteChoices)
@@ -873,9 +919,9 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
 def API_StartRTVVote():
     Log.debug("Received external RTV vote request")
     global PluginInstance
-    currentVote = PluginInstance._voteContext.GetCurrentVote()
+    # currentVote = PluginInstance._voteContext.GetCurrentVote()
     votesInProgress = PluginInstance._serverData.GetServerVar("votesInProgress")
-    if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+    if not PluginInstance._currentVote and (votesInProgress == None or len(votesInProgress) == 0):
         if PluginInstance._serverData.GetServerVar("campaignMode") == True:
             PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
             return False
