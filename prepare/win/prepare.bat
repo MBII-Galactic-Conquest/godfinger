@@ -13,6 +13,14 @@ call ../../venv/Scripts/activate.bat
 echo Using python at :
 where python
 
+:: Check for latest pip
+python -m pip install --upgrade pip
+if %errorlevel% neq 0 (
+    echo Error checking for pip update. Press Enter to exit.
+    pause
+    exit /b
+)
+
 :: Install dependencies
 echo Installing dependencies...
 python -m pip install -U -r requirements.txt
