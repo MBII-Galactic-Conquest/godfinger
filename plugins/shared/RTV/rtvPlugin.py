@@ -13,7 +13,7 @@ import lib.shared.config as config
 import lib.shared.player as player
 import lib.shared.serverdata as serverdata
 import lib.shared.teams as teams
-from lib.shared.colors import ColorizeText, HighlightSubstr, StripColorCodes
+import lib.shared.colors as colors
 from lib.shared.player import Player
 from lib.shared.timeout import Timeout
 
@@ -302,12 +302,13 @@ class RTMVote(RTVVote):
 class RTV(object):
     def __init__(self, serverData : serverdata.ServerData):
         self._config : config.Config = DEFAULT_CFG        
+        self._themeColor = self._config.cfg["pluginThemeColor"]
         self._players : dict[player.Player] = {}
         self._serverData : serverdata.ServerData = serverData
         self._wantsToRTV : list[int] = []
         self._nominations : list[RTVNomination] = []
         self._currentVote = None
-        self._messagePrefix : str = self._config.cfg["MessagePrefix"]
+        self._messagePrefix : str = colors.COLOR_CODES[self._themeColor] + self._config.cfg["MessagePrefix"]
         self._mapContainer = MapContainer(GetAllMaps(), self)
         self._commandList = \
             {
@@ -413,7 +414,7 @@ class RTV(object):
                         self._SwitchRTM(winner)
                     else:
                         self._rtmToSwitch = winner
-                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing mode to {ColorizeText(winner.GetMapName(), 'lblue')} next round!")
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
                     t = Timeout()
@@ -423,7 +424,7 @@ class RTV(object):
                         self._SwitchRTV(winner)
                     else:
                         self._rtvToSwitch = winner
-                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing map to {ColorizeText(winner.GetMapName(), 'lblue')} next round!")
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
                     self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             else:
                 if type(self._currentVote) == RTMVote:
@@ -452,7 +453,7 @@ class RTV(object):
     def _SwitchRTM(self, winner : Map, doSleep=True):
         self._rtmToSwitch = None
         modeToChange = MBMODE_ID_MAP[winner.GetMapName().lower().replace(' ', '')]
-        self._serverData.interface.SvSay(self._messagePrefix + f"Switching game mode to {ColorizeText(winner.GetMapName(), 'lblue')}!")
+        self._serverData.interface.SvSay(self._messagePrefix + f"Switching game mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)}!")
         if doSleep:
             sleep(1)
         self._serverData.interface.MbMode(modeToChange)
@@ -460,7 +461,7 @@ class RTV(object):
     def _SwitchRTV(self, winner : Map, doSleep=True):
         self._rtvToSwitch = None
         mapToChange = winner.GetMapName()
-        self._serverData.interface.SvSay(self._messagePrefix + f"Switching map to {ColorizeText(mapToChange, 'lblue')}!");
+        self._serverData.interface.SvSay(self._messagePrefix + f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!");
         #self._serverData.interface.SvSound("sound/sup/barney/ba_later.wav") -> Optionally uncomment for custom server sounds, << MBAssets4//OR//mb2_sup_assets/sound/sup >>
         #sleep(4)
         if doSleep:
@@ -486,7 +487,7 @@ class RTV(object):
                 self._serverData.interface.SvSay(self._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!");
                 return capture
             elif self._rtvCooldown.IsSet():
-                self._serverData.interface.SvSay(self._messagePrefix + f"RTV is on cooldown for {ColorizeText(self._rtvCooldown.LeftDHMS(), 'lblue')}.")
+                self._serverData.interface.SvSay(self._messagePrefix + f"RTV is on cooldown for {colors.ColorizeText(self._rtvCooldown.LeftDHMS(), self._themeColor)}.")
                 return capture
             if not eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.append(eventPlayerId)
@@ -521,7 +522,7 @@ class RTV(object):
         self._currentVote = newVote
         self._OnVoteStart()
         self._currentVote._Start()
-        self._serverData.interface.SvSay(self._messagePrefix + f"{ColorizeText('RTV', 'lblue')} has started! Vote will complete in {ColorizeText(str(self._currentVote._voteTime), 'lblue')} seconds.")
+        self._serverData.interface.SvSay(self._messagePrefix + f"{colors.ColorizeText('RTV', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
         # self._AnnounceVote()
 
     def _StartRTMVote(self, choices=None):
@@ -540,7 +541,7 @@ class RTV(object):
         self._currentVote = newVote
         self._OnVoteStart()
         self._currentVote._Start()
-        self._serverData.interface.SvSay(self._messagePrefix + f"{ColorizeText('RTM', 'lblue')} has started! Vote will complete in {ColorizeText(str(self._currentVote._voteTime), 'lblue')} seconds.")
+        self._serverData.interface.SvSay(self._messagePrefix + f"{colors.ColorizeText('RTM', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
         # self._AnnounceVote()
 
     def HandleRTM(self, player: player.Player, teamId : int, cmdArgs : list[str]):
@@ -554,7 +555,7 @@ class RTV(object):
                 self._serverData.interface.SvSay(self._messagePrefix + "This server has RTM disabled.");
                 return capture
             elif self._rtmCooldown.IsSet():
-                self._serverData.interface.SvSay(self._messagePrefix + f"RTM is on cooldown for {ColorizeText(self._rtmCooldown.LeftDHMS(), 'lblue')}.")
+                self._serverData.interface.SvSay(self._messagePrefix + f"RTM is on cooldown for {colors.ColorizeText(self._rtmCooldown.LeftDHMS(), self._themeColor)}.")
                 return capture
             if not eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.append(eventPlayerId)
@@ -615,9 +616,9 @@ class RTV(object):
                             self._nominations.remove(i)
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
                 if playerHasNomination:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 changed their nomination to {ColorizeText(mapToNom, 'lblue')}!")
+                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 changed their nomination to {colors.ColorizeText(mapToNom, self._themeColor)}!")
                 else:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {ColorizeText(mapToNom, 'lblue')} for RTV!")
+                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {colors.ColorizeText(mapToNom, self._themeColor)} for RTV!")
             else:
                 if not self._mapContainer.FindMapWithName(mapToNom):
                     failReason = "map was not found"
@@ -660,7 +661,7 @@ class RTV(object):
                 else:
                     self._serverData.interface.Say(self._messagePrefix + f"Index out of range! (1-{len(pages)})")
             else:
-                self._serverData.interface.Say(self._messagePrefix + f"Invalid index {ColorizeText(cmdArgs[1], 'lblue')}!")
+                self._serverData.interface.Say(self._messagePrefix + f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -675,7 +676,7 @@ class RTV(object):
                 if all(str.find(mapName, x) != -1 for x in cmdArgs[1:]):
                     for searchTerm in cmdArgs[1:]:
                         index = str.find(mapName, searchTerm)
-                        mapName = HighlightSubstr(mapName, index, index + len(searchTerm), "lblue")
+                        mapName = colors.HighlightSubstr(mapName, index, index + len(searchTerm), self._themeColor)
                     if len(mapStr) + len(mapName) < 950:
                         mapStr += mapName
                         mapStr += ', '
@@ -687,12 +688,12 @@ class RTV(object):
             if len(mapStr) > 0:
                 mapPages.append(mapStr[:-2])
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + f"Search {ColorizeText(searchQuery, 'lblue')} returned no results.")
+                self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
-                self._serverData.interface.Say(self._messagePrefix + f"{str(totalResults)} results for {ColorizeText(searchQuery, 'lblue')}: {mapPages[0]}")
+                self._serverData.interface.Say(self._messagePrefix + f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
                 # mapPages.reverse()
-                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} results for {ColorizeText(searchQuery, 'lblue')}:"]
+                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
         return capture
@@ -863,7 +864,7 @@ def OnStart():
         return False;
     if PluginInstance._config.cfg["kickProtectedNames"] == True:
         for i in PluginInstance._serverData.API.GetAllClients():
-            nameStripped = StripColorCodes(i.GetName().lower())
+            nameStripped = colors.StripColorCodes(i.GetName().lower())
             if nameStripped == "admin" or nameStripped == "server":
                 PluginInstance._serverData.interface.ClientKick(i.GetId())
     loadTime = time() - startTime
