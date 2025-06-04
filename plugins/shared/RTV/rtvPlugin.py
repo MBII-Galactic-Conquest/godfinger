@@ -947,7 +947,7 @@ def OnEvent(event) -> bool:
 
 # Helper function to get all map names from currently installed PK3 files located in MBII directory and base directory next to MBII
 def GetAllMaps() -> list[Map]:
-    mbiiDir = DEFAULT_CFG.cfg["MBIIPath"]
+    mbiiDir = DEFAULT_CFG.cfg["MBIIPath"] + "\\"
     mapList = []
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]; # base comes next so it wont override MBII dir contents if files match
     for dir in dirsToProcess:
