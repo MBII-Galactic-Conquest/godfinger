@@ -5,4 +5,3 @@ requests
 python-dotenv
 gitpython
 pywinpty
-psutil
