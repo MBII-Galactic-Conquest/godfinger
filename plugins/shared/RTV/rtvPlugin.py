@@ -30,6 +30,7 @@ CONFIG_FALLBACK = \
     "RTVPrefix": "!",
     "requirePrefix" : false,
     "kickProtectedNames" : true,
+    "useSayOnly" : false,
     "floodProtection" :
     {
         "enabled" : false,
