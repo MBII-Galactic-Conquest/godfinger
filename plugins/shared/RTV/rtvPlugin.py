@@ -225,7 +225,7 @@ class MapContainer(object):
 
     def FindMapWithName(self, name) -> Map | None:
         for m in self._mapDict:
-            if m == name:
+            if m.lower() == name.lower():
                 return self._mapDict[m]
         return None
 
@@ -354,9 +354,7 @@ class RTV(object):
                 self._currentVote._announceTimer.Set(self._config.cfg[voteType]["voteAnnounceTimer"])
                 self._AnnounceVote()
         # check recent map timers
-        for i in self._rtvRecentMaps:
-            if i[1].IsSet() == False:
-                self._rtvRecentMaps.remove(i)
+        self._rtvRecentMaps = [i for i in self._rtvRecentMaps if i[1].IsSet()]
 
     def _AnnounceVote(self):
         saystr = ""
