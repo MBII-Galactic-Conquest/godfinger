@@ -25,9 +25,11 @@ DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
 CONFIG_FALLBACK = \
 """{
     "MBIIPath": "your/mbii/path/here",
-    "MessagePrefix": "^5[RTV]^7: ",
+    "pluginThemeColor" : "green",
+    "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
     "requirePrefix" : false,
+    "kickProtectedNames" : true,
     "floodProtection" :
     {
         "enabled" : false,
@@ -36,60 +38,34 @@ CONFIG_FALLBACK = \
     "rtv" : 
     {
         "enabled" : true,
-        "voteTime" : 20,
+        "voteTime" : 180,
+        "voteAnnounceTimer" : 30,
         "voteRequiredRatio" : 0.5,
+        "automaticMaps" : true,
+        "primaryMaps" : 
+        [
+            
+        ],
+        "secondaryMaps" : 
+        [
+            
+        ],
+        "useSecondaryMaps" : 1,
         "mapBanList" : 
         [
-            "fifa",
-            "tmnt",
-            "SOM_ptf_Sdestroyer",
-            "SOM_Sdestroyer",
-            "SOM_theed",
-            "pb2_citadel",
-            "pb2_cloudcity",
-            "pb2_ctf_bespin",
-            "pb2_ctf_imperial",
-            "pb2_ctf_rift",
-            "pb2_ctf_theed",
-            "pb2_dotf",
-            "pb2_kashyyyk",
-            "pb2_ptf_jeditemple",
-            "pb2_ptf_sdestroyer",
-            "pb2_reactor",
-            "pb2_sdestroyer",
-            "pb_dotf",
-            "pb_sdestroyer",
-            "som_dotf",
-            "som_snowfacility",
-            "pb3_reactor",
-            "uM_Canyon_guns",
-            "uM_Taspir_rockets",
-            "uM_birdmino",
-            "uM_crazyrace2",
-            "um_bouncy",
-            "um_crazyrace",
-            "um_ctf_gib_bespin",
-            "um_ctf_gib_coruscant",
-            "um_ctf_gib_narshaddaa",
-            "um_ctf_gib_narshaddaa",
-            "um_football",
-            "um_jawarace",
-            "um_nightmare",
-            "um_prisonraid_v4",
-            "um_rockettennis",
-            "um_rockettennis",
-            "um_spacerace",
-            "um_swooprace",
-            "um_xwing",
-            "mb2_sailbarge",
-            "mb2_veh_destroyer"
+            
         ],
-        "mapBanListWhitelist" : false,
+        "mapTypePriority" : {
+            "enabled" : true,
+            "primary" : 2,
+            "secondary" : 0,
+            "nochange" : 1
+        },
         "allowNominateCurrentMap" : false,
         "emptyServerMap" : 
         {
             "enabled" : true,
-            "map" : "gc_intermission"
+            "map" : "mb2_dotf_classicb"
         },
         "timeLimit" : 
         {
@@ -106,18 +82,25 @@ CONFIG_FALLBACK = \
             "enabled" : true,
             "percent" : 0.1
         },
-        "successTimeout" : 60,
+        "successTimeout" : 30,
         "failureTimeout" : 60,
         "disableRecentlyPlayedMaps" : 1800,
-        "skipVoting" : false,
-        "changeImmediately" : false
+        "skipVoting" : true,
+        "secondTurnVoting" : true,
+        "changeImmediately" : true
     },
     "rtm" : 
     {
         "enabled" : true,
         "voteTime" : 20,
+        "voteAnnounceTimer" : 30,
         "voteRequiredRatio" : 0.5,
         "modes_enabled" : ["Open", "Legends", "Duel", "Full Authentic"],
+        "emptyServerMode" : 
+        {
+            "enabled" : false,
+            "mode" : "open"
+        },
         "timeLimit" : 
         {
             "enabled" : false,
@@ -135,8 +118,9 @@ CONFIG_FALLBACK = \
         },
         "successTimeout" : 60,
         "failureTimeout" : 60,
-        "skipVoting" : false,
-        "changeImmediately" : false
+        "skipVoting" : true,
+        "secondTurnVoting" : true,
+        "changeImmediately" : true
     }
 }
 
