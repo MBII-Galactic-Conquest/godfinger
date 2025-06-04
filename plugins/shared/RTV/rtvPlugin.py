@@ -331,6 +331,14 @@ class RTV(object):
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
+        if self._config.cfg["useSayOnly"] == True:
+            self.SvSay = self.Say
+
+    def Say(self, saystr):
+        return self._serverData.interface.Say(self._messagePrefix + saystr)
+
+    def SvSay(self, saystr):
+        return self._serverData.interface.SvSay(self._messagePrefix + saystr)
 
     def _getAllPlayers(self):
         return self._players
@@ -353,7 +361,7 @@ class RTV(object):
         saystr = ""
         for i in range(len(self._currentVote._voteOptions)):
             saystr += f"{i+1}({len(self._currentVote._playerVotes[i+1])}): {self._currentVote._voteOptions[i].GetMapName()}; "
-        self._serverData.interface.SvSay(self._messagePrefix + saystr[:-2])
+        self.SvSay(saystr[:-2])
     
     def _OnVoteStart(self):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
@@ -373,7 +381,7 @@ class RTV(object):
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
         # Check for vote percentage threshold if applicable
         if self._config.cfg[voteType]["minimumVotePercent"]["enabled"] and (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < self._config.cfg[voteType]["minimumVotePercent"]["percent"]:
-            self._serverData.interface.SvSay(self._messagePrefix + f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVotePercent']['percent'] * 100} percent)")
+            self.SvSay(f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVotePercent']['percent'] * 100} percent)")
             self._currentVote = None
             if type(self._currentVote) == RTMVote:
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
@@ -398,7 +406,7 @@ class RTV(object):
                         self._SwitchRTM(winner)
                     else:
                         self._rtmToSwitch = winner
-                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
+                        self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
                     t = Timeout()
@@ -408,14 +416,14 @@ class RTV(object):
                         self._SwitchRTV(winner)
                     else:
                         self._rtvToSwitch = winner
-                        self._serverData.interface.SvSay(self._messagePrefix + f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
+                        self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
                     self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             else:
                 if type(self._currentVote) == RTMVote:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Voted to not change mode.");
+                    self.SvSay(f"Voted to not change mode.");
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Voted to not change map.");
+                    self.SvSay(f"Voted to not change map.");
                     self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             self._currentVote = None
         elif len(winners) > 1:
@@ -426,7 +434,7 @@ class RTV(object):
             else:
                 self._StartRTVVote(voteOptions)
         elif len(winners) == 0:
-            self._serverData.interface.SvSay(self._messagePrefix + "Vote ended with no voters, keeping everything the same!");
+            self.SvSay("Vote ended with no voters, keeping everything the same!");
             # TODO: This will cause a crash with a vote with 0 options, shouldn't occur in practice
             if type(self._currentVote) == RTMVote:
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
@@ -437,7 +445,7 @@ class RTV(object):
     def _SwitchRTM(self, winner : Map, doSleep=True):
         self._rtmToSwitch = None
         modeToChange = MBMODE_ID_MAP[winner.GetMapName().lower().replace(' ', '')]
-        self._serverData.interface.SvSay(self._messagePrefix + f"Switching game mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)}!")
+        self.SvSay(f"Switching game mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)}!")
         if doSleep:
             sleep(1)
         self._serverData.interface.MbMode(modeToChange)
@@ -445,7 +453,7 @@ class RTV(object):
     def _SwitchRTV(self, winner : Map, doSleep=True):
         self._rtvToSwitch = None
         mapToChange = winner.GetMapName()
-        self._serverData.interface.SvSay(self._messagePrefix + f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!");
+        self.SvSay(f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!");
         #self._serverData.interface.SvSound("sound/sup/barney/ba_later.wav") -> Optionally uncomment for custom server sounds, << MBAssets4//OR//mb2_sup_assets/sound/sup >>
         #sleep(4)
         if doSleep:
@@ -468,16 +476,16 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if self._serverData.GetServerVar("campaignMode") == True:
-                self._serverData.interface.SvSay(self._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!");
+                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!");
                 return capture
             elif self._rtvCooldown.IsSet():
-                self._serverData.interface.SvSay(self._messagePrefix + f"RTV is on cooldown for {colors.ColorizeText(self._rtvCooldown.LeftDHMS(), self._themeColor)}.")
+                self.SvSay(f"RTV is on cooldown for {colors.ColorizeText(self._rtvCooldown.LeftDHMS(), self._themeColor)}.")
                 return capture
             if not eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.append(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             if len(self._wantsToRTV) >= ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio']):
                 self._StartRTVVote()
         return capture
@@ -506,7 +514,7 @@ class RTV(object):
         self._currentVote = newVote
         self._OnVoteStart()
         self._currentVote._Start()
-        self._serverData.interface.SvSay(self._messagePrefix + f"{colors.ColorizeText('RTV', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
+        self.SvSay(f"{colors.ColorizeText('RTV', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
         # self._AnnounceVote()
 
     def _StartRTMVote(self, choices=None):
@@ -525,7 +533,7 @@ class RTV(object):
         self._currentVote = newVote
         self._OnVoteStart()
         self._currentVote._Start()
-        self._serverData.interface.SvSay(self._messagePrefix + f"{colors.ColorizeText('RTM', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
+        self.SvSay(f"{colors.ColorizeText('RTM', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
         # self._AnnounceVote()
 
     def HandleRTM(self, player: player.Player, teamId : int, cmdArgs : list[str]):
@@ -536,16 +544,16 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if self._config.cfg["rtm"]["enabled"] == False:
-                self._serverData.interface.SvSay(self._messagePrefix + "This server has RTM disabled.");
+                self.SvSay("This server has RTM disabled.");
                 return capture
             elif self._rtmCooldown.IsSet():
-                self._serverData.interface.SvSay(self._messagePrefix + f"RTM is on cooldown for {colors.ColorizeText(self._rtmCooldown.LeftDHMS(), self._themeColor)}.")
+                self.SvSay(f"RTM is on cooldown for {colors.ColorizeText(self._rtmCooldown.LeftDHMS(), self._themeColor)}.")
                 return capture
             if not eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.append(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             if len(self._wantsToRTM) >= ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio']):
                 self._StartRTMVote()
         return capture
@@ -559,9 +567,9 @@ class RTV(object):
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.remove(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already didn't want to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already didn't want to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
         return capture
         
 
@@ -573,13 +581,13 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if self._serverData.GetServerVar("campaignMode") == True:
-                self._serverData.interface.SvSay(self._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
+                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
                 return capture
             if eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.remove(eventPlayerId)
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + f"{eventPlayer.GetName()}^7 already doesn't want to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
         return capture
 
     def HandleMapNom(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -600,9 +608,9 @@ class RTV(object):
                             self._nominations.remove(i)
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
                 if playerHasNomination:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 changed their nomination to {colors.ColorizeText(mapToNom, self._themeColor)}!")
+                    self.SvSay(f"Player {eventPlayer.GetName()}^7 changed their nomination to {colors.ColorizeText(mapToNom, self._themeColor)}!")
                 else:
-                    self._serverData.interface.SvSay(self._messagePrefix + f"Player {eventPlayer.GetName()}^7 nominated {colors.ColorizeText(mapToNom, self._themeColor)} for RTV!")
+                    self.SvSay(f"Player {eventPlayer.GetName()}^7 nominated {colors.ColorizeText(mapToNom, self._themeColor)} for RTV!")
             else:
                 if not self._mapContainer.FindMapWithName(mapToNom):
                     failReason = "map was not found"
@@ -614,7 +622,7 @@ class RTV(object):
                     failReason = "server does not allow nomination of current map"
                 else:
                     failReason = "unknown reason"
-                self._serverData.interface.Say(self._messagePrefix + f"Map could not be nominated: {failReason}")
+                self.Say(f"Map could not be nominated: {failReason}")
         return capture
 
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -641,11 +649,11 @@ class RTV(object):
             if cmdArgs[1].isdecimal():
                 pageIndex = int(cmdArgs[1])
                 if 1 <= pageIndex <= len(pages):
-                    self._serverData.interface.Say(self._messagePrefix + pages[pageIndex - 1])
+                    self.Say(pages[pageIndex - 1])
                 else:
-                    self._serverData.interface.Say(self._messagePrefix + f"Index out of range! (1-{len(pages)})")
+                    self.Say(f"Index out of range! (1-{len(pages)})")
             else:
-                self._serverData.interface.Say(self._messagePrefix + f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+                self.Say(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -672,9 +680,9 @@ class RTV(object):
             if len(mapStr) > 0:
                 mapPages.append(mapStr[:-2])
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
+                self._serverData.interface.SvTell(player.GetId(), f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
-                self._serverData.interface.Say(self._messagePrefix + f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
+                self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
                 # mapPages.reverse()
                 batchCmds = [f"say {self._messagePrefix}{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
@@ -794,10 +802,10 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._serverData.GetServerVar("campaignMode") == True:
-                self._serverData.interface.SvSay(self._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
+                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
                 return True
             else:
-                self._serverData.interface.SvSay(self._messagePrefix + "Smod forced RTV vote")
+                self.SvSay("Smod forced RTV vote")
                 self._StartRTVVote()
         return True
 
