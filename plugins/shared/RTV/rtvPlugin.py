@@ -137,10 +137,8 @@ MBMODE_ID_MAP = {
 
 if DEFAULT_CFG == None:
     DEFAULT_CFG = config.Config()
-    DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
-    f = open(DEFAULT_CFG_PATH, "wt")
-    f.write(CONFIG_FALLBACK)
-    f.close()
+    with open(DEFAULT_CFG_PATH, "wt") as f:
+        f.write(CONFIG_FALLBACK)
 
 Log = logging.getLogger(__name__);
 
@@ -211,17 +209,10 @@ class MapContainer(object):
     def GetRandomMaps(self, num, blacklist=None) -> list[Map]:
         if blacklist != None:
             blacklist = [x.lower() for x in blacklist]
-        if num > self._mapCount:
-            l = sample(list(self._mapDict.values()), k=self._mapCount)
-            while len([x for x in l if x.GetMapName().lower() in blacklist]) > 0:
-                l = sample(list(self._mapDict.values()), k=self._mapCount)
-        elif num < 0:
-            l = []
-        else:
-            l = sample(list(self._mapDict.values()), k=num)
-            while len([x for x in l if x.GetMapName().lower() in blacklist]) > 0:
-                l = sample(list(self._mapDict.values()), k=num)
-        return l
+        valid_maps = [m for m in self._mapDict.values() if m.GetMapName().lower() not in blacklist]
+        if len(valid_maps) < num:
+            return valid_maps
+        return sample(valid_maps, k=num)
 
     def FindMapWithName(self, name) -> Map | None:
         for m in self._mapDict:
@@ -679,7 +670,7 @@ class RTV(object):
             if len(mapStr) > 0:
                 mapPages.append(mapStr[:-2])
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
+                self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix} Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
