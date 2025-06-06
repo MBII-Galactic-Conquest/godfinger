@@ -684,7 +684,7 @@ class RTV(object):
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
                 # mapPages.reverse()
-                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
+                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
         return capture
