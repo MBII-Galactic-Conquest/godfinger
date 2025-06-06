@@ -78,7 +78,7 @@ CONFIG_FALLBACK = \
             "enabled" : false,
             "rounds" : 0
         },
-        "minimumVotePercent" :
+        "minimumVoteRatio" :
         {
             "enabled" : true,
             "percent" : 0.1
@@ -112,7 +112,7 @@ CONFIG_FALLBACK = \
             "enabled" : false,
             "rounds" : 0
         },
-        "minimumVotePercent" :
+        "minimumVoteRatio" :
         {
             "enabled" : false,
             "percent" : 0
@@ -370,8 +370,8 @@ class RTV(object):
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
         # Check for vote percentage threshold if applicable
-        if self._config.cfg[voteType]["minimumVotePercent"]["enabled"] and (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < self._config.cfg[voteType]["minimumVotePercent"]["percent"]:
-            self.SvSay(f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVotePercent']['percent'] * 100} percent)")
+        if self._config.cfg[voteType]["minimumVoteRatio"]["enabled"] and (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]:
+            self.SvSay(f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVoteRatio']['ratio'] * 100} percent)")
             self._currentVote = None
             if type(self._currentVote) == RTMVote:
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
@@ -954,7 +954,7 @@ def GetAllMaps() -> list[Map]:
                 with ZipFile(dir + "\\" + filename) as file:
                     zipNameList = file.namelist()
                     for name in zipNameList:
-                        if name.endswith(".bsp") and not name in mapList:
+                        if name.endswith(".bsp") and not name in [x.GetMapName() for x in mapList]:
                             path = name
                             name = name.lower().removeprefix("maps/").removesuffix(".bsp")
                             newMap = Map(name, path)
