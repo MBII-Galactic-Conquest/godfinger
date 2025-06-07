@@ -395,14 +395,14 @@ class RTV(object):
             {
                 # Global commands
                 teams.TEAM_GLOBAL : {
-                    tuple(["rtv", "rock the vote"]) : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
-                    tuple(["rtm"]) : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
-                    tuple(["unrtm"]) : ("!unrtm - revoke your vote to start the next RTM vote", self.HandleUnRTM),
-                    tuple(["unrtv", "unrockthevote"]) : ("!<unrtv | unrockthevote> - cancel your vote to start the next Map vote", self.HandleUnRTV),
-                    tuple(["maplist"]) : ("!maplist <#> - display page # of the server's map list", self.HandleMaplist),
-                    tuple(["nom", "nominate", "mapnom"]) : ("!nominate <map> - nominates a map for the next round of voting", self.HandleMapNom),
-                    tuple(["search"]) : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
-                    tuple(["1", "2", "3", "4", "5", "6"]) : ("", self.HandleDecimalVote)  # handle decimal votes
+                    ("rtv", "rock the vote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
+                    ("rtm") : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
+                    ("unrtm") : ("!unrtm - revoke your vote to start the next RTM vote", self.HandleUnRTM),
+                    ("unrtv", "unrockthevote") : ("!<unrtv | unrockthevote> - cancel your vote to start the next Map vote", self.HandleUnRTV),
+                    ("maplist") : ("!maplist <#> - display page # of the server's map list", self.HandleMaplist),
+                    ("nom", "nominate", "mapnom") : ("!nominate <map> - nominates a map for the next round of voting", self.HandleMapNom),
+                    ("search") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
+                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)  # handle decimal votes
                 },
                 # Team-specific commands (only vote commands for other teams)
                 teams.TEAM_EVIL : {
@@ -419,7 +419,7 @@ class RTV(object):
         # Server Moderator commands
         self._smodCommandList = \
         {
-            tuple(["frtv", "forcertv"]) : ("!<frtv | forcertv> - forces an RTV vote if no other vote is currently active", self.HandleForceRTV)
+            ("frtv", "forcertv") : ("!<frtv | forcertv> - forces an RTV vote if no other vote is currently active", self.HandleForceRTV)
         }
         
         # State tracking variables
