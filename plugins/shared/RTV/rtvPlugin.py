@@ -114,7 +114,7 @@ CONFIG_FALLBACK = \
         "minimumVoteRatio" :
         {
             "enabled" : true,
-            "percent" : 0.1
+            "ratio" : 0.1
         },
         "successTimeout" : 30,
         "failureTimeout" : 60,
@@ -148,7 +148,7 @@ CONFIG_FALLBACK = \
         "minimumVoteRatio" :
         {
             "enabled" : false,
-            "percent" : 0
+            "ratio" : 0
         },
         "successTimeout" : 60,
         "failureTimeout" : 60,
@@ -170,6 +170,7 @@ MBMODE_ID_MAP = {
 
 if DEFAULT_CFG == None:
     DEFAULT_CFG = config.Config()
+    DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
     with open(DEFAULT_CFG_PATH, "wt") as f:
         f.write(CONFIG_FALLBACK)
 
@@ -240,16 +241,31 @@ class MapContainer(object):
         return self._mapCount
 
     def GetRandomMaps(self, num, blacklist=None) -> list[Map]:
-        if blacklist != None:
+        # Convert blacklist to lowercase for case-insensitive matching
+        if blacklist is not None:
             blacklist = [x.lower() for x in blacklist]
-        valid_maps = [m for m in self._mapDict.values() if m.GetMapName().lower() not in blacklist]
-        if len(valid_maps) < num:
-            return valid_maps
-        return sample(valid_maps, k=num)
+        else:
+            blacklist = []
+            
+        # Get all available maps that are not blacklisted
+        available_maps = []
+        for m in self._mapDict.values():
+            if m.GetMapName().lower() not in blacklist:
+                available_maps.append(m)
+        
+        # Handle edge cases
+        if num <= 0:
+            return []
+        if num > len(available_maps):
+            return available_maps
+        
+        # Return random selection
+        return sample(available_maps, k=num)
 
     def FindMapWithName(self, name) -> Map | None:
+        name_lower = name.lower()
         for m in self._mapDict:
-            if m.lower() == name.lower():
+            if m.lower() == name_lower:
                 return self._mapDict[m]
         return None
 
@@ -477,8 +493,6 @@ class RTV(object):
         self._rtvToSwitch = None
         mapToChange = winner.GetMapName()
         self.SvSay(f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!");
-        #self._serverData.interface.SvSound("sound/sup/barney/ba_later.wav") -> Optionally uncomment for custom server sounds, << MBAssets4//OR//mb2_sup_assets/sound/sup >>
-        #sleep(4)
         if doSleep:
             sleep(1)
         self._serverData.interface.MapReload(mapToChange);
@@ -521,11 +535,18 @@ class RTV(object):
             blacklist = [x[0] for x in self._rtvRecentMaps]
             if self._config.cfg["rtv"]["useSecondaryMaps"] < 2:
                 blacklist.extend([x.GetMapName() for x in self._mapContainer.GetAllMaps() if x.GetPriority() == MapPriorityType.MAPTYPE_SECONDARY])
+            if not self._config.cfg["rtv"]["allowNominateCurrentMap"]:
+                blacklist.append(self._mapName.lower())
+                
             for nom in self._nominations:
                 voteChoices.append(nom.GetMap())
+                
             choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=blacklist)
-            while (self._mapName in [x.GetMapName() for x in choices] and self._config.cfg["rtv"]["allowNominateCurrentMap"] == True) or ((True in [x.GetMap() in choices for x in self._nominations]) and (not len(choices) <= self._mapContainer.GetMapCount())):
-                choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=blacklist)
+            
+            # Filter out nominations to prevent duplicates
+            nomination_names = {n.GetMap().GetMapName().lower() for n in self._nominations}
+            choices = [m for m in choices if m.GetMapName().lower() not in nomination_names]
+            
             self._nominations.clear()
             voteChoices.extend([x for x in choices])
             noChangeMap = Map("Don't Change", "N/A")
@@ -538,7 +559,6 @@ class RTV(object):
         self._OnVoteStart()
         self._currentVote._Start()
         self.SvSay(f"{colors.ColorizeText('RTV', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
-        # self._AnnounceVote()
 
     def _StartRTMVote(self, choices=None):
         self._wantsToRTM.clear()
@@ -557,7 +577,6 @@ class RTV(object):
         self._OnVoteStart()
         self._currentVote._Start()
         self.SvSay(f"{colors.ColorizeText('RTM', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
-        # self._AnnounceVote()
 
     def HandleRTM(self, player: player.Player, teamId : int, cmdArgs : list[str]):
         capture = True
@@ -707,7 +726,6 @@ class RTV(object):
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
-                # mapPages.reverse()
                 batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
@@ -935,21 +953,18 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
 def API_StartRTVVote():
     Log.debug("Received external RTV vote request")
     global PluginInstance
-    # currentVote = PluginInstance._voteContext.GetCurrentVote()
     votesInProgress = PluginInstance._serverData.GetServerVar("votesInProgress")
     if not PluginInstance._currentVote and (votesInProgress == None or len(votesInProgress) == 0):
         if PluginInstance._serverData.GetServerVar("campaignMode") == True:
             PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
             return False
         else:
-            # PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "External RTV vote")
             PluginInstance._StartRTVVote()
             return True
     return False
 
 def OnEvent(event) -> bool:
     global PluginInstance;
-    #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return PluginInstance.OnChatMessage( event.client, event.message, event.teamId );
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
@@ -989,8 +1004,7 @@ def GetAllMaps() -> list[Map]:
                     for name in zipNameList:
                         if name.endswith(".bsp") and not name in [x.GetMapName() for x in mapList]:
                             path = name
-                            name = name.lower().removeprefix("maps/").removesuffix(".bsp")
+                            name = name.lower().replace("maps/", "").replace(".bsp", "")
                             newMap = Map(name, path)
-                            #Log.debug(str(path));
                             mapList.append(newMap)
     return mapList
