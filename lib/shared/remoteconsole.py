@@ -148,7 +148,7 @@ class RCON(object):
     def SvSay(self, msg):
         if not type(msg) == bytes:
             msg = bytes(msg, "UTF-8")
-        if len(msg) > 148: # Message is too big for "svsay".
+        if len(msg) > 138: # Message is too big for "svsay".
                         # Use "say" instead.
             return self.Say(msg)
         else:
