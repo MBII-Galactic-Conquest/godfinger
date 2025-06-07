@@ -448,6 +448,7 @@ class RTV(object):
                     ("unrtv", "unrockthevote") : ("!<unrtv | unrockthevote> - cancel your vote to start the next Map vote", self.HandleUnRTV),
                     ("maplist") : ("!maplist <#> - display page # of the server's map list", self.HandleMaplist),
                     ("nom", "nominate", "mapnom") : ("!nominate <map> - nominates a map for the next round of voting", self.HandleMapNom),
+                    ("nomlist", "nominationlist", "nominatelist", "noml") : ("!nomlist - displays a list of nominations for the next map", self.HandleNomList),
                     ("search") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
                     ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)  # handle decimal votes
                 },
@@ -937,7 +938,7 @@ class RTV(object):
             
             # Display results
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix} Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
+                self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix}Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
@@ -958,6 +959,18 @@ class RTV(object):
                 # Validate vote option
                 if index in range(0, len(currVote.GetOptions())):
                     currVote.HandleVoter(player, index)
+        return capture
+
+    def HandleNomList(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+        """Handle nomination list command"""
+        capture = False
+        outputStr = ""
+        for i in self._nominations:
+            outputStr += f"{i.GetMap().GetMapName()} ({i.GetPlayer().GetName()})^7;"
+        if len(outputStr) > 0:
+            self.Say(f"{colors.ColorizeText('Map Nominations', self._themeColor)}: " + outputStr)
+        else:
+            self.Say("No map nominations to display.")
         return capture
 
     def OnChatMessage(self, eventClient : client.Client, eventMessage : str, eventTeamID : int):
@@ -1194,7 +1207,7 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
     
     # Register commands with server
     newVal = []
-    rCommands = SERVER_DATA.GetServerVar("registeredCommands")
+    rCommands = PluginInstance._serverData.GetServerVar("registeredCommands")
     if rCommands != None:
         newVal.extend(rCommands)
     for cmd in PluginInstance._commandList[teams.TEAM_GLOBAL]:
