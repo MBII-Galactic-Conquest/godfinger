@@ -7,6 +7,7 @@ from random import sample
 from time import sleep, time
 from zipfile import ZipFile
 
+# Import Godfinger Event system and shared libraries
 import godfingerEvent
 import lib.shared.client as client
 import lib.shared.config as config
@@ -17,11 +18,14 @@ import lib.shared.colors as colors
 from lib.shared.player import Player
 from lib.shared.timeout import Timeout
 
+# Global server data instance
 SERVER_DATA = None
 
-DEFAULT_CFG_PATH = os.path.join(os.path.dirname(__file__), "rtvConfig.json");
+# Configuration file paths and defaults
+DEFAULT_CFG_PATH = os.path.join(os.path.dirname(__file__), "rtvConfig.json")
 DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
 
+# Fallback configuration if config file doesn't exist
 CONFIG_FALLBACK = \
 """{
     "MBIIPath": "your/mbii/path/here",
@@ -160,6 +164,7 @@ CONFIG_FALLBACK = \
 
 """
 
+# Map game modes to their internal IDs
 MBMODE_ID_MAP = {
     'open' : 0,
     'semiauthentic' : 1,
@@ -168,36 +173,44 @@ MBMODE_ID_MAP = {
     'legends' : 4
 }
 
+# Create default config if it doesn't exist
 if DEFAULT_CFG == None:
     DEFAULT_CFG = config.Config()
     DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
     with open(DEFAULT_CFG_PATH, "wt") as f:
         f.write(CONFIG_FALLBACK)
 
-Log = logging.getLogger(__name__);
+# Initialize logger
+Log = logging.getLogger(__name__)
 
 class MapPriorityType(Enum):
+    """Enumeration for map priority types"""
     MAPTYPE_PRIMARY =  auto()
     MAPTYPE_SECONDARY = auto()
     MAPTYPE_NOCHANGE = auto()
     MAPTYPE_AUTO = auto()
 
 class Map(object):
+    """Represents a game map with name, path, and priority"""
     def __init__(self, mapName, mapPath):
         self._mapName = mapName
         self._mapPath = mapPath
         self._priority = MapPriorityType.MAPTYPE_AUTO
 
     def GetMapName(self) -> str:
+        """Get map name"""
         return self._mapName
     
     def GetMapPath(self) -> str:
+        """Get map file path"""
         return self._mapPath
 
     def GetPriority(self) -> int:
+        """Get map priority type"""
         return self._priority
 
     def SetPriority(self, val):
+        """Set map priority type"""
         if val in [MapPriorityType.MAPTYPE_NOCHANGE, MapPriorityType.MAPTYPE_PRIMARY, MapPriorityType.MAPTYPE_SECONDARY, MapPriorityType.MAPTYPE_AUTO]:
             self._priority = val
         
@@ -208,19 +221,26 @@ class Map(object):
         return self.__str__()
 
 class MapContainer(object):
+    """Container for managing available maps with filtering and prioritization"""
     def __init__(self, mapArray : list[Map], pluginInstance):
         self._mapCount = 0
         self._mapDict = {}
+        
+        # Get configuration from plugin instance
         primaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["primaryMaps"]]
         secondaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["secondaryMaps"]]
         mapBanList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["mapBanList"]]
         useSecondaryMaps = pluginInstance._config.cfg["rtv"]["useSecondaryMaps"]
         automaticMaps = pluginInstance._config.cfg["rtv"]["automaticMaps"]
+        
+        # Process maps based on configuration
         if automaticMaps:
+            # Include all maps with auto priority
             for m in mapArray:
                 m.SetPriority(MapPriorityType.MAPTYPE_AUTO)
                 self._mapDict[m.GetMapName()] = m
         else:
+            # Filter maps based on primary/secondary lists
             for m in mapArray:
                 if m.GetMapName().lower() in primaryMapList:
                     m.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)
@@ -228,19 +248,25 @@ class MapContainer(object):
                 elif m.GetMapName().lower() in secondaryMapList and useSecondaryMaps > 0:
                     m.SetPriority(MapPriorityType.MAPTYPE_SECONDARY)
                     self._mapDict[m.GetMapName()] = m
+        
+        # Apply ban list
         for m in list(self._mapDict.keys()):
             mLower = m.lower()
             if (mLower in mapBanList):
                 del self._mapDict[m]
+        
         self._mapCount = len(self._mapDict.keys())
     
     def GetAllMaps(self) -> list[Map]:
+        """Get all available maps"""
         return list(self._mapDict.values())
 
     def GetMapCount(self) -> int:
+        """Get total number of available maps"""
         return self._mapCount
 
     def GetRandomMaps(self, num, blacklist=None) -> list[Map]:
+        """Get random selection of maps excluding blacklisted ones"""
         # Convert blacklist to lowercase for case-insensitive matching
         if blacklist is not None:
             blacklist = [x.lower() for x in blacklist]
@@ -263,6 +289,7 @@ class MapContainer(object):
         return sample(available_maps, k=num)
 
     def FindMapWithName(self, name) -> Map | None:
+        """Find map by name (case-insensitive)"""
         name_lower = name.lower()
         for m in self._mapDict:
             if m.lower() == name_lower:
@@ -270,6 +297,7 @@ class MapContainer(object):
         return None
 
 class RTVVote(object):
+    """Base class for handling voting systems (RTV and RTM)"""
     def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtv"]["voteTime"], announceCount = 1):
         self._voteOptions : list[Map] = voteOptions
         self._voteTime = voteTime
@@ -278,68 +306,94 @@ class RTVVote(object):
         self._announceTimer = Timeout()
     
     def  _Start(self):
+        """Initialize vote tracking"""
         for i in range(len(self._voteOptions)):
             self._playerVotes[i+1] = []
         self._voteStartTime = time()
 
     def HandleVoter(self, voterId, voterOption):
+        """Process a player's vote"""
         voteType = "rtm" if type(self) == RTMVote else "rtv"
+        
+        # Remove previous vote if exists
         for i in self._playerVotes:
             if voterId in self._playerVotes[i]:
                 self._playerVotes[i].remove(voterId)
+        
+        # Record new vote
         self._playerVotes[voterOption+1].append(voterId)
+        
+        # Skip voting if enabled and majority reached
         if PluginInstance._config.cfg[voteType]["skipVoting"] == True:
             votesLeft = len(PluginInstance._serverData.API.GetAllClients()) - self.GetVoterCount()
             if len(self._playerVotes[voterOption+1]) > votesLeft:
-                self._voteStartTime = 0     # instantly finish vote
+                self._voteStartTime = 0  # instantly finish vote
         print(f"player {voterId} voted for {voterOption+1}")
         return True
     
     def GetOptions(self):
+        """Get available vote options"""
         return self._voteOptions
 
     def GetWinners(self):
+        """Determine vote winner(s) with tie resolution"""
         voteType = "rtm" if type(self) == RTMVote else "rtv"
         winners = []
         countMax = 0
+        
+        # Find option(s) with highest votes
         for i in self._playerVotes:
             if len(winners) == 0 or len(self._playerVotes[i]) > countMax:
                 winners = [i]
                 countMax = len(self._playerVotes[i])
             elif len(self._playerVotes[i]) == countMax:
                 winners.append(i)
-        # if second turn voting is enabled, allow a second winner if the first winner did not get at least 50% of the total voters
-        if PluginInstance._config.cfg[voteType]["secondTurnVoting"] == True and len(winners) == 1 and len(self._playerVotes[winners[0]]) <= (self.GetVoterCount() // 2):
+        
+        # Handle second turn voting if enabled
+        if PluginInstance._config.cfg[voteType]["secondTurnVoting"] == True and \
+           len(winners) == 1 and \
+           len(self._playerVotes[winners[0]]) <= (self.GetVoterCount() // 2):
             sortedByVote = list(self._playerVotes)
             sortedByVote.sort(key = lambda a : len(self._playerVotes[a]))
             sortedByVote.reverse()  # list is initially sorted with lowest values first
             winners.append(sortedByVote[1])
+        
         return [self._voteOptions[x - 1] for x in winners] if countMax > 0 else []
 
     def GetVoterCount(self):
+        """Get total number of voters"""
         return sum([len(self._playerVotes[x]) for x in self._playerVotes])
 
 
 class RTMVote(RTVVote):
+    """Specialized vote class for Rock the Mode (RTM)"""
     def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtm"]["voteTime"], announceCount=1):
         super().__init__(voteOptions, voteTime, announceCount)
 
 class RTV(object):
+    """Main class implementing Rock the Vote (RTV) and Rock the Mode (RTM) functionality"""
     def __init__(self, serverData : serverdata.ServerData):
+        # Configuration setup
         self._config : config.Config = DEFAULT_CFG        
         self._themeColor = self._config.cfg["pluginThemeColor"]
         self._players : dict[player.Player] = {}
         self._serverData : serverdata.ServerData = serverData
+        
+        # RTV state tracking
         self._wantsToRTV : list[int] = []
         self._nominations : list[RTVNomination] = []
         self._currentVote = None
+        
+        # Message formatting
         self._messagePrefix : str = colors.COLOR_CODES[self._themeColor] + self._config.cfg["MessagePrefix"]
+        
+        # Map management
         self._mapContainer = MapContainer(GetAllMaps(), self)
+        
+        # Command definitions
         self._commandList = \
             {
-                # commands and aliases must be tuples because lists are unhashable apparently
-                # index 0 : tuple of aliases for each command
-                # index 1: tuple of help string and handler function
+                # Global commands
                 teams.TEAM_GLOBAL : {
                     tuple(["rtv", "rock the vote"]) : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
                     tuple(["rtm"]) : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
@@ -348,22 +402,27 @@ class RTV(object):
                     tuple(["maplist"]) : ("!maplist <#> - display page # of the server's map list", self.HandleMaplist),
                     tuple(["nom", "nominate", "mapnom"]) : ("!nominate <map> - nominates a map for the next round of voting", self.HandleMapNom),
                     tuple(["search"]) : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
-                    tuple(["1", "2", "3", "4", "5", "6"]) : ("", self.HandleDecimalVote)    # handle decimal votes (e.g !1, !2, !3)
+                    tuple(["1", "2", "3", "4", "5", "6"]) : ("", self.HandleDecimalVote)  # handle decimal votes
                 },
+                # Team-specific commands (only vote commands for other teams)
                 teams.TEAM_EVIL : {
-                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)    # handle decimal votes (e.g !1, !2, !3)
+                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)
                 },
                 teams.TEAM_GOOD : {
-                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)    # handle decimal votes (e.g !1, !2, !3)
+                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)
                 },
                 teams.TEAM_SPEC : {
-                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)    # handle decimal votes (e.g !1, !2, !3)
+                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)
                 }
             }
+        
+        # Server Moderator commands
         self._smodCommandList = \
         {
             tuple(["frtv", "forcertv"]) : ("!<frtv | forcertv> - forces an RTV vote if no other vote is currently active", self.HandleForceRTV)
         }
+        
+        # State tracking variables
         self._mapName = None
         self._wantsToRTM = []
         self._rtvCooldown = Timeout()
@@ -372,37 +431,49 @@ class RTV(object):
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
+        
+        # Configure say method based on settings
         if self._config.cfg["useSayOnly"] == True:
             self.SvSay = self.Say
 
     def Say(self, saystr):
+        """Send message to all players"""
         return self._serverData.interface.Say(self._messagePrefix + saystr)
 
     def SvSay(self, saystr):
+        """Send server message to all players"""
         return self._serverData.interface.SvSay(self._messagePrefix + saystr)
 
     def _getAllPlayers(self):
+        """Get all connected players"""
         return self._players
     
     def _doLoop(self):
-        # check vote status
+        """Main loop processing for vote management"""
+        # Check vote status
         if self._currentVote != None:
             voteType = "rtm" if type(self._currentVote) == RTMVote else "rtv"
+            
+            # Check if vote time has expired
             if time() - self._currentVote._voteStartTime >= self._currentVote._voteTime:
                 self._OnVoteFinish()
+            # Announce vote status at intervals
             elif self._currentVote._announceTimer.IsSet() == False:
                 self._currentVote._announceTimer.Set(self._config.cfg[voteType]["voteAnnounceTimer"])
                 self._AnnounceVote()
-        # check recent map timers
+        
+        # Clean up expired recent maps
         self._rtvRecentMaps = [i for i in self._rtvRecentMaps if i[1].IsSet()]
 
     def _AnnounceVote(self):
+        """Announce current vote status to all players"""
         saystr = ""
         for i in range(len(self._currentVote._voteOptions)):
             saystr += f"{i+1}({len(self._currentVote._playerVotes[i+1])}): {self._currentVote._voteOptions[i].GetMapName()}; "
         self.SvSay(saystr[:-2])
     
     def _OnVoteStart(self):
+        """Handle vote start event"""
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         if votesInProgress == None:
             self._serverData.SetServerVar("votesInProgress", ["RTV"])
@@ -411,25 +482,36 @@ class RTV(object):
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
     
     def _OnVoteFinish(self):
+        """Process vote results and determine next action"""
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         voteType = "rtm" if type(self._currentVote) == RTMVote else "rtv"
+        
+        # Clean up vote tracking
         if votesInProgress == None:
             self._serverData.SetServerVar("votesInProgress", [])
         elif "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
-        # Check for vote percentage threshold if applicable
-        if self._config.cfg[voteType]["minimumVoteRatio"]["enabled"] and (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]:
+        
+        # Check vote participation threshold
+        if self._config.cfg[voteType]["minimumVoteRatio"]["enabled"] and \
+           (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < \
+           self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]:
             self.SvSay(f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVoteRatio']['ratio'] * 100} percent)")
             self._currentVote = None
+            # Set appropriate cooldown
             if type(self._currentVote) == RTMVote:
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
             else:
                 self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
             return None
+        
+        # Determine winner(s)
         winners = self._currentVote.GetWinners()
-        if voteType == "rtv" and not self._config.cfg["rtv"]["automaticMaps"] and self._config.cfg["rtv"]["mapTypePriority"]["enabled"]:
-            # Attempt to resolve through priority
+        
+        # Apply map priority system for RTV votes
+        if voteType == "rtv" and not self._config.cfg["rtv"]["automaticMaps"] and \
+           self._config.cfg["rtv"]["mapTypePriority"]["enabled"]:
             priorityMap = {
                 MapPriorityType.MAPTYPE_NOCHANGE : self._config.cfg["rtv"]["mapTypePriority"]["nochange"],
                 MapPriorityType.MAPTYPE_PRIMARY : self._config.cfg["rtv"]["mapTypePriority"]["primary"],
@@ -437,10 +519,13 @@ class RTV(object):
             }
             maxPrio = max(winners, key=lambda a : priorityMap[a.GetPriority()]).GetPriority()
             winners = [winner for winner in winners if priorityMap[winner.GetPriority()] == priorityMap[maxPrio]]
+        
+        # Handle vote results
         if len(winners) == 1:
             winner = winners[0]
             if winner.GetMapName() != "Don't Change":
                 if type(self._currentVote) == RTMVote:
+                    # Handle RTM result
                     if self._config.cfg["rtm"]["changeImmediately"] == True:
                         self._SwitchRTM(winner)
                     else:
@@ -448,6 +533,7 @@ class RTV(object):
                         self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
+                    # Handle RTV result
                     t = Timeout()
                     t.Set(self._config.cfg["rtv"]["disableRecentlyPlayedMaps"])
                     self._rtvRecentMaps.append((winner.GetMapName(), t))
@@ -458,23 +544,24 @@ class RTV(object):
                         self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
                     self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             else:
+                # Handle "Don't Change" result
                 if type(self._currentVote) == RTMVote:
-                    self.SvSay(f"Voted to not change mode.");
+                    self.SvSay(f"Voted to not change mode.")
                     self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
                 else:
-                    self.SvSay(f"Voted to not change map.");
+                    self.SvSay(f"Voted to not change map.")
                     self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
             self._currentVote = None
         elif len(winners) > 1:
+            # Handle tie - start tiebreaker vote
             voteOptions = [winner for winner in winners]
-            tiebreakerVote = RTVVote(voteOptions)
             if type(self._currentVote) == RTMVote:
                 self._StartRTMVote(voteOptions)
             else:
                 self._StartRTVVote(voteOptions)
         elif len(winners) == 0:
-            self.SvSay("Vote ended with no voters, keeping everything the same!");
-            # TODO: This will cause a crash with a vote with 0 options, shouldn't occur in practice
+            # Handle no votes cast
+            self.SvSay("Vote ended with no voters, keeping everything the same!")
             if type(self._currentVote) == RTMVote:
                 self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
             else:
@@ -482,6 +569,7 @@ class RTV(object):
             self._currentVote = None
 
     def _SwitchRTM(self, winner : Map, doSleep=True):
+        """Switch game mode to winner of RTM vote"""
         self._rtmToSwitch = None
         modeToChange = MBMODE_ID_MAP[winner.GetMapName().lower().replace(' ', '')]
         self.SvSay(f"Switching game mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)}!")
@@ -490,70 +578,93 @@ class RTV(object):
         self._serverData.interface.MbMode(modeToChange)
     
     def _SwitchRTV(self, winner : Map, doSleep=True):
+        """Switch map to winner of RTV vote"""
         self._rtvToSwitch = None
         mapToChange = winner.GetMapName()
-        self.SvSay(f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!");
+        self.SvSay(f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!")
         if doSleep:
             sleep(1)
-        self._serverData.interface.MapReload(mapToChange);
+        self._serverData.interface.MapReload(mapToChange)
     
     def HandleChatCommand(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+        """Route chat command to appropriate handler"""
         command = cmdArgs[0]
         for c in self._commandList[teamId]:
             if command in c:
                 return self._commandList[teamId][c][1](player, teamId, cmdArgs)
         return False
 
+    # Command handlers below with detailed explanations
     
     def HandleRTV(self, player : player.Player, teamId : int, cmdArgs : list[str]):
+        """Handle !rtv command - player votes to start map vote"""
         capture = True
         eventPlayer = player
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        
+        # Check if RTV is possible
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
+            # Campaign mode check
             if self._serverData.GetServerVar("campaignMode") == True:
-                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!");
+                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
                 return capture
+            # Cooldown check
             elif self._rtvCooldown.IsSet():
                 self.SvSay(f"RTV is on cooldown for {colors.ColorizeText(self._rtvCooldown.LeftDHMS(), self._themeColor)}.")
                 return capture
+            
+            # Process RTV request
             if not eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.append(eventPlayerId)
                 self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
                 self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+            
+            # Check if threshold reached to start vote
             if len(self._wantsToRTV) >= ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio']):
                 self._StartRTVVote()
         return capture
 
     def _StartRTVVote(self, choices=None):
+        """Start Rock the Vote process"""
         self._wantsToRTV.clear()
         voteChoices = []
         print("RTV start")
+        
+        # Build vote options if not provided
         if choices == None:
+            # Prepare blacklist of maps to exclude
             blacklist = [x[0] for x in self._rtvRecentMaps]
             if self._config.cfg["rtv"]["useSecondaryMaps"] < 2:
                 blacklist.extend([x.GetMapName() for x in self._mapContainer.GetAllMaps() if x.GetPriority() == MapPriorityType.MAPTYPE_SECONDARY])
             if not self._config.cfg["rtv"]["allowNominateCurrentMap"]:
                 blacklist.append(self._mapName.lower())
                 
+            # Add nominated maps
             for nom in self._nominations:
                 voteChoices.append(nom.GetMap())
                 
+            # Get random maps to fill options
             choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=blacklist)
             
             # Filter out nominations to prevent duplicates
             nomination_names = {n.GetMap().GetMapName().lower() for n in self._nominations}
             choices = [m for m in choices if m.GetMapName().lower() not in nomination_names]
             
+            # Clear nominations and build final list
             self._nominations.clear()
             voteChoices.extend([x for x in choices])
+            
+            # Add "Don't Change" option
             noChangeMap = Map("Don't Change", "N/A")
             noChangeMap.SetPriority(MapPriorityType.MAPTYPE_NOCHANGE)
             voteChoices.append(noChangeMap)
         else:
             voteChoices = choices
+        
+        # Create and start vote
         newVote = RTVVote(voteChoices)
         self._currentVote = newVote
         self._OnVoteStart()
@@ -561,17 +672,24 @@ class RTV(object):
         self.SvSay(f"{colors.ColorizeText('RTV', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
 
     def _StartRTMVote(self, choices=None):
+        """Start Rock the Mode process"""
         self._wantsToRTM.clear()
         voteChoices = []
         print("RTM start")
+        
+        # Build vote options if not provided
         if choices == None:
             choices = self._config.cfg["rtm"]["modes_enabled"]
             voteChoices.extend([Map(x, "RTM") for x in choices])
+            
+            # Add "Don't Change" option
             noChangeMap = Map("Don't Change", "RTM")
             noChangeMap.SetPriority(MapPriorityType.MAPTYPE_NOCHANGE)
             voteChoices.append(noChangeMap)
         else:
             voteChoices = choices
+        
+        # Create and start vote
         newVote = RTMVote(voteChoices)
         self._currentVote = newVote
         self._OnVoteStart()
@@ -579,33 +697,45 @@ class RTV(object):
         self.SvSay(f"{colors.ColorizeText('RTM', self._themeColor)} has started! Vote will complete in {colors.ColorizeText(str(self._currentVote._voteTime), self._themeColor)} seconds.")
 
     def HandleRTM(self, player: player.Player, teamId : int, cmdArgs : list[str]):
+        """Handle !rtm command - player votes to start mode vote"""
         capture = True
         eventPlayer = player
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        
+        # Check if RTM is possible
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
+            # Feature enabled check
             if self._config.cfg["rtm"]["enabled"] == False:
-                self.SvSay("This server has RTM disabled.");
+                self.SvSay("This server has RTM disabled.")
                 return capture
+            # Cooldown check
             elif self._rtmCooldown.IsSet():
                 self.SvSay(f"RTM is on cooldown for {colors.ColorizeText(self._rtmCooldown.LeftDHMS(), self._themeColor)}.")
                 return capture
+            
+            # Process RTM request
             if not eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.append(eventPlayerId)
                 self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
                 self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+            
+            # Check if threshold reached to start vote
             if len(self._wantsToRTM) >= ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio']):
                 self._StartRTMVote()
         return capture
 
     def HandleUnRTM(self, player: player.Player, teamId : int, cmdArgs : list[str]):
+        """Handle !unrtm command - revoke RTM vote"""
         capture = True
         eventPlayer = player
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        
+        # Check if revocation is possible
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.remove(eventPlayerId)
@@ -616,15 +746,21 @@ class RTV(object):
         
 
     def HandleUnRTV(self, player : player.Player, teamId : int, cmdArgs : list[str]):
+        """Handle !unrtv command - revoke RTV vote"""
         capture = True
         eventPlayer = player
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        
+        # Check if revocation is possible
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
+            # Campaign mode check
             if self._serverData.GetServerVar("campaignMode") == True:
                 self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
                 return capture
+            
+            # Process revocation
             if eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.remove(eventPlayerId)
                 self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
@@ -633,27 +769,42 @@ class RTV(object):
         return capture
 
     def HandleMapNom(self, player : player.Player, teamId : int, cmdArgs : list[str]):
+        """Handle !nominate command - nominate a map for voting"""
         capture = False
         eventPlayer = player
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        
+        # Check if nomination is possible
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and len(cmdArgs) >= 2:
             capture = True
             mapToNom = cmdArgs[1]
             playerHasNomination = eventPlayer in [x.GetPlayer() for x in self._nominations]
-            if self._mapContainer.FindMapWithName(mapToNom) != None and len(self._nominations) < 5 and not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
+            
+            # Validate nomination
+            if self._mapContainer.FindMapWithName(mapToNom) != None and \
+               len(self._nominations) < 5 and \
+               not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and \
+               (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or \
+                (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
+               
                 mapObj = self._mapContainer.FindMapWithName(mapToNom)
+                # Update existing nomination
                 if playerHasNomination:
                     for i in self._nominations:
                         if i.GetPlayer() == eventPlayer:
                             self._nominations.remove(i)
+                # Add new nomination
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
+                
+                # Send appropriate message
                 if playerHasNomination:
                     self.SvSay(f"Player {eventPlayer.GetName()}^7 changed their nomination to {colors.ColorizeText(mapToNom, self._themeColor)}!")
                 else:
                     self.SvSay(f"Player {eventPlayer.GetName()}^7 nominated {colors.ColorizeText(mapToNom, self._themeColor)} for RTV!")
             else:
+                # Handle invalid nomination
                 if not self._mapContainer.FindMapWithName(mapToNom):
                     failReason = "map was not found"
                 elif len(self._nominations) >= 5:
@@ -668,13 +819,17 @@ class RTV(object):
         return capture
 
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
+        """Handle !maplist command - show available maps"""
         capture = False
         eventPlayer = player
         eventPlayerId = eventPlayer.GetId()
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        
+        # Process command if valid
         if len(cmdArgs) == 2:
             capture = True
+            # Build paginated map list
             pages = []
             pageStr = ""
             for map in self._mapContainer.GetAllMaps():
@@ -688,6 +843,8 @@ class RTV(object):
                     pageStr += map.GetMapName()
                     pageStr += ', '
             pages.append(pageStr[:-2])
+            
+            # Show requested page
             if cmdArgs[1].isdecimal():
                 pageIndex = int(cmdArgs[1])
                 if 1 <= pageIndex <= len(pages):
@@ -699,18 +856,25 @@ class RTV(object):
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
+        """Handle !search command - search maps by name"""
         capture = False
         if len(cmdArgs) > 1:
             searchQuery = ' '.join(cmdArgs[1:])
             totalResults = 0
             mapPages = []
             mapStr = ""
+            
+            # Search maps
             for map in self._mapContainer.GetAllMaps():
                 mapName = map.GetMapName()
+                # Check if map matches all search terms
                 if all(str.find(mapName, x) != -1 for x in cmdArgs[1:]):
+                    # Highlight search terms in results
                     for searchTerm in cmdArgs[1:]:
                         index = str.find(mapName, searchTerm)
                         mapName = colors.HighlightSubstr(mapName, index, index + len(searchTerm), self._themeColor)
+                    
+                    # Add to results page
                     if len(mapStr) + len(mapName) < 950:
                         mapStr += mapName
                         mapStr += ', '
@@ -719,62 +883,74 @@ class RTV(object):
                         mapPages.append(mapStr)
                         mapStr = mapName + ', '
                     totalResults += 1
+            
+            # Add remaining results
             if len(mapStr) > 0:
                 mapPages.append(mapStr[:-2])
+            
+            # Display results
             if len(mapPages) == 0:
                 self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix} Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
+                # Batch output for multiple pages
                 batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
         return capture
 
     def HandleDecimalVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+        """Handle numeric voting commands (1-6) during active votes"""
         capture = False
         currVote = self._currentVote
         if currVote != None:
             if cmdArgs[0].isdecimal():
                 capture = True
-                index = int(cmdArgs[0])-1;
+                index = int(cmdArgs[0])-1
+                # Validate vote option
                 if index in range(0, len(currVote.GetOptions())):
-                    currVote.HandleVoter(player, index);
+                    currVote.HandleVoter(player, index)
         return capture
 
     def OnChatMessage(self, eventClient : client.Client, eventMessage : str, eventTeamID : int):
+        """Handle incoming chat messages and route commands"""
         if eventClient != None:
             Log.debug(f"Received chat message from client {eventClient.GetId()}")
             commandPrefix = self._config.cfg["RTVPrefix"]
             capture = False
             eventPlayer : player.Player = self._players[eventClient.GetId()]
             eventPlayerId = eventPlayer.GetId()
-            currentVote = self._currentVote
-            votesInProgress = self._serverData.GetServerVar("votesInProgress")
-            eventMessage = eventMessage.lower()
+            
             if eventPlayer != None:
-                capture : bool = False;
+                capture : bool = False
+                # Check if message starts with command prefix
                 if eventMessage.startswith(self._config.cfg["RTVPrefix"]) or not self._config.cfg["requirePrefix"]:
+                    # Remove prefix if present
                     if eventMessage.startswith(self._config.cfg["RTVPrefix"]):
                         eventMessage = eventMessage[len(self._config.cfg["RTVPrefix"]):]
-                    if len ( eventMessage ) > 0: # in case if someone sends just a prefix and nothing else, otherwise we're splitting an empty string
+                    
+                    # Process command if non-empty
+                    if len ( eventMessage ) > 0:
                         messageParse = eventMessage.split()
                         return self.HandleChatCommand(eventPlayer, eventTeamID, messageParse)
-                return capture;
-            return False
+            return capture
     
     def OnClientConnect(self, eventClient : client.Client):
+        """Handle new client connection"""
         newPlayer = Player(eventClient)
-        self._OnNewPlayer(newPlayer);
+        self._OnNewPlayer(newPlayer)
         return False
 
     def _OnNewPlayer(self, newPlayer : player.Player):
+        """Add new player to tracking"""
         newPlayerId = newPlayer.GetId()
         if newPlayerId in self._players:
             Log.warning(f"Player ID {newPlayerId} already exists in RTV players. Overwriting entry with newly connected player's data...")
         self._players[newPlayerId] = newPlayer
 
     def OnClientDisconnect(self, eventClient : client.Client, reason : int):
+        """Handle client disconnection"""
         if reason != godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN:
             dcPlayerId = eventClient.GetId()
             if dcPlayerId in self._players:
@@ -784,6 +960,7 @@ class RTV(object):
         return False
     
     def OnEmptyServer(self, data, isStartup):
+        """Handle empty server event - switch to default map/mode"""
         doMap = self._config.cfg["rtv"]["emptyServerMap"]["enabled"]
         doMode = self._config.cfg["rtm"]["emptyServerMode"]["enabled"]
         if doMap and doMode:
@@ -795,11 +972,15 @@ class RTV(object):
         return False
 
     def OnClientChange(self, eventClient, eventData):
+        """Handle client changes (not implemented)"""
         return False
 
     def OnServerInit(self, data):
+        """Handle server initialization (round start)"""
         self._roundTimer += 1
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        
+        # Check if we should start an automatic vote
         if not self._currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if self._config.cfg["rtv"]["roundLimit"]["enabled"] == True and self._roundTimer > self._config.cfg["rtv"]["roundLimit"]["rounds"]:
                 self._StartRTVVote()
@@ -807,7 +988,8 @@ class RTV(object):
             elif self._config.cfg["rtm"]["roundLimit"]["enabled"] == True and self._roundTimer > self._config.cfg["rtm"]["roundLimit"]["rounds"]:
                 self._StartRTMVote()
                 self._roundTimer = 0
-        # self._SwitchRT* sets their corresponding ToSwitch variable to None
+        
+        # Process pending map/mode changes
         if self._rtvToSwitch != None:
             self._SwitchRTV(self._rtvToSwitch)
         elif self._rtmToSwitch != None:
@@ -815,32 +997,42 @@ class RTV(object):
         return False
 
     def OnServerShutdown(self):
+        """Handle server shutdown (not implemented)"""
         return False
 
     def OnClientKill(self, eventClient, eventVictim, eventWeaponStr):
+        """Handle client kill event (not implemented)"""
         return False
 
     def OnPlayer(self, client, data):
+        """Handle player event (not implemented)"""
         return False
 
     def OnExit(self, eventData):
+        """Handle exit event (not implemented)"""
         return False
     
     def OnMapChange(self, mapName, oldMapName) -> bool:
+        """Handle map change event"""
         Log.debug(f"Map change event received: {mapName}")
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        # Clean up vote tracking
         if "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
+        # Update current map
         if mapName != self._mapName:
             self._mapName = mapName
+        # Reset current vote
         if self._currentVote != None:
             self._currentVote = None
         return False
 
     def HandleForceRTV(self, playerName, smodId, adminIP, cmdArgs):
+        """Handle smod !forcertv command - force start RTV vote"""
         currentVote = self._currentVote
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._serverData.GetServerVar("campaignMode") == True:
                 self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
@@ -851,94 +1043,109 @@ class RTV(object):
         return True
 
     def HandleSmodCommand(self, playerName, smodId, adminIP, cmdArgs):
+        """Route smod command to appropriate handler"""
         command = cmdArgs[0]
         if command.startswith("!"):
-            # TODO: Make this an actual config option
-            if command.startswith("!"):
-                command = command[len("!"):]
+            command = command[len("!"):]
         for c in self._smodCommandList:
             if command in c:
                 return self._smodCommandList[c][1](playerName, smodId, adminIP, cmdArgs)
         return False
     
     def Start(self) -> bool:
-        allClients = self._serverData.API.GetAllClients();
+        """Initialize plugin with current players"""
+        allClients = self._serverData.API.GetAllClients()
         for cl in allClients:
-            newPlayer = player.Player(cl);
-            self._OnNewPlayer(newPlayer);
-        return True;
-
+            newPlayer = player.Player(cl)
+            self._OnNewPlayer(newPlayer)
+        return True
 
     def OnSmsay(self, senderName : str, smodID : int, senderIP : str, message : str):
+        """Handle smod chat messages"""
         message = message.lower()
         messageParse = message.split()
         return self.HandleSmodCommand(senderName, smodID, senderIP, messageParse)
 
 class RTVNomination(object):
+    """Represents a player's map nomination"""
     def __init__(self, player, map):
         self._player = player
         self._map = map
 
     def GetPlayer(self) -> player.Player:
+        """Get nominating player"""
         return self._player
 
     def GetMap(self) -> Map:
+        """Get nominated map"""
         return self._map
+
+# Plugin lifecycle functions below with detailed explanations
 
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     global PluginInstance
     startTime = time()
-    serverMap = PluginInstance._serverData.mapName;
-    if serverMap == '': # godfinger hasn't initialized map yet, we gotta get it straight from the server
+    
+    # Get current map
+    serverMap = PluginInstance._serverData.mapName
+    if serverMap == '': # godfinger hasn't initialized map yet
         serverMap = PluginInstance._serverData.interface.GetCvar("mapname")
     PluginInstance._mapName = serverMap
+    
+    # Initialize plugin
     if not PluginInstance.Start():
-        return False;
+        return False
+    
+    # Kick protected names if enabled
     if PluginInstance._config.cfg["kickProtectedNames"] == True:
         for i in PluginInstance._serverData.API.GetAllClients():
             nameStripped = colors.StripColorCodes(i.GetName().lower())
             if nameStripped == "admin" or nameStripped == "server":
                 PluginInstance._serverData.interface.ClientKick(i.GetId())
+    
+    # Report startup time
     loadTime = time() - startTime
     PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"RTV started in {loadTime:.2f} seconds!")
-    return True; # indicate plugin start success
+    return True  # indicate plugin start success
 
-# Called each loop tick from the system, TODO? maybe add a return timeout for next call
+# Called each loop tick from the system
 def OnLoop():
     PluginInstance._doLoop()
-    #print("Calling Loop function from plugin!");
 
 # Called before plugin is unloaded by the system, finalize and free everything here
 def OnFinish():
     global PluginInstance
-    del PluginInstance;
+    del PluginInstance
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports=None):
-    global SERVER_DATA;
-    SERVER_DATA = serverData;
+    global SERVER_DATA
+    SERVER_DATA = serverData
 
-    logMode = logging.INFO;
+    # Configure logging
+    logMode = logging.INFO
     if serverData.args.debug:
-        logMode = logging.DEBUG;
+        logMode = logging.DEBUG
     if serverData.args.logfile != "":
         logging.basicConfig(
-        filename=serverData.args.logfile,
-        level=logMode,
-        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+            filename=serverData.args.logfile,
+            level=logMode,
+            format='%(asctime)s %(levelname)08s %(name)s %(message)s')
     else:
         logging.basicConfig(
-        level=logMode,
-        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+            level=logMode,
+            format='%(asctime)s %(levelname)08s %(name)s %(message)s')
 
-    global PluginInstance;
+    # Create plugin instance
+    global PluginInstance
     PluginInstance = RTV(serverData)
     
-
+    # Register API exports
     if exports != None:
         exports.Add("StartRTVVote", API_StartRTVVote)
     
+    # Register commands with server
     newVal = []
     rCommands = SERVER_DATA.GetServerVar("registeredCommands")
     if rCommands != None:
@@ -948,12 +1155,14 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
             if not i.isdecimal():
                 newVal.append((i, PluginInstance._commandList[teams.TEAM_GLOBAL][cmd][0]))
     SERVER_DATA.SetServerVar("registeredCommands", newVal)
-    return True; # indicate plugin load success
+    return True  # indicate plugin load success
 
 def API_StartRTVVote():
+    """API function to start RTV vote externally"""
     Log.debug("Received external RTV vote request")
     global PluginInstance
     votesInProgress = PluginInstance._serverData.GetServerVar("votesInProgress")
+    # Check if vote can be started
     if not PluginInstance._currentVote and (votesInProgress == None or len(votesInProgress) == 0):
         if PluginInstance._serverData.GetServerVar("campaignMode") == True:
             PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
@@ -964,27 +1173,28 @@ def API_StartRTVVote():
     return False
 
 def OnEvent(event) -> bool:
-    global PluginInstance;
+    """Route Godfinger events to appropriate handlers"""
+    global PluginInstance
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
-        return PluginInstance.OnChatMessage( event.client, event.message, event.teamId );
+        return PluginInstance.OnChatMessage( event.client, event.message, event.teamId )
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
-        return PluginInstance.OnClientConnect( event.client);
+        return PluginInstance.OnClientConnect( event.client)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
-        return PluginInstance.OnClientChange( event.client, event.data );
+        return PluginInstance.OnClientChange( event.client, event.data )
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
-        return PluginInstance.OnClientDisconnect( event.client, event.reason );
+        return PluginInstance.OnClientDisconnect( event.client, event.reason )
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
-        return PluginInstance.OnServerInit(event.data);
+        return PluginInstance.OnServerInit(event.data)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
-        return PluginInstance.OnServerShutdown();
+        return PluginInstance.OnServerShutdown()
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
-        return PluginInstance.OnClientKill(event.client, event.victim, event.weaponStr);
+        return PluginInstance.OnClientKill(event.client, event.victim, event.weaponStr)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER:
-        return PluginInstance.OnPlayer(event.client, event.data["text"] if "text" in event.data else "");
+        return PluginInstance.OnPlayer(event.client, event.data["text"] if "text" in event.data else "")
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
-        return PluginInstance.OnExit(event.data);
+        return PluginInstance.OnExit(event.data)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
-        return PluginInstance.OnMapChange(event.mapName, event.oldMapName);
+        return PluginInstance.OnMapChange(event.mapName, event.oldMapName)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return PluginInstance.OnSmsay(event.playerName, event.smodID, event.adminIP, event.message)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
@@ -993,6 +1203,7 @@ def OnEvent(event) -> bool:
 
 # Helper function to get all map names from currently installed PK3 files located in MBII directory and base directory next to MBII
 def GetAllMaps() -> list[Map]:
+    """Scan PK3 files in MBII directories to discover available maps"""
     mbiiDir = DEFAULT_CFG.cfg["MBIIPath"] + "\\"
     mapList = []
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]; # base comes next so it wont override MBII dir contents if files match
@@ -1002,6 +1213,7 @@ def GetAllMaps() -> list[Map]:
                 with ZipFile(dir + "\\" + filename) as file:
                     zipNameList = file.namelist()
                     for name in zipNameList:
+                        # Process BSP files as map objects
                         if name.endswith(".bsp") and not name in [x.GetMapName() for x in mapList]:
                             path = name
                             name = name.lower().replace("maps/", "").replace(".bsp", "")
