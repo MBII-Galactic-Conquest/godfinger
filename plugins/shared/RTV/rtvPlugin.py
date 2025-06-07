@@ -35,7 +35,7 @@
 # =================================================================================
 # GODFINGER RTV CREDITS:
 # =================================================================================
-# Godfinger created by:
+# Godfinger contributors:
 # 2cwldys (https://github.com/2cwldys),
 # ACHUTA/Mantlar, (https://github.com/mantlar)
 # ViceDice, (https://github.com/2cwldys)
@@ -443,13 +443,14 @@ class RTV(object):
                 # Global commands
                 teams.TEAM_GLOBAL : {
                     ("rtv", "rock the vote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
-                    ("rtm") : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
-                    ("unrtm") : ("!unrtm - revoke your vote to start the next RTM vote", self.HandleUnRTM),
+                    ("rtm", "rockthemode") : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
+                    ("unrtm", "unrockthemode") : ("!unrtm - revoke your vote to start the next RTM vote", self.HandleUnRTM),
                     ("unrtv", "unrockthevote") : ("!<unrtv | unrockthevote> - cancel your vote to start the next Map vote", self.HandleUnRTV),
-                    ("maplist") : ("!maplist <#> - display page # of the server's map list", self.HandleMaplist),
+                    ("maplist", "maps") : ("!maplist <#> - display page # of the server's map list", self.HandleMaplist),
                     ("nom", "nominate", "mapnom") : ("!nominate <map> - nominates a map for the next round of voting", self.HandleMapNom),
                     ("nomlist", "nominationlist", "nominatelist", "noml") : ("!nomlist - displays a list of nominations for the next map", self.HandleNomList),
-                    ("search") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
+                    ("search", "mapsearch") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
+                    ('help', "cmds") : ("!help - display help about a given command, or all commands if no command is given", self.HandleHelp),
                     ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)  # handle decimal votes
                 },
                 # Team-specific commands (only vote commands for other teams)
@@ -964,6 +965,23 @@ class RTV(object):
             self.Say("No map nominations to display.")
         return capture
 
+    # only included if not already defined in another plugin
+    def HandleHelp(self, player : player.Player, teamId : int, cmdArgs : list[str]):
+        capture = True
+        commandAliasList = self._serverData.GetServerVar("registeredCommands")
+        if len(cmdArgs) > 1:
+            for i in commandAliasList:
+                if cmdArgs[1] == i[0]:
+                    saystr = i[1]
+                    self.Say(saystr)
+                    return capture
+            # couldn't find command
+            self.Say(f"Couldn't find chat command {colors.ColorizeText(cmdArgs[1], self._themeColor)}")
+        else:
+            saystr = ', '.join([x[0] for x in commandAliasList])
+            self.Say(colors.ColorizeText("(Say !help <command> for help on a specific command): ", self._themeColor) + saystr)
+        return capture
+        
     def OnChatMessage(self, eventClient : client.Client, eventMessage : str, eventTeamID : int):
         """Handle incoming chat messages and route commands"""
         if eventClient != None:
@@ -1194,7 +1212,11 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
     
     # Register commands with server
     newVal = []
+    # Check for existing help command from another plugin before using this plugin's
     rCommands = PluginInstance._serverData.GetServerVar("registeredCommands")
+    if rCommands != None and 'help' in [x for x, _ in rCommands]:
+        del PluginInstance._commandList[teams.TEAM_GLOBAL][('help', "cmds")]
+
     if rCommands != None:
         newVal.extend(rCommands)
     for cmd in PluginInstance._commandList[teams.TEAM_GLOBAL]:
