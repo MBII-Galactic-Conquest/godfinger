@@ -134,7 +134,7 @@ class IServerInterface():
     def ClientSound(self, soundName : str, clientId : int) -> str:
         return;
 
-    def Smsay(self, msg : str) -> str:
+    def SmSay(self, msg : str) -> str:
         return;
 
     def Test(self):
@@ -346,9 +346,9 @@ class RconInterface(AServerInterface):
             return self._rcon.ClientSound(soundName, clientId);
         return None;
 
-    def SmSay(self, soundName : str, clientId : int) -> str:
+    def SmSay(self, msg : str) -> str:
         if self.IsOpened():
-            return self._rcon.SmSay(soundName, clientId);
+            return self._rcon.SmSay(msg);
         return None;
 
 #endregion RconCommands

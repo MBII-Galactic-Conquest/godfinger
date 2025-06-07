@@ -468,7 +468,9 @@ class RTV(object):
         # Server Moderator commands
         self._smodCommandList = \
         {
-            ("frtv", "forcertv") : ("!<frtv | forcertv> - forces an RTV vote if no other vote is currently active", self.HandleForceRTV)
+            ("frtv", "forcertv") : ("!<frtv | forcertv> - forces an RTV vote if no other vote is currently active", self.HandleForceRTV),
+            ("rtvenable", "rtve") : ("!rtvenable - finishes the timeout period of RTV immediately", self.HandleRTVEnable),
+            ("rtmenable", "rtme") : ("!rtmenable - finishes the timeout period of RTM immediately", self.HandleRTMEnable)
         }
         
         # State tracking variables
@@ -1105,6 +1107,36 @@ class RTV(object):
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             self.SvSay("Smod forced RTV vote")
             self._StartRTVVote()
+        return True
+
+    def HandleRTVEnable(self, playerName, smodId, adminIP, cmdArgs):
+        """Handle smod !rtvenable command - force reset the cooldown for RTV"""
+        currentVote = self._currentVote
+        votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        # Check if RTV can be forced
+        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+            if self._config.cfg["rtv"]["enabled"] and self._rtvCooldown.IsSet():
+                self.SvSay("SMOD reset the cooldown for RTV!")
+                self._rtvCooldown.Finish()
+            elif not self._config.cfg["rtv"]["enabled"]:
+                self._serverData.interface.SmSay(self._messagePrefix + "RTV is not enabled.")
+            elif not self._rtvCooldown.IsSet():
+                self._serverData.interface.SmSay(self._messagePrefix + "RTV is not on cooldown.")
+        return True
+
+    def HandleRTMEnable(self, playerName, smodId, adminIP, cmdArgs):
+        """Handle smod !rtmenable command - force reset the cooldown for RTM"""
+        currentVote = self._currentVote
+        votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        # Check if RTV can be forced
+        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+            if self._config.cfg["rtm"]["enabled"] and self._rtmCooldown.IsSet():
+                self.SvSay("SMOD reset the cooldown for RTM!")
+                self._rtmCooldown.Finish()
+            elif not self._config.cfg["rtm"]["enabled"]:
+                self._serverData.interface.SmSay(self._messagePrefix + "RTM is not enabled.")
+            elif not self._rtmCooldown.IsSet():
+                self._serverData.interface.SmSay(self._messagePrefix + "RTM is not on cooldown.")
         return True
 
     def HandleSmodCommand(self, playerName, smodId, adminIP, cmdArgs):
