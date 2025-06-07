@@ -356,4 +356,6 @@ class RCON(object):
             self.ExecVstr(vstrStorage)
 
     def SmSay(self, msg : str):
-        return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self.rcon_pwd, msg));
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self._password, msg));
