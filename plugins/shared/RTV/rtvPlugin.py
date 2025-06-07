@@ -469,6 +469,7 @@ class RTV(object):
         self._smodCommandList = \
         {
             ("frtv", "forcertv") : ("!<frtv | forcertv> - forces an RTV vote if no other vote is currently active", self.HandleForceRTV),
+            ("frtm", "forcertm") : ("!<frtm | forcertm> - forces an RTM vote if no other vote is currently active", self.HandleForceRTM),
             ("rtvenable", "rtve") : ("!rtvenable - finishes the timeout period of RTV immediately", self.HandleRTVEnable),
             ("rtmenable", "rtme") : ("!rtmenable - finishes the timeout period of RTM immediately", self.HandleRTMEnable)
         }
@@ -1107,6 +1108,16 @@ class RTV(object):
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             self.SvSay("Smod forced RTV vote")
             self._StartRTVVote()
+        return True
+
+    def HandleForceRTM(self, playerName, smodId, adminIP, cmdArgs):
+        """Handle smod !forcertm command - force start RTM vote"""
+        currentVote = self._currentVote
+        votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        # Check if RTV can be forced
+        if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
+            self.SvSay("Smod forced RTM vote")
+            self._StartRTMVote()
         return True
 
     def HandleRTVEnable(self, playerName, smodId, adminIP, cmdArgs):
