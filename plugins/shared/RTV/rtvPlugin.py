@@ -654,12 +654,8 @@ class RTV(object):
         
         # Check if RTV is possible
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
-            # Campaign mode check
-            if self._serverData.GetServerVar("campaignMode") == True:
-                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
-                return capture
             # Cooldown check
-            elif self._rtvCooldown.IsSet():
+            if self._rtvCooldown.IsSet():
                 self.SvSay(f"RTV is on cooldown for {colors.ColorizeText(self._rtvCooldown.LeftDHMS(), self._themeColor)}.")
                 return capture
             
@@ -803,11 +799,6 @@ class RTV(object):
         
         # Check if revocation is possible
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
-            # Campaign mode check
-            if self._serverData.GetServerVar("campaignMode") == True:
-                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
-                return capture
-            
             # Process revocation
             if eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.remove(eventPlayerId)
@@ -1094,12 +1085,8 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-            if self._serverData.GetServerVar("campaignMode") == True:
-                self.SvSay("RTV is disabled. !togglecampaign to vote to enable it!")
-                return True
-            else:
-                self.SvSay("Smod forced RTV vote")
-                self._StartRTVVote()
+            self.SvSay("Smod forced RTV vote")
+            self._StartRTVVote()
         return True
 
     def HandleSmodCommand(self, playerName, smodId, adminIP, cmdArgs):
@@ -1224,12 +1211,8 @@ def API_StartRTVVote():
     votesInProgress = PluginInstance._serverData.GetServerVar("votesInProgress")
     # Check if vote can be started
     if not PluginInstance._currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-        if PluginInstance._serverData.GetServerVar("campaignMode") == True:
-            PluginInstance._serverData.rcon.svsay(PluginInstance._messagePrefix + "RTV is disabled. !togglecampaign to vote to enable it!")
-            return False
-        else:
-            PluginInstance._StartRTVVote()
-            return True
+        PluginInstance._StartRTVVote()
+        return True
     return False
 
 def OnEvent(event) -> bool:
