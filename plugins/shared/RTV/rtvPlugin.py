@@ -1089,7 +1089,7 @@ class RTV(object):
         Log.debug(f"Map change event received: {mapName}")
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Clean up vote tracking
-        if "RTV" in votesInProgress:
+        if votesInProgress != None and "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
         # Update current map
