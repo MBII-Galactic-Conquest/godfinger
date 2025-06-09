@@ -209,15 +209,15 @@ class MBIIServer:
         self._status = MBIIServer.STATUS_INIT;
         Log.info("Initializing Godfinger...");
         # Config load first
-        self._config = config.Config.fromJSON(CONFIG_DEFAULT_PATH)
+        self._config = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
         if self._config == None:
-            # handle config-less init
-            Log.error("Missing config.json, creating a fallback one, close the app, modify godfingerCfg.json and come back")
-            self._config = config.Config()
-            self._config.cfg = json.loads(CONFIG_FALLBACK)
-            f = open(CONFIG_DEFAULT_PATH, "wt")
-            f.write(CONFIG_FALLBACK)
-            f.close()
+            # # handle config-less init
+            # Log.error("Missing config.json, creating a fallback one, close the app, modify godfingerCfg.json and come back")
+            # self._config = config.Config()
+            # self._config.cfg = json.loads(CONFIG_FALLBACK)
+            # f = open(CONFIG_DEFAULT_PATH, "wt")
+            # f.write(CONFIG_FALLBACK)
+            # f.close()
             self._status = MBIIServer.STATUS_CONFIG_ERROR;
             return;
     
@@ -415,6 +415,7 @@ class MBIIServer:
             self._restartTimeout.Set(timeout);
             self._lastRestartTick = timeout;
             self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger Restarting procedure started, ETA %s"%self._restartTimeout.LeftDHMS()));
+            Log.info("Restart issued, proceeding.");
     
     def Start(self):
         try:
