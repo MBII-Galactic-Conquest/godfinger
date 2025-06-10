@@ -5,7 +5,13 @@ A discord bot plugin that runs in sync with your godfinger installation, allowin
 
 https://discord.com/developers/
 
+NOTE: Go to OAUTH2 -> URL Generator, under scopes set BOT and APPLICATION.COMMANDS to checked. Under bot permissions give ADMINISTRATOR if it is your bot, or otherwise use slash command & VC permissions.
+
 NOTE: Sessions will not start if the player-vs-player ratio is uneven. (!= 3v4, 5v6, etc...)
+
+
+Joining the PUG voice chat automatically has you join the queue, creating if applicable.
+
 
 Type !queue for a readout of commands:
 
@@ -34,6 +40,7 @@ ALLOWED_CHANNEL_ID= <--- Required channel ID where PUG queues are handled.
 PUG_VC_IDS= <--- Voice channels for automatic queue management, seperated by comma (e.g., 123456789,987654321)
 SERVER_PASSWORD=None <--- Change to your sessions password.
 SERVER_IP= <--- Static IP for display in embeds
+GUILD_ID <--- Guild ID for the bot to access for app commands
 
 # Persistence Configuration
 COOLDOWN_FILE=.cooldown <--- Needed for persisting across GF restarts.

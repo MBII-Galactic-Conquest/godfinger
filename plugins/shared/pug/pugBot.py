@@ -7,6 +7,7 @@ import lib.shared.client as client
 
 import discord
 from discord.ext import commands, tasks
+from discord import app_commands # Import app_commands for slash commands
 from discord.utils import get
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -42,6 +43,7 @@ ALLOWED_CHANNEL_ID= # Text channel for commands and updates
 PUG_VC_IDS=         # Voice channels for automatic queue management, seperated by comma (e.g., 123456789,987654321)
 SERVER_PASSWORD=None
 SERVER_IP=           # Static IP for display in embeds if SERVER_DATA.game_ip is not available dynamically
+GUILD_ID=            # The ID of your Discord server/guild for faster slash command syncing
 
 # Persistence Configuration
 COOLDOWN_FILE=.cooldown
@@ -60,7 +62,7 @@ env_vars_to_reset = [
     "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", "NEW_QUEUE_COOLDOWN",
     "BOT_TOKEN", "PUG_ROLE_ID", "ADMIN_ROLE_ID",
     "ALLOWED_CHANNEL_ID", "PUG_VC_IDS", "SERVER_PASSWORD", "COOLDOWN_FILE", "EMBED_IMAGE",
-    "SERVER_IP"
+    "SERVER_IP", "GUILD_ID"
 ]
 
 def reset_env_vars(vars_list):
@@ -96,6 +98,8 @@ try:
     STATIC_SERVER_IP = os.getenv("SERVER_IP")
     COOLDOWN_FILE = os.getenv("COOLDOWN_FILE")
     EMBED_IMAGE = os.getenv("EMBED_IMAGE")
+    # Load GUILD_ID
+    GUILD_ID = int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None
 
 except Exception as e:
     Log.error(f"Error loading environment variables: {e}. Please check your pugConfig.env file.")
@@ -147,6 +151,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.voice_states = True
+# Set command_prefix to something irrelevant like '!' or omit it if you don't use prefix commands
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 class pugBotPlugin(object):
@@ -154,6 +159,7 @@ class pugBotPlugin(object):
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[PUG]", "lblue") + ": "
 
+# Removed 'self' from here as it's a global task
 @tasks.loop(seconds=30)
 async def monitor_queue_task():
     global player_queue, last_join_time, last_queue_clear_time, game_in_progress
@@ -163,6 +169,9 @@ async def monitor_queue_task():
         channel = bot.get_channel(ALLOWED_CHANNEL_ID)
         if channel:
             await channel.send("**Queue timed out due to inactivity!**\n> Clearing queue...")
+            # Access _serverData through the global PluginInstance if needed
+            if 'PluginInstance' in globals() and PluginInstance._serverData:
+                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5PUG Queue has been cleared due to inactivity!")
         player_queue.clear()
         last_queue_clear_time = datetime.utcnow()
         last_join_time = None
@@ -181,6 +190,24 @@ async def monitor_queue_task():
 @bot.event
 async def on_ready():
     print(f"Bot connected as {bot.user}")
+    # Sync slash commands when the bot is ready
+    try:
+        # Guild-specific sync for faster development
+        if GUILD_ID:
+            guild_obj = discord.Object(id=GUILD_ID)
+            # You might not need copy_global_to if you're only syncing to one guild for dev
+            # bot.tree.copy_global_to(guild=guild_obj)
+            await bot.tree.sync(guild=guild_obj)
+            print(f"Slash commands synced to guild ID: {GUILD_ID}")
+        else:
+            # Fallback to global sync if GUILD_ID is not configured (will be slower)
+            await bot.tree.sync()
+            print("Slash commands synced globally.")
+
+    except Exception as e:
+        print(f"Failed to sync slash commands: {e}")
+        Log.error(f"Failed to sync slash commands: {e}", exc_info=True)
+
     if not monitor_queue_task.is_running():
         monitor_queue_task.start()
 
@@ -218,11 +245,12 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
             Log.debug(f"Game is in progress. Blocking auto-join for {member.display_name}.")
             embed = discord.Embed(
                 title="A Game is Currently In Progress!",
-                description=f"You can join the server directly using IP:\n\n `{server_ip}`",
+                description=f"The game in progress must end before starting a new queue.\n\n"
+                            f"You can join the server directly using IP:\n\n`{server_ip}`\n\n\n\n",
                 color=discord.Color.blue()
             )
             if SERVER_PASSWORD and SERVER_PASSWORD.strip():
-                embed.add_field(name="\n\nServer Password", value=f"`{SERVER_PASSWORD}`", inline=False)
+                embed.add_field(name="Server Password", value=f"`{SERVER_PASSWORD}`", inline=False)
             if EMBED_IMAGE:
                 embed.set_image(url=EMBED_IMAGE)
             try:
@@ -243,7 +271,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
                     description=(
                         f"A new PUG queue cannot be started yet.\n\nPlease wait for "
                         f"`({minutes:02d}:{seconds:02d})` ...\n\n"
-                        f"Rejoin VC, or use `!queue join` when the cooldown expires.\nUse `!queue forcejoin` if you are admin and wish to bypass the cooldown."
+                        f"Rejoin VC, or use `/queue join` when the cooldown expires.\nUse `/queue forcejoin` if you are admin and wish to bypass the cooldown."
                     ),
                     color=discord.Color.red()
                 )
@@ -269,6 +297,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
 
 
 # --- Helper functions to wrap existing queue logic for internal calls ---
+# Removed 'self' from here
 async def handle_queue_join(member: discord.Member, channel: discord.TextChannel):
     """Handles logic for a member joining the queue, called internally."""
     global player_queue, queue_created_time, last_join_time, last_queue_clear_time, game_in_progress
@@ -280,17 +309,24 @@ async def handle_queue_join(member: discord.Member, channel: discord.TextChannel
     if not player_queue:
         queue_created_time = datetime.utcnow()
         pug_mention = f"<@&{PUG_ROLE_ID}>"
-        await channel.send(f"{member.mention} started a new queue! {pug_mention}\n> `{MIN_QUEUE_SIZE}` players required to `!queue start` without admin.")
+        # Access _serverData through the global PluginInstance
+        if 'PluginInstance' in globals() and PluginInstance._serverData:
+            PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A discord PUG queue has been started! ^9({MIN_QUEUE_SIZE}) ^5players required to begin...")
+        await channel.send(f"{member.mention} started a new queue! {pug_mention}\n> `{MIN_QUEUE_SIZE}` players required to `/queue start` without admin.")
 
     player_queue.append(member)
     last_join_time = datetime.utcnow()
 
     needed = MAX_QUEUE_SIZE - len(player_queue)
+    # Access _serverData through the global PluginInstance
+    if 'PluginInstance' in globals() and PluginInstance._serverData:
+        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A player has joined the discord PUG queue, ^9({len(player_queue)}/{MAX_QUEUE_SIZE}) ^5needed to start...")
     await channel.send(f"{member.mention} has joined the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
 
     if len(player_queue) >= MAX_QUEUE_SIZE:
         await start_queue(channel)
 
+# Removed 'self' from here
 async def handle_queue_leave(member: discord.Member, channel: discord.TextChannel):
     """Handles logic for a member leaving the queue, called internally."""
     global player_queue, last_queue_clear_time, game_in_progress
@@ -299,25 +335,30 @@ async def handle_queue_leave(member: discord.Member, channel: discord.TextChanne
         player_queue.remove(member)
 
         if not player_queue:
+            # Access _serverData through the global PluginInstance
+            if 'PluginInstance' in globals() and PluginInstance._serverData:
+                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5The discord PUG queue is now empty and has been cancelled...")
             await channel.send(f"{member.mention} has left the queue!\n> **The queue is now empty and has been cancelled.**")
             last_queue_clear_time = datetime.utcnow()
             game_in_progress = False # Reset if queue becomes empty due to a leave (a forming queue was abandoned)
             Log.info("Queue is now empty due to a leave. game_in_progress set to False.")
         else:
             needed = MAX_QUEUE_SIZE - len(player_queue)
+            # Access _serverData through the global PluginInstance
+            if 'PluginInstance' in globals() and PluginInstance._serverData:
+                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A player has left the discord PUG queue, ^9({len(player_queue)}/{MAX_QUEUE_SIZE}) ^5needed to start...")
             await channel.send(f"{member.mention} has left the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
     else:
         Log.info(f"{member.display_name} left VC, but was not found in active queue.")
 
-# === Queue Command Group ===
-@bot.group()
-async def queue(ctx):
-    if ctx.invoked_subcommand is None:
-        await ctx.send("Available subcommands: `join`, `leave`, `status`, `start`, `password`, `forcestart`, `forcejoin`.")
+# === Queue Slash Command Group ===
+queue_group = app_commands.Group(name="queue", description="Commands for managing the PUG queue.")
+bot.tree.add_command(queue_group) # Add the group to the command tree
 
-@queue.command(name='join')
-async def queue_join(ctx):
-    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+@queue_group.command(name='join', description="Join the PUG queue.")
+async def queue_join_slash(interaction: discord.Interaction):
+    if interaction.channel_id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
     # Determine the server IP for the embed messages
@@ -327,18 +368,18 @@ async def queue_join(ctx):
     if game_in_progress:
         embed = discord.Embed(
             title="A Game is Currently In Progress!",
-            description=f"Please wait for the current game to finish before starting a new queue.\n\n"
-                        f"You can join the server directly using IP: `{server_ip}`",
+            description=f"The game in progress must end before starting a new queue.\n\n"
+                        f"You can join the server directly using IP:\n\n`{server_ip}`\n\n\n\n",
             color=discord.Color.blue()
         )
         if SERVER_PASSWORD and SERVER_PASSWORD.strip():
-             embed.add_field(name="\n\nServer Password", value=f"`{SERVER_PASSWORD}`", inline=False)
+             embed.add_field(name="Server Password", value=f"`{SERVER_PASSWORD}`", inline=False)
         
         if EMBED_IMAGE:
             embed.set_image(url=EMBED_IMAGE)
             
-        await ctx.send(embed=embed)
-        Log.info(f"Blocked {ctx.author.display_name} from joining queue via !join during game_in_progress.")
+        await interaction.response.send_message(embed=embed) # Send as public response
+        Log.info(f"Blocked {interaction.user.display_name} from joining queue via /queue join during game_in_progress.")
         return
 
     # --- Check queue cooldown (blocks everyone) ---
@@ -352,31 +393,33 @@ async def queue_join(ctx):
                 description=(
                     f"A new PUG queue cannot be started yet. Please wait "
                     f"`({minutes:02d}:{seconds:02d})`.\n\n"
-                    f"Please use `!queue forcejoin` if you are an admin and wish to bypass this cooldown."
+                    f"Please use `/queue forcejoin` if you are an admin wishing to bypass the cooldown." # Updated to slash command
                 ),
                 color=discord.Color.red()
             )
-            await ctx.send(embed=embed)
-            Log.info(f"Blocked {ctx.author.display_name} from joining queue via !join during cooldown.")
+            await interaction.response.send_message(embed=embed) # Send as public response
+            Log.info(f"Blocked {interaction.user.display_name} from joining queue via /queue join during cooldown.")
             return
 
     # If not blocked by game_in_progress or cooldown, proceed
-    await handle_queue_join(ctx.author, ctx.channel)
+    # Initial response must be sent within 3 seconds, so we defer long operations to followup or send ephemeral then public
+    # For handle_queue_join, it sends multiple messages, so we'll send a deferred initial response then the actual messages.
+    await interaction.response.defer() # Defer the response as handle_queue_join will send messages
+    await handle_queue_join(interaction.user, interaction.channel)
+    await interaction.followup.send("Your join request has been processed!", ephemeral=True)
 
-@queue.command(name='forcejoin')
-async def queue_forcejoin(ctx):
+@queue_group.command(name='forcejoin', description="Admin: Force join the PUG queue, bypassing all checks.")
+@app_commands.checks.has_role(ADMIN_ROLE_ID) # Admin permission check
+async def queue_forcejoin_slash(interaction: discord.Interaction):
     global player_queue, queue_created_time, last_join_time, game_in_progress, last_queue_clear_time
 
-    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+    if interaction.channel_id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
-    if ADMIN_ROLE_ID not in [role.id for role in ctx.author.roles]:
-        await ctx.send("**You don't have permission to use this command!**")
-        return
-
-    user = ctx.author
+    user = interaction.user
     if user in player_queue:
-        await ctx.send(f"{user.mention}, you're already in the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`)")
+        await interaction.response.send_message(f"{user.mention}, you're already in the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`)")
         return
 
     # Admin force-joining explicitly resets game_in_progress if a game was active.
@@ -387,30 +430,47 @@ async def queue_forcejoin(ctx):
         player_queue.clear() # Ensure queue is cleared if force-joining to start fresh
         Log.info("Admin force-joining: game_in_progress reset, cooldown reset, and queue cleared.")
 
+    # Defer the response as handle_queue_join will send messages
+    await interaction.response.defer()
+
     if not player_queue:
         queue_created_time = datetime.utcnow()
         pug_mention = f"<@&{PUG_ROLE_ID}>"
-        await ctx.send(f"{user.mention} force-started a new queue! {pug_mention}")
+        # Since handle_queue_join sends the first message, we can just log here.
+        # If you want this specific message to show *before* handle_queue_join's first message,
+        # you'd need to modify handle_queue_join or send it as a followup *before* calling handle_queue_join.
+        # For now, handle_queue_join's message will be the first public message.
+        await interaction.followup.send(f"{user.mention} force-started a new queue! {pug_mention}")
+        Log.info(f"{user.display_name} force-started a new queue.")
 
-    player_queue.append(user)
-    last_join_time = datetime.utcnow()
+    await handle_queue_join(user, interaction.channel)
+    if not interaction.response.is_done():
+        await interaction.followup.send("Force join request processed!", ephemeral=True)
 
-    needed = MAX_QUEUE_SIZE - len(player_queue)
-    await ctx.send(f"{user.mention} has joined the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
+@queue_forcejoin_slash.error # Error handler for forcejoin_slash
+async def queue_forcejoin_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingRole):
+        await interaction.response.send_message("You do not have the required role to use this command.", ephemeral=True)
+    else:
+        Log.error(f"Error in /queue forcejoin: {error}", exc_info=True)
+        await interaction.response.send_message("An unexpected error occurred while processing your command.", ephemeral=True)
 
-    if len(player_queue) >= MAX_QUEUE_SIZE:
-        await start_queue(ctx.channel)
 
-@queue.command(name='leave')
-async def queue_leave(ctx):
-    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+@queue_group.command(name='leave', description="Leave the PUG queue.")
+async def queue_leave_slash(interaction: discord.Interaction):
+    if interaction.channel_id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
-    await handle_queue_leave(ctx.author, ctx.channel)
+    await interaction.response.defer() # Defer as handle_queue_leave sends messages
+    await handle_queue_leave(interaction.user, interaction.channel)
+    await interaction.followup.send("Your leave request has been processed!", ephemeral=True)
 
-@queue.command(name='status')
-async def queue_status(ctx):
-    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+
+@queue_group.command(name='status', description="Check the current PUG queue status.")
+async def queue_status_slash(interaction: discord.Interaction):
+    if interaction.channel_id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
     if not player_queue:
@@ -419,13 +479,13 @@ async def queue_status(ctx):
             if time_since_clear < NEW_QUEUE_COOLDOWN:
                 remaining_cooldown = int(NEW_QUEUE_COOLDOWN - time_since_clear)
                 minutes, seconds = divmod(remaining_cooldown, 60)
-                await ctx.send(
+                await interaction.response.send_message( # Public response
                     f"**The queue is currently empty!**\n"
                     f"> Next queue can be started in `({minutes:02d}:{seconds:02d})`."
                 )
                 return
         
-        await ctx.send("**The queue is currently empty!**")
+        await interaction.response.send_message("**The queue is currently empty!**") # Public response
     else:
         names = [user.mention for user in player_queue]
         formatted_names = "\n".join([f"{i+1}. {name}" for i, name in enumerate(names)])
@@ -437,38 +497,60 @@ async def queue_status(ctx):
             minutes, seconds = divmod(time_left, 60)
             time_left_str = f"\n> Queue will expire in *(mm:ss)* `{int(minutes):02d}:{int(seconds):02d}` ..."
 
-        await ctx.send(
+        await interaction.response.send_message( # Public response
             f"Queue Status:\n"
             f"> `{len(player_queue)}` player(s) in queue.{time_left_str}\n\n"
             f"{formatted_names}"
         )
 
-@queue.command(name='start')
-async def start_command(ctx):
-    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+@queue_group.command(name='start', description="Manually start the PUG queue if conditions are met.")
+async def start_command_slash(interaction: discord.Interaction):
+    if interaction.channel_id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
     if len(player_queue) >= MIN_QUEUE_SIZE and len(player_queue) % 2 == 0:
-        await start_queue(ctx.channel)
+        await interaction.response.defer() # Tells Discord the bot is thinking...
+        try:
+            await start_queue(interaction.channel)
+            await interaction.followup.send("Queue start request processed!", ephemeral=True)
+        except Exception as e:
+            Log.error(f"Error starting queue for /start command by {interaction.user.display_name}: {e}", exc_info=True)
+            await interaction.followup.send(f"An unexpected error occurred while starting the queue. Please check logs. Error: `{e}`", ephemeral=True)
+            # You could also send a more user-friendly message without the raw error:
+            # await interaction.followup.send("An unexpected error occurred while trying to start the queue. Please try again later or contact an admin.", ephemeral=True)
     else:
-        await ctx.send(
+        await interaction.response.send_message(
             f"**Not enough players to start the queue!**\n"
             f"> Minimum required: `{MIN_QUEUE_SIZE}`\n"
             f"> Current players: `{len(player_queue)}`\n"
             f"*You need an even number of players to form balanced teams...*"
         )
 
-@queue.command(name='forcestart')
-async def force_start(ctx):
-    Log.info(f"Force start command triggered by {ctx.author.name}")
-    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+@queue_group.command(name='forcestart', description="Admin: Force start the PUG queue regardless of player count.")
+@app_commands.checks.has_role(ADMIN_ROLE_ID)
+async def force_start_slash(interaction: discord.Interaction):
+    Log.info(f"Force start command triggered by {interaction.user.name}")
+    if interaction.channel_id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
-    if ADMIN_ROLE_ID not in [role.id for role in ctx.author.roles]:
-        await ctx.send("**You don't have permission to use this command!**")
-        return
+    await interaction.response.defer() # Tells Discord the bot is thinking...
+    try:
+        await start_queue(interaction.channel)
+        await interaction.followup.send("Force start request processed!", ephemeral=True)
+    except Exception as e:
+        Log.error(f"Error force-starting queue for /forcestart command by {interaction.user.display_name}: {e}", exc_info=True)
+        await interaction.followup.send(f"An unexpected error occurred while force-starting the queue. Please check logs. Error: `{e}`", ephemeral=True)
 
-    await start_queue(ctx.channel)
+@force_start_slash.error # Error handler for force_start_slash
+async def force_start_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingRole):
+        await interaction.response.send_message("You do not have the required role to use this command.", ephemeral=True)
+    else:
+        Log.error(f"Error in /queue forcestart: {error}", exc_info=True)
+        await interaction.response.send_message("An unexpected error occurred while processing your command.", ephemeral=True)
+
 
 async def start_queue(channel):
     global player_queue, last_queue_clear_time, game_in_progress
@@ -487,22 +569,23 @@ async def start_queue(channel):
     player_queue.clear()
     last_queue_clear_time = datetime.utcnow()
     game_in_progress = True
+
+    if 'PluginInstance' in globals() and PluginInstance._serverData:
+        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A discord PUG queue has begun!")
     Log.info("Queue started. player_queue cleared and game_in_progress set to True.")
 
 
 # === Miscellaneous Commands ===
-@bot.command(name='pw')
-async def password_command(ctx):
-    if ctx.channel.id != ALLOWED_CHANNEL_ID:
+@bot.tree.command(name='password', description="Displays the current server password.")
+async def password_slash(interaction: discord.Interaction):
+    if interaction.channel_id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
     if not SERVER_PASSWORD or SERVER_PASSWORD.strip() == "":
-        await ctx.send(f"**There is no password for this PUG session.**")
+        await interaction.response.send_message(f"**There is no password for this PUG session.**")
         return
-    await ctx.send(f"Server password: `{SERVER_PASSWORD}`")
+    await interaction.response.send_message(f"Server password: `{SERVER_PASSWORD}`")
 
-@bot.command(name='password')
-async def password_alias(ctx):
-    await password_command(ctx)
 
 async def send_match_start_embed():
     global EMBED_IMAGE, player_queue
