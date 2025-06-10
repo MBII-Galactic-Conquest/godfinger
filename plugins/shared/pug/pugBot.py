@@ -661,6 +661,24 @@ def check_if_gittracker_used():
         Log.error(f"An unexpected error occurred while reading godfingerCfg.json at {cfg_path}: {e}", exc_info=True)
         return False
 
+def ClearExistingQueue():
+    global player_queue, last_queue_clear_time, game_in_progress
+
+    if player_queue or game_in_progress:
+        Log.info("Server has been reset or shut down, clearing the active PUG queue and applying cooldown.")
+        asyncio.run_coroutine_threadsafe(
+            queue_server_empty(
+                "**Server has been restarted or shut down.**\n> Clearing the active PUG queue..."
+            ),
+            bot.loop
+        )
+        player_queue.clear()
+        last_queue_clear_time = datetime.utcnow()
+        game_in_progress = False
+
+        if check_if_gittracker_used():
+            create_cooldown_file()
+
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     global last_queue_clear_time, SERVER_DATA
@@ -706,6 +724,7 @@ def OnLoop():
 
 # Called before the plugin is unloaded by the system
 def OnFinish():
+    ClearExistingQueue();
     pass
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
@@ -723,7 +742,6 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
-
         if player_queue or game_in_progress:
             Log.info("Server is empty, clearing any active PUG queue and applying cooldown.")
             asyncio.run_coroutine_threadsafe(
@@ -735,7 +753,6 @@ def OnEvent(event) -> bool:
             player_queue.clear()
             last_queue_clear_time = datetime.utcnow()
             game_in_progress = False
-            Log.info("Server empty event. game_in_progress set to False.")
 
             if check_if_gittracker_used():
                 create_cooldown_file()
@@ -743,23 +760,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
-
-        if player_queue or game_in_progress:
-            Log.info("Server has been reset or shut down, clearing any active PUG queue and applying cooldown.")
-            asyncio.run_coroutine_threadsafe(
-                queue_server_empty(
-                    "**Server has been restarted or shut down.**\n> Clearing any active PUG queue..."
-                ),
-                bot.loop
-            )
-            player_queue.clear()
-            last_queue_clear_time = datetime.utcnow()
-            game_in_progress = False
-            Log.info("Server shutdown event. game_in_progress set to False.")
-
-            if check_if_gittracker_used():
-                create_cooldown_file()
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER:
