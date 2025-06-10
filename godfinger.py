@@ -246,7 +246,8 @@ class MBIIServer:
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["password"],\
                                                                     os.path.join(self._config.cfg["MBIIPath"], self._config.cfg["interfaces"]["rcon"]["logFilename"]),\
                                                                     self._config.cfg["interfaces"]["rcon"]["logReadDelay"],
-                                                                    self._config.cfg["interfaces"]["rcon"]["Debug"]["TestRetrospect"]);
+                                                                    self._config.cfg["interfaces"]["rcon"]["Debug"]["TestRetrospect"],
+                                                                    procName=self._config.cfg["serverFileName"]);
         
         if self._svInterface == None:
             Log.error("Server interface was not initialized properly.");
