@@ -1,6 +1,6 @@
-import logging;
-import godfingerEvent;
-import pluginExports;
+import logging
+import godfingerEvent
+import pluginExports
 import lib.shared.serverdata as serverdata
 import lib.shared.colors as colors
 import lib.shared.client as client
@@ -16,8 +16,8 @@ import json
 import asyncio
 import os
 
-SERVER_DATA = None;
-Log = logging.getLogger(__name__);
+SERVER_DATA = None
+Log = logging.getLogger(__name__)
 
 # Environment File
 env_file = os.path.join(os.path.dirname(__file__), "pugConfig.env")
@@ -37,7 +37,8 @@ NEW_QUEUE_COOLDOWN=300 # 5 minutes in seconds
 BOT_TOKEN=
 PUG_ROLE_ID=
 ADMIN_ROLE_ID=
-ALLOWED_CHANNEL_ID=
+ALLOWED_CHANNEL_ID= # Text channel for commands and updates
+PUG_VC_IDS=         # Voice channels for automatic queue management, seperated by comma (e.g., 123456789,987654321)
 SERVER_PASSWORD=password
 
 # Persistence Configuration
@@ -54,9 +55,9 @@ EMBED_IMAGE=
 
 # List of environment variables to reset
 env_vars_to_reset = [
-    "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", "NEW_QUEUE_COOLDOWN", 
-    "BOT_TOKEN", "PUG_ROLE_ID", "ADMIN_ROLE_ID", 
-    "ALLOWED_CHANNEL_ID", "SERVER_PASSWORD", "COOLDOWN_FILE", "EMBED_IMAGE"
+    "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", "NEW_QUEUE_COOLDOWN",
+    "BOT_TOKEN", "PUG_ROLE_ID", "ADMIN_ROLE_ID",
+    "ALLOWED_CHANNEL_ID", "PUG_VC_IDS", "SERVER_PASSWORD", "COOLDOWN_FILE", "EMBED_IMAGE"
 ]
 
 def reset_env_vars(vars_list):
@@ -71,13 +72,14 @@ def reset_env_vars(vars_list):
         status = 'Reset' if var not in os.environ else 'Not Reset'
         print(f"{var:<25}{status}")
 
-reset_env_vars(env_vars_to_reset);
+reset_env_vars(env_vars_to_reset)
 
-check_and_create_env();
+check_and_create_env()
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.voice_states = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
@@ -87,10 +89,19 @@ MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE"))
 MIN_QUEUE_SIZE = int(os.getenv("MIN_QUEUE_SIZE"))
 NEW_QUEUE_COOLDOWN = int(os.getenv("NEW_QUEUE_COOLDOWN"))
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Keep as str
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 PUG_ROLE_ID = int(os.getenv("PUG_ROLE_ID"))
 ADMIN_ROLE_ID = int(os.getenv("ADMIN_ROLE_ID"))
 ALLOWED_CHANNEL_ID = int(os.getenv("ALLOWED_CHANNEL_ID"))
+
+pug_vc_ids_str = os.getenv("PUG_VC_IDS")
+if pug_vc_ids_str:
+    # Ensure all parts are stripped and are digits before converting to int
+    PUG_VC_IDS = [int(vc_id.strip()) for vc_id in pug_vc_ids_str.split(',') if vc_id.strip().isdigit()]
+else:
+    PUG_VC_IDS = [] # Default to empty list if not configured
+Log.info(f"Configured PUG Voice Channel IDs: {PUG_VC_IDS}")
+
 SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
 
 COOLDOWN_FILE = os.getenv("COOLDOWN_FILE")
@@ -140,7 +151,6 @@ class pugBotPlugin(object):
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[PUG]", "lblue") + ": "
 
-
 @tasks.loop(seconds=30)
 async def monitor_queue_task():
     global player_queue, last_join_time, last_queue_clear_time
@@ -162,6 +172,116 @@ async def on_ready():
     if not monitor_queue_task.is_running():
         monitor_queue_task.start()
 
+# --- Voice State Update Handler ---
+@bot.event
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    # Ignore bot's own voice state changes
+    if member.bot:
+        return
+
+    # Get the text channel for queue messages
+    queue_text_channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+    if not queue_text_channel:
+        Log.error(f"Allowed text channel with ID {ALLOWED_CHANNEL_ID} not found.")
+        return
+
+    # Determine if user was in a PUG VC before
+    was_in_pug_vc = before.channel and before.channel.id in PUG_VC_IDS
+    # Determine if user is now in a PUG VC
+    is_in_pug_vc = after.channel and after.channel.id in PUG_VC_IDS
+
+    # --- User joins a PUG VC (from no VC or non-PUG VC) ---
+    # User was not in a voice channel (before.channel is None) OR moved from a non-PUG VC
+    # AND now they are in one of the designated PUG VCs
+    if (not before.channel or not was_in_pug_vc) and is_in_pug_vc:
+        Log.info(f"{member.display_name} joined PUG VC: {after.channel.name}")
+        
+        # Do not add if already in queue (prevents redundant messages/actions)
+        if member in player_queue:
+            Log.info(f"{member.display_name} joined PUG VC but is already in queue. Skipping auto-join message.")
+            return
+
+        # Check for queue cooldown before joining
+        if last_queue_clear_time:
+            time_since_clear = (datetime.utcnow() - last_queue_clear_time).total_seconds()
+            if time_since_clear < NEW_QUEUE_COOLDOWN:
+                remaining_cooldown = int(NEW_QUEUE_COOLDOWN - time_since_clear)
+                minutes, seconds = divmod(remaining_cooldown, 60)
+                
+                # Send private message about cooldown
+                embed = discord.Embed(
+                    title="Queue Cooldown Active!",
+                    description=(
+                        f"A new PUG queue cannot be started yet. Please wait "
+                        f"`({minutes:02d}:{seconds:02d})`.\n\n"
+                        f"You can still join manually using `!queue join` in "
+                        f"<#{ALLOWED_CHANNEL_ID}>, but a game won't start until cooldown expires."
+                    ),
+                    color=discord.Color.red()
+                )
+                try:
+                    await member.send(embed=embed)
+                    Log.info(f"Sent cooldown PM to {member.display_name}.")
+                except discord.Forbidden:
+                    Log.warning(f"Could not send PM to {member.display_name}. DMs might be disabled.")
+                return # Do not proceed with adding to queue automatically if cooldown is active
+
+        # If no cooldown or cooldown expired, proceed to add to queue
+        await handle_queue_join(member, queue_text_channel)
+
+
+    # --- User leaves a PUG VC or moves out of all PUG VCs ---
+    # User was in a PUG VC, and is now not in any PUG VC (either disconnected or moved elsewhere)
+    if was_in_pug_vc and not is_in_pug_vc:
+        Log.info(f"{member.display_name} left PUG VC: {before.channel.name} or moved out of all PUG VCs.")
+
+        # Only remove if a queue is in progress
+        if player_queue:
+            await handle_queue_leave(member, queue_text_channel)
+        else:
+            Log.info(f"{member.display_name} left VC but no queue active, skipping removal.")
+
+
+# --- Helper functions to wrap existing queue logic for internal calls ---
+async def handle_queue_join(member: discord.Member, channel: discord.TextChannel):
+    """Handles logic for a member joining the queue, called internally."""
+    global player_queue, queue_created_time, last_join_time, last_queue_clear_time
+
+    if member in player_queue:
+        await channel.send(f"{member.mention}, you're already in the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`)")
+        return
+
+    if not player_queue:
+        queue_created_time = datetime.utcnow()
+        pug_mention = f"<@&{PUG_ROLE_ID}>"
+        await channel.send(f"{member.mention} started a new queue! {pug_mention}\n> `{MIN_QUEUE_SIZE}` players required to `!queue start` without admin.")
+
+    player_queue.append(member)
+    last_join_time = datetime.utcnow()
+
+    needed = MAX_QUEUE_SIZE - len(player_queue)
+    await channel.send(f"{member.mention} has joined the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
+
+    if len(player_queue) >= MAX_QUEUE_SIZE:
+        await start_queue(channel)
+
+async def handle_queue_leave(member: discord.Member, channel: discord.TextChannel):
+    """Handles logic for a member leaving the queue, called internally."""
+    global player_queue, last_queue_clear_time
+
+    if member in player_queue:
+        player_queue.remove(member)
+
+        if not player_queue:
+            await channel.send(f"{member.mention} has left the queue!\n> **The queue is now empty and has been cancelled.**")
+            last_queue_clear_time = datetime.utcnow()
+        else:
+            needed = MAX_QUEUE_SIZE - len(player_queue)
+            await channel.send(f"{member.mention} has left the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
+    else:
+        # This case might happen if they were manually removed, or bot restarted
+        Log.info(f"{member.display_name} left VC, but was not found in active queue.")
+
 # === Queue Command Group ===
 @bot.group()
 async def queue(ctx):
@@ -170,39 +290,11 @@ async def queue(ctx):
 
 @queue.command(name='join')
 async def queue_join(ctx):
-    global player_queue, queue_created_time, last_join_time, last_queue_clear_time
-
+    # This command is now primarily for manual joins, as VC join handles auto-join
     if ctx.channel.id != ALLOWED_CHANNEL_ID:
         return
 
-    user = ctx.author
-    if user in player_queue:
-        await ctx.send(f"{user.mention}, you're already in the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`)")
-        return
-
-    if last_queue_clear_time:
-        time_since_clear = (datetime.utcnow() - last_queue_clear_time).total_seconds()
-        if time_since_clear < NEW_QUEUE_COOLDOWN:
-            remaining_cooldown = int(NEW_QUEUE_COOLDOWN - time_since_clear)
-            minutes, seconds = divmod(remaining_cooldown, 60)
-            await ctx.send(
-                f"**A new queue cannot be started yet!**\n> Please wait `({minutes:02d}:{seconds:02d})`"
-            )
-            return
-
-    if not player_queue:
-        queue_created_time = datetime.utcnow()
-        pug_mention = f"<@&{PUG_ROLE_ID}>"
-        await ctx.send(f"{user.mention} started a new queue! {pug_mention}\n> `{MIN_QUEUE_SIZE}` players required to `!queue start` without admin.")
-
-    player_queue.append(user)
-    last_join_time = datetime.utcnow()
-
-    needed = MAX_QUEUE_SIZE - len(player_queue)
-    await ctx.send(f"{user.mention} has joined the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
-
-    if len(player_queue) >= MAX_QUEUE_SIZE:
-        await start_queue(ctx.channel)
+    await handle_queue_join(ctx.author, ctx.channel) # Call the centralized handler
 
 @queue.command(name='forcejoin')
 async def queue_forcejoin(ctx):
@@ -236,22 +328,11 @@ async def queue_forcejoin(ctx):
 
 @queue.command(name='leave')
 async def queue_leave(ctx):
-    global player_queue, last_queue_clear_time
+    # This command is now primarily for manual leaves, as VC leave handles auto-leave
     if ctx.channel.id != ALLOWED_CHANNEL_ID:
         return
 
-    user = ctx.author
-    if user in player_queue:
-        player_queue.remove(user)
-
-        if not player_queue:
-            await ctx.send(f"{user.mention} has left the queue!\n> **The queue is now empty and has been cancelled.**")
-            last_queue_clear_time = datetime.utcnow()
-        else:
-            needed = MAX_QUEUE_SIZE - len(player_queue)
-            await ctx.send(f"{user.mention} has left the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
-    else:
-        await ctx.send(f"{user.mention}, you're not in the queue!")
+    await handle_queue_leave(ctx.author, ctx.channel) # Call the centralized handler
 
 @queue.command(name='status')
 async def queue_status(ctx):
@@ -319,8 +400,9 @@ async def start_queue(channel):
     global player_queue, last_queue_clear_time
     role_mention = f"<@&{PUG_ROLE_ID}>"
 
-    if check_embed_image_exists:
-        await send_match_start_embed();
+    # Check if the embed image is configured and exists before trying to send
+    if check_embed_image_exists(): # This function already sets EMBED_IMAGE to None if invalid
+        await send_match_start_embed()
     else:
         message = "**Queue started!**\n"
         message += f"> {role_mention}\n\n"
@@ -363,7 +445,7 @@ async def send_match_start_embed():
             embed_description = "**Players in Queue:**\n"
             embed_description += "\n".join([f"{i+1}. {user.mention}" for i, user in enumerate(player_queue)])
         else:
-            embed_description = "**No players currently in queue.**"
+            embed_description = "**No players currently in queue.**" # This case should ideally not happen after a start command
 
         embed = discord.Embed(
             title="PUG Match Starting!",
@@ -425,9 +507,9 @@ def check_if_gittracker_used():
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     global last_queue_clear_time
-    logMode = logging.INFO;
+    logMode = logging.INFO
     if serverData.args.debug:
-        logMode = logging.DEBUG;
+        logMode = logging.DEBUG
     if serverData.args.logfile != "":
         logging.basicConfig(
         filename=serverData.args.logfile,
@@ -438,21 +520,21 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
         level=logMode,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s')
 
-    global SERVER_DATA;
-    SERVER_DATA = serverData; # keep it stored
+    global SERVER_DATA
+    SERVER_DATA = serverData # keep it stored
     if exports != None:
-        pass;
-    global PluginInstance;
+        pass
+    global PluginInstance
     PluginInstance = pugBotPlugin(serverData)
 
     if check_cooldown_file_exists():
         last_queue_clear_time = datetime.utcnow()
         Log.info(f"Persistent cooldown file found. Applying full {NEW_QUEUE_COOLDOWN}s cooldown from bot startup.")
-        clear_cooldown_file();
+        clear_cooldown_file()
     else:
         Log.info("No persistent cooldown file found, proceeding as normal.")
 
-    return True; # indicate plugin load success
+    return True # indicate plugin load success
 
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
@@ -460,7 +542,7 @@ def OnStart():
     startTime = time.time()
     loadTime = time.time() - startTime
     PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"PUGBot started in {loadTime:.2f} seconds!")
-    return True; # indicate plugin start success
+    return True # indicate plugin start success
 
 # Called each loop tick from the system
 def OnLoop():
@@ -472,20 +554,19 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
-    #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
+    global player_queue, last_queue_clear_time
+
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
-        global player_queue, last_queue_clear_time
-        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
 
         if player_queue:
             Log.info("Server is empty, clearing the active PUG queue and applying cooldown.")
@@ -500,12 +581,10 @@ def OnEvent(event) -> bool:
 
             if check_if_gittracker_used():
                 create_cooldown_file()
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
-        global player_queue, last_queue_clear_time
-        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
 
         if player_queue:
             Log.info("Server has been reset or shut down, clearing the active PUG queue and applying cooldown.")
@@ -522,23 +601,23 @@ def OnEvent(event) -> bool:
                 create_cooldown_file()
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT:
-        return False;
+        return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER_SPAWN:
-        return False;
+        return False
 
-    return False;
+    return False
 
 # === Run the Bot ===
 def run_bot():
