@@ -59,6 +59,10 @@ else
     exit 1
 fi
 
+# Check for latest pip
+echo "Checking for latest pip package..."
+$PIP_CMD install --upgrade pip
+
 # Install dependencies
 echo "Installing dependencies..."
 $PIP_CMD install -U -r requirements.txt --break-system-packages

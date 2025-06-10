@@ -504,6 +504,22 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
+        global player_queue, last_queue_clear_time
+        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+
+        if player_queue:
+            Log.info("Server has been reset or shut down, clearing the active PUG queue and applying cooldown.")
+            asyncio.run_coroutine_threadsafe(
+                queue_server_empty(
+                    "**Server has been restarted or shut down.**\n> Clearing the active PUG queue..."
+                ),
+                bot.loop
+            )
+            player_queue.clear()
+            last_queue_clear_time = datetime.utcnow()
+
+            if check_if_gittracker_used():
+                create_cooldown_file()
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
         return False;

@@ -25,11 +25,14 @@ ENSURE YOU MODIFY YOUR gtConfig.json,
   "refresh_interval": 60,
   "gfBuildBranch": "main",
   "svnPostHookFile": "path/to/bat/or/sh",
+  "winSCPScriptFile": "path/to/bat/or/sh",
+  "isWinSCPBuilding": false,
   "isSVNBuilding": false,
   "isGFBuilding": false
 }
 
 IF you are using SVN building with a post hook file, ensure it is in godfinger RWD.
+IF you are using WinSCP script hooks, for automated .PK3 asset updates, align your gamedata/ folder appropriately.
 
 ============
 
