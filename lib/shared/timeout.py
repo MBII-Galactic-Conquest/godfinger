@@ -13,7 +13,7 @@ class Timeout:
         self._endS = self._startS + self._timeS;
         if self._endS < self._startS:
             self._overflow = True;
-            print("Timeout overflow error.");
+            print("Timeout overflow.");
         else:
             self._overflow = False;
     
@@ -26,7 +26,10 @@ class Timeout:
     def Left(self):
         if self._endS == 0:
             return 0;
-        return (self._endS - time.time());
+        left = self._endS - time.time();
+        if left < 0:
+            left = 0;
+        return left;
 
     def LeftDHMS(self):
         left = self.Left();

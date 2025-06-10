@@ -497,6 +497,20 @@ class MBIIServer:
         elif line.startswith("gsess"):
             self.OnRealInit(message);
             return;
+    
+        # maybe its better to move it outside of string parsing
+        if line.startswith("wd_"):
+            if line == "wd_unavailable":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_UNAVAILABLE,None));
+            elif line == "wd_existing":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_EXISTING,None));
+            elif line == "wd_started":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_STARTED,None));
+            elif line == "wd_died":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_DIED,None));
+            elif line == "wd_restarted":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_RESTARTED,None));
+            return;
 
         lineParse = line.split()
         
