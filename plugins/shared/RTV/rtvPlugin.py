@@ -547,6 +547,7 @@ class RTV(object):
         
         # Check vote participation threshold
         if self._config.cfg[voteType]["minimumVoteRatio"]["enabled"] and \
+           len(self._serverData.API.GetAllClients()) > 0 and \
            (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < \
            self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]:
             self.SvSay(f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVoteRatio']['ratio'] * 100} percent)")
@@ -675,7 +676,7 @@ class RTV(object):
                 self._StartRTVVote()
         return capture
 
-    def _StartRTVVote(self, choices=None):
+    def _StartRTVVote(self, choices=None, allowNoChange=True):
         """Start Rock the Vote process"""
         self._wantsToRTV.clear()
         voteChoices = []
@@ -706,9 +707,10 @@ class RTV(object):
             voteChoices.extend([x for x in choices])
             
             # Add "Don't Change" option
-            noChangeMap = Map("Don't Change", "N/A")
-            noChangeMap.SetPriority(MapPriorityType.MAPTYPE_NOCHANGE)
-            voteChoices.append(noChangeMap)
+            if allowNoChange == True:
+                noChangeMap = Map("Don't Change", "N/A")
+                noChangeMap.SetPriority(MapPriorityType.MAPTYPE_NOCHANGE)
+                voteChoices.append(noChangeMap)
         else:
             voteChoices = choices
         
@@ -1035,6 +1037,10 @@ class RTV(object):
         """Handle empty server event - switch to default map/mode"""
         doMap = self._config.cfg["rtv"]["emptyServerMap"]["enabled"]
         doMode = self._config.cfg["rtm"]["emptyServerMode"]["enabled"]
+        # cancel current vote if there is one
+        if self._currentVote != None:
+            print("last player dc'ed, killing current vote")
+            self._currentVote = None
         if doMap and doMode:
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]], self._config.cfg["rtv"]["emptyServerMap"]["map"])
         elif doMap:
@@ -1096,8 +1102,7 @@ class RTV(object):
         if mapName != self._mapName:
             self._mapName = mapName
         # Reset current vote
-        if self._currentVote != None:
-            self._currentVote = None
+        self._currentVote = None
         return False
 
     def HandleForceRTV(self, playerName, smodId, adminIP, cmdArgs):
@@ -1269,14 +1274,14 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
     SERVER_DATA.SetServerVar("registeredCommands", newVal)
     return True  # indicate plugin load success
 
-def API_StartRTVVote():
+def API_StartRTVVote(allowNoChange=True):
     """API function to start RTV vote externally"""
     Log.debug("Received external RTV vote request")
     global PluginInstance
     votesInProgress = PluginInstance._serverData.GetServerVar("votesInProgress")
     # Check if vote can be started
     if not PluginInstance._currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-        PluginInstance._StartRTVVote()
+        PluginInstance._StartRTVVote(allowNoChange=allowNoChange)
         return True
     return False
 
