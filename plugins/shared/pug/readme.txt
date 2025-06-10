@@ -31,7 +31,9 @@ BOT_TOKEN= <--- Your BOT access TOKEN, keep private!
 PUG_ROLE_ID= <--- Role to PING for when queues start.
 ADMIN_ROLE_ID= <--- PUG Mod/Admin role for overriding queues.
 ALLOWED_CHANNEL_ID= <--- Required channel ID where PUG queues are handled.
-SERVER_PASSWORD=password <--- Change to your sessions password.
+PUG_VC_IDS= <--- Voice channels for automatic queue management, seperated by comma (e.g., 123456789,987654321)
+SERVER_PASSWORD=None <--- Change to your sessions password.
+SERVER_IP= <--- Static IP for display in embeds
 
 # Persistence Configuration
 COOLDOWN_FILE=.cooldown <--- Needed for persisting across GF restarts.
