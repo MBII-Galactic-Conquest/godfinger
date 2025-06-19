@@ -37,7 +37,7 @@ CONFIG_FALLBACK = \
     ],
     "blacklist":
     [
-
+    
     ]
 }
 """
