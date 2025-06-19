@@ -47,6 +47,7 @@ GUILD_ID=            # The ID of your Discord server/guild for faster slash comm
 
 # Persistence Configuration
 COOLDOWN_FILE=.cooldown
+PERSIST_FILE=.persist
 
 # Miscellaneous Configuration
 EMBED_IMAGE=
@@ -97,6 +98,7 @@ try:
     SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
     STATIC_SERVER_IP = os.getenv("SERVER_IP")
     COOLDOWN_FILE = os.getenv("COOLDOWN_FILE")
+    PERSIST_FILE = os.getenv("PERSIST_FILE")
     EMBED_IMAGE = os.getenv("EMBED_IMAGE")
     # Load GUILD_ID
     GUILD_ID = int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None
@@ -106,6 +108,27 @@ except Exception as e:
     # Exit or handle error appropriately if essential variables are missing/malformed
     exit(1)
 
+def create_persist_file():
+    """Creates a temporary .persist file for recurring games in progress on shutdown event."""
+    try:
+        with open(PERSIST_FILE, 'w') as f:
+            f.write("")
+        Log.info(f"Persisting file {PERSIST_FILE} created.")
+    except IOError as e:
+        Log.error(f"Error creating persisting file {PERSIST_FILE}: {e}")
+
+def check_persist_file_exists():
+    """Checks if the temporary .persist file exists."""
+    return os.path.exists(PERSIST_FILE)
+
+def clear_persist_file():
+    """Removes the temporary .persist file."""
+    if os.path.exists(PERSIST_FILE):
+        try:
+            os.remove(PERSIST_FILE)
+            Log.info(f"Cooldown file {PERSIST_FILE} removed.")
+        except OSError as e:
+            Log.error(f"Error removing cooldown file {PERSIST_FILE}: {e}")
 
 def create_cooldown_file():
     """Creates an empty cooldown file to signal an active cooldown."""
@@ -701,6 +724,9 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     global PluginInstance
     PluginInstance = pugBotPlugin(serverData)
 
+    if check_persist_file_exists():
+        clear_persist_file();
+
     if check_cooldown_file_exists():
         last_queue_clear_time = datetime.utcnow()
         Log.info(f"Persistent cooldown file found. Applying full {NEW_QUEUE_COOLDOWN}s cooldown from bot startup.")
@@ -725,6 +751,8 @@ def OnLoop():
 # Called before the plugin is unloaded by the system
 def OnFinish():
     ClearExistingQueue();
+    if check_persist_file_exists():
+        clear_persist_file()
     pass
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
@@ -742,6 +770,7 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
+
         if player_queue or game_in_progress:
             Log.info("Server is empty, clearing any active PUG queue and applying cooldown.")
             asyncio.run_coroutine_threadsafe(
@@ -753,11 +782,23 @@ def OnEvent(event) -> bool:
             player_queue.clear()
             last_queue_clear_time = datetime.utcnow()
             game_in_progress = False
+            if check_persist_file_exists():
+                clear_persist_file()
 
             if check_if_gittracker_used():
                 create_cooldown_file()
+
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
+
+        if game_in_progress:
+            if check_persist_file_exists():
+                return
+            create_persist_file()
+        else:
+            if check_persist_file_exists():
+                game_in_progress = True
+
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
         return False
@@ -768,6 +809,14 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
+
+        if not game_in_progress:
+            if check_persist_file_exists():
+                game_in_progress = True
+        else:
+            if not check_persist_file_exists():
+                create_persist_file()
+
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return False

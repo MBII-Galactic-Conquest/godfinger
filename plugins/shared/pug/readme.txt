@@ -44,6 +44,7 @@ GUILD_ID <--- Guild ID for the bot to access for app commands
 
 # Persistence Configuration
 COOLDOWN_FILE=.cooldown <--- Needed for persisting across GF restarts.
+PERSIST_FILE=.persist <--- Temporary persisting file needed for preserving games_in_progress.
 
 # Miscellaneous Configuration
 EMBED_IMAGE= <--- Place an IMGUR link here to use for your embeds.
