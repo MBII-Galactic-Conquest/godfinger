@@ -97,8 +97,8 @@ try:
 
     SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
     STATIC_SERVER_IP = os.getenv("SERVER_IP")
-    COOLDOWN_FILE = os.getenv("COOLDOWN_FILE")
-    PERSIST_FILE = os.getenv("PERSIST_FILE")
+    COOLDOWN_FILE = os.path.join(os.path.dirname(__file__), os.getenv("COOLDOWN_FILE"))
+    PERSIST_FILE = os.path.join(os.path.dirname(__file__), os.getenv("PERSIST_FILE"))
     EMBED_IMAGE = os.getenv("EMBED_IMAGE")
     # Load GUILD_ID
     GUILD_ID = int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None
@@ -194,7 +194,7 @@ async def monitor_queue_task():
             await channel.send("**Queue timed out due to inactivity!**\n> Clearing queue...")
             # Access _serverData through the global PluginInstance if needed
             if 'PluginInstance' in globals() and PluginInstance._serverData:
-                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5PUG Queue has been cleared due to inactivity!")
+                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A discord pug queue has been cleared due to inactivity!")
         player_queue.clear()
         last_queue_clear_time = datetime.utcnow()
         last_join_time = None
@@ -427,7 +427,7 @@ async def queue_join_slash(interaction: discord.Interaction):
     # If not blocked by game_in_progress or cooldown, proceed
     # Initial response must be sent within 3 seconds, so we defer long operations to followup or send ephemeral then public
     # For handle_queue_join, it sends multiple messages, so we'll send a deferred initial response then the actual messages.
-    await interaction.response.defer() # Defer the response as handle_queue_join will send messages
+    await interaction.response.defer(ephemeral=True) # Defer the response as handle_queue_join will send messages
     await handle_queue_join(interaction.user, interaction.channel)
     await interaction.followup.send("Your join request has been processed!", ephemeral=True)
 
@@ -454,7 +454,7 @@ async def queue_forcejoin_slash(interaction: discord.Interaction):
         Log.info("Admin force-joining: game_in_progress reset, cooldown reset, and queue cleared.")
 
     # Defer the response as handle_queue_join will send messages
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
 
     if not player_queue:
         queue_created_time = datetime.utcnow()
@@ -485,7 +485,7 @@ async def queue_leave_slash(interaction: discord.Interaction):
         await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
-    await interaction.response.defer() # Defer as handle_queue_leave sends messages
+    await interaction.response.defer(ephemeral=True) # Defer as handle_queue_leave sends messages
     await handle_queue_leave(interaction.user, interaction.channel)
     await interaction.followup.send("Your leave request has been processed!", ephemeral=True)
 
@@ -533,7 +533,7 @@ async def start_command_slash(interaction: discord.Interaction):
         return
 
     if len(player_queue) >= MIN_QUEUE_SIZE and len(player_queue) % 2 == 0:
-        await interaction.response.defer() # Tells Discord the bot is thinking...
+        await interaction.response.defer(ephemeral=True) # Tells Discord the bot is thinking...
         try:
             await start_queue(interaction.channel)
             await interaction.followup.send("Queue start request processed!", ephemeral=True)
@@ -558,7 +558,7 @@ async def force_start_slash(interaction: discord.Interaction):
         await interaction.response.send_message("This command can only be used in the designated PUG channel.", ephemeral=True)
         return
 
-    await interaction.response.defer() # Tells Discord the bot is thinking...
+    await interaction.response.defer(ephemeral=True) # Tells Discord the bot is thinking...
     try:
         await start_queue(interaction.channel)
         await interaction.followup.send("Force start request processed!", ephemeral=True)
@@ -793,8 +793,9 @@ def OnEvent(event) -> bool:
 
         if game_in_progress:
             if check_persist_file_exists():
-                return
-            create_persist_file()
+                return False;
+            else:
+                create_persist_file()
         else:
             if check_persist_file_exists():
                 game_in_progress = True
@@ -809,14 +810,6 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
-
-        if not game_in_progress:
-            if check_persist_file_exists():
-                game_in_progress = True
-        else:
-            if not check_persist_file_exists():
-                create_persist_file()
-
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return False
