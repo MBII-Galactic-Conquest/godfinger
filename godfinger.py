@@ -13,7 +13,6 @@ import signal;
 import sys;
 import subprocess;
 import tempfile;
-import readchar;
 
 IsVenv = sys.prefix != sys.base_prefix;
 if not IsVenv:
@@ -315,9 +314,6 @@ class MBIIServer:
         self._lastRestartTick = 0.0;
         self._restartTimeout = timeout.Timeout();
         self.restartOnCrash = self._config.cfg["restartOnCrash"];
-
-        # CLI I/O
-        self._previousKbKey = -1;
             
 
         Log.info("The Godfinger initialized in %.2f seconds!\n" %(time.time() - startTime));
@@ -486,11 +482,6 @@ class MBIIServer:
                 self.restartOnCrash = False;
                 self.Stop();
                 return;
-        else:
-            key = readchar.readkey();
-            if key == readchar.key.CTRL_R:
-                self.Restart(0); # instant restart hehe
-            self._previousKbKey = key;
         messages = self._svInterface.GetMessages();
         while not messages.empty():
             message = messages.get();
