@@ -170,8 +170,8 @@ class RCON(object):
     def MbMode(self, cmd, mapToChange=None):
         """ Changes to the given MbMode (0 = Open, 1 = Semi Authentic, 2 = Full Authentic, 3 = Duel, 4 = Legends). If mapToChange is provided, also changes to that map. """
         if mapToChange == None:
-            mapToChange = ""
-        if not type(mapToChange) == bytes and mapToChange != "":
+            mapToChange = b""
+        if not type(mapToChange) == bytes and mapToChange != b"":
             mapToChange = bytes(mapToChange, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i %b" % (self._password, cmd, mapToChange))
     
