@@ -22,7 +22,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 ### `MessagePrefix`
 - **Description**: Prefix used for plugin messages.
 - **Example**: `"[RTV]^7: "`
-- **Notes**: You can use color codes in the prefix (e.g., `^7` for white).
+- **Notes**: The plugin theme color's corresponding color code is added to the beginning of the message prefix. If this is not desirable, make sure the message prefix begins with a color code (^[0-9]) You can use color codes in the prefix (e.g., `^7` for white).
 
 ### `RTVPrefix`
 - **Description**: Command prefix for RTV/RTM commands.
