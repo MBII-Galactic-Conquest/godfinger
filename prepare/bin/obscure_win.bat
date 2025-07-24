@@ -7,3 +7,4 @@
 
 attrib +h "..\..\update\.update_noinput.py"
 attrib +h "..\..\update\.deployments_noinput.py"
+attrib +h "..\..\lib\other\.hardrestart.py"

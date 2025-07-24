@@ -1,4 +1,3 @@
-
 import socket;
 import sys;
 import time;
@@ -149,7 +148,7 @@ class RCON(object):
     def SvSay(self, msg):
         if not type(msg) == bytes:
             msg = bytes(msg, "UTF-8")
-        if len(msg) > 148: # Message is too big for "svsay".
+        if len(msg) > 138: # Message is too big for "svsay".
                         # Use "say" instead.
             return self.Say(msg)
         else:
@@ -168,11 +167,19 @@ class RCON(object):
             clientId = bytes(clientId, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b svtell %b %b" % (self._password, clientId, msg));
 
-    def MbMode(self, cmd):
-        return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i" % (self._password, cmd))
+    def MbMode(self, cmd, mapToChange=None):
+        """ Changes to the given MbMode (0 = Open, 1 = Semi Authentic, 2 = Full Authentic, 3 = Duel, 4 = Legends). If mapToChange is provided, also changes to that map. """
+        if mapToChange == None:
+            mapToChange = b""
+        if not type(mapToChange) == bytes and mapToChange != b"":
+            mapToChange = bytes(mapToChange, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b mbmode %i %b" % (self._password, cmd, mapToChange))
     
-    def ClientMute(self, player_id):
-        return self.Request(b"\xff\xff\xff\xffrcon %b mute %i" % (self._password, player_id))
+    def ClientMute(self, player_id : int, minutes : int = 10):
+        """ Mutes the client with the given ID for the given number of minutes, or 10 minutes if no duration is given. The number of minutes must be between 1-60, inclusive. """
+        if 0 < minutes <= 60:   # rcon mute must be between
+            return self.Request(b"\xff\xff\xff\xffrcon %b mute %i %i" % (self._password, player_id))
+        return None
   
     def ClientUnmute(self, player_id):
         return self.Request(b"\xff\xff\xff\xffrcon %b unmute %i" % (self._password, player_id));
@@ -349,4 +356,6 @@ class RCON(object):
             self.ExecVstr(vstrStorage)
 
     def SmSay(self, msg : str):
-        return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self.rcon_pwd, msg));
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self._password, msg));

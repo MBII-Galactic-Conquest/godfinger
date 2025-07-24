@@ -21,7 +21,6 @@ update/key/*
 __pycache__/*
 *.log
 
-!docker/godfinger-egg.json
 !start/autostart.cfg
 
 godfingerCfg.json
@@ -32,5 +31,15 @@ gtConfig.json
 
 *.db
 *.DB
+
 ignored/*
 venv/*
+docker/
+data/
+
+.DS_Store
+
+*.pkl
+*.pk3
+*.zip
+*.bak

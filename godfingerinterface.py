@@ -14,6 +14,9 @@ import lib.shared.colors as colors;
 import lib.shared.util as util;
 import lib.shared.client as client;
 import math;
+import lib.shared.pswd as pswd;
+import lib.shared.observer as observer;
+import psutil;
 
 IsUnix      = (os.name == "posix");
 IsWindows   = (os.name == "nt");
@@ -56,7 +59,7 @@ class IServerInterface():
     def TeamSay(self, players, team, vstrStorage, msg):
         return "Not implemented";
 
-    def MbMode(self, mode : int) -> str:
+    def MbMode(self, mode : int, mapToChange : str = None) -> str:
         return "Not implemented";
     
     def ClientMute(self, pid : int) -> str:
@@ -134,7 +137,7 @@ class IServerInterface():
     def ClientSound(self, soundName : str, clientId : int) -> str:
         return;
 
-    def Smsay(self, msg : str) -> str:
+    def SmSay(self, msg : str) -> str:
         return;
 
     def Test(self):
@@ -194,7 +197,7 @@ class AServerInterface(IServerInterface):
 
 
 class RconInterface(AServerInterface):
-    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False):
+    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.x86.exe"):
         super().__init__();
         self._logReaderLock                     = threading.Lock();
         self._logReaderThreadControl            = threadcontrol.ThreadControl();
@@ -205,8 +208,29 @@ class RconInterface(AServerInterface):
         self._rcon: remoteconsole.RCON          = remoteconsole.RCON( ( ipAddress, port ), bindAddr, password );
         self._testRetrospect                    = testRetrospect;
     
+        self._wdObserver = observer.Observer(self._OnWDEvent);
+        self._watchdog = pswd.ProcessWatchdog(procName);
+        self._watchdog.Subscribe(self._wdObserver);
+    
     def __del__(self):
         self.Close();
+    
+    def _OnWDEvent(self, event):
+        if event == pswd.WD_EVENT_PROCESS_UNAVAILABLE:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_unavailable"));
+        if event == pswd.WD_EVENT_PROCESS_EXISTING:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_existing"));
+        if event == pswd.WD_EVENT_PROCESS_STARTED:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_started"));
+        if event == pswd.WD_EVENT_PROCESS_DIED:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_died"));
+        if event == pswd.WD_EVENT_PROCESS_RESTARTED:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_restarted"));
     
 #region RconCommands
 
@@ -233,9 +257,9 @@ class RconInterface(AServerInterface):
         if self.IsOpened():
             return self._rcon.BatchExecute(vstrStorage, cmdList, sleepBetweenChunks, cleanUp);
 
-    def MbMode(self, mode : int) -> str:
+    def MbMode(self, mode : int, mapToChange : str = None) -> str:
         if self.IsOpened():
-            return self._rcon.MbMode(mode);
+            return self._rcon.MbMode(mode, mapToChange);
         return None;
     
     def ClientMute(self, pid : int) -> str:
@@ -346,9 +370,9 @@ class RconInterface(AServerInterface):
             return self._rcon.ClientSound(soundName, clientId);
         return None;
 
-    def SmSay(self, soundName : str, clientId : int) -> str:
+    def SmSay(self, msg : str) -> str:
         if self.IsOpened():
-            return self._rcon.SmSay(soundName, clientId);
+            return self._rcon.SmSay(msg);
         return None;
 
 #endregion RconCommands
@@ -380,6 +404,7 @@ class RconInterface(AServerInterface):
             return False
         if not self._rcon.Open():
             return False
+        self._watchdog.Start();
 
         # Check if the log file exists; if not, attempt to create it.
         if not os.path.exists(self._logPath):
@@ -442,6 +467,7 @@ class RconInterface(AServerInterface):
             self._rcon.Close();
             self._messageQueueSwap.queue.clear();
             self._workingMessageQueue.queue.clear();
+            self._watchdog.Stop();
             super().Close();
 
 
@@ -541,7 +567,7 @@ class PtyInterface(AServerInterface):
     class SvSayProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -555,7 +581,7 @@ class PtyInterface(AServerInterface):
     class SayProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -569,7 +595,7 @@ class PtyInterface(AServerInterface):
     class SvTellProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -771,7 +797,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "svsay %s"%strs[i];
-                proc = PtyInterface.SvSayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SvSayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;
@@ -782,7 +808,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "say %s"%strs[i];
-                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;
@@ -793,7 +819,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "svtell %i %s"%(pid, strs[i]);
-                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;

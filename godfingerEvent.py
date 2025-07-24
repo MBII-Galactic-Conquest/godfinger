@@ -19,6 +19,12 @@ GODFINGER_EVENT_TYPE_PLAYER_SPAWN       = 14; # player spawned event, data : dic
 GODFINGER_EVENT_TYPE_CLIENT_BEGIN       = 15; # just a client begin signal, called each time the client window is refreshed ( post connect, spawn, team switch, maybe something else )
 GODFINGER_EVENT_TYPE_SERVER_EMPTY       = 16; # A server empty signal, fired before last client is removed from client list due to disconnect, no specific data.
 
+GODFINGER_EVENT_TYPE_WD_UNAVAILABLE     = 1000; # watchdog raised event, game process is not active, happens only upon startup of GF
+GODFINGER_EVENT_TYPE_WD_EXISTING        = 1001; # watchdog raised event, game process is exiting upon GF startup
+GODFINGER_EVENT_TYPE_WD_DIED            = 1002; # watchdog raised event, game process has died during watch
+GODFINGER_EVENT_TYPE_WD_STARTED         = 1003; # watchdog raised event, game process has started during watch
+GODFINGER_EVENT_TYPE_WD_RESTARTED       = 1004; # watchdog raised event, game process has restarted after dying during watch
+
 class Event():
     def __init__(self, type : int, data : dict, isStartup = False):
         self.type = type;

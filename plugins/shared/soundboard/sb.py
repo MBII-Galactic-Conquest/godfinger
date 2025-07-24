@@ -25,6 +25,10 @@ class soundBoardPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[SB]", "lblue") + ": "
+        self.player_join_sound_path = None
+        self.player_leave_sound_path = None
+        self.message_global_sound_path = None
+        self.player_start_sound_path = None
 
 class ClientInfo():
   def __init__(self):
@@ -105,10 +109,18 @@ def SV_MessageGlobal(MESSAGEGLOBAL_SOUND_PATH):
 
     return;
 
+def SV_EmptyAllClients():
+    global ClientsData
+
+    ClientsData.clear()
+
+    return ClientsData;
+
 def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     global PluginInstance
 
     ID = cl.GetId()
+    NAME = cl.GetName()
 
     if PLAYERSTART_SOUND_PATH is None or PLAYERSTART_SOUND_PATH == "" or PLAYERSTART_SOUND_PATH == PLACEHOLDER:
         Log.error(f"{PLAYERSTART_SOUND_PATH} is null or using placeholder, exiting...")
@@ -117,10 +129,11 @@ def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     if PLAYERSTART_SOUND_PATH == "void":
         return;
 
-    if ID in ClientsData:  # check if client is present ( shouldnt be negative anyway )
+    if ID in ClientsData:   # check if client is present ( shouldnt be negative anyway )
         if ClientsData[ID].hasBeenGreeted == False: # check if client wasnt greeted yet
             PluginInstance._serverData.interface.ClientSound(f"{PLAYERSTART_SOUND_PATH}", ID)
             Log.info(f"{PLAYERSTART_SOUND_PATH} has been played to Client {ID}...")
+            PluginInstance._serverData.interface.SvSay(f"{NAME} ^7has made it into the server.")
             ClientsData[ID].hasBeenGreeted = True; # we greeted them, now the above check wont pass again
     else:
         return;
@@ -172,7 +185,10 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     global PluginInstance
-    SV_LoadJson()
+    (PluginInstance.player_join_sound_path,
+     PluginInstance.player_leave_sound_path,
+     PluginInstance.message_global_sound_path,
+     PluginInstance.player_start_sound_path) = SV_LoadJson()
     startTime = time.time()
     loadTime = time.time() - startTime
     PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"Soundboard started in {loadTime:.2f} seconds!")
@@ -190,26 +206,27 @@ def OnFinish():
 def OnEvent(event) -> bool:
     #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
-        SV_MessageGlobal();
+        SV_MessageGlobal(PluginInstance.message_global_sound_path);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
         CL_OnConnect(event.client);
-        SV_PlayerJoin();
+        SV_PlayerJoin(PluginInstance.player_join_sound_path);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
-        CL_PlayerStart(event.client);
+        CL_PlayerStart(PluginInstance.player_start_sound_path, event.client);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         CL_OnDisconnect(event.client);
-        SV_PlayerLeave();
+        SV_PlayerLeave(PluginInstance.player_leave_sound_path);
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
+        SV_EmptyAllClients();
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
         return False;
