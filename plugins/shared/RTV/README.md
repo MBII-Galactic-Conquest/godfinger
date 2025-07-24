@@ -11,7 +11,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 ### `MBIIPath`
 - **Description**: Path to your Movie Battles II installation directory.
 - **Example (Windows)**: `"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Jedi Academy\\GameData\\MBII\\"`
-- **Example (Linux)**: `"/home/container/.local/share/openjk/MBII/jampgamei386.so"`
+- **Example (Linux)**: `"/home/container/.local/share/openjk/MBII/"`
 - **Notes**: This should point to the directory containing your MBII files.
 
 ### `pluginThemeColor`
