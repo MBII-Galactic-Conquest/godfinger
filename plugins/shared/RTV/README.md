@@ -16,7 +16,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 
 ### `pluginThemeColor`
 - **Description**: Color used for plugin messages and highlights.
-- **Possible Values**: Any valid color code found in `lib/colors.py` (e.g., "red", "green", "blue", "lblue", etc.).
+- **Possible Values**: Any valid color code found in `lib/shared/colors.py` (e.g., "red", "green", "blue", "lblue", etc.).
 - **Example**: `"lblue"`
 
 ### `MessagePrefix`
