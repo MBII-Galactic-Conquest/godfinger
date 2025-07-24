@@ -59,7 +59,7 @@ class IServerInterface():
     def TeamSay(self, players, team, vstrStorage, msg):
         return "Not implemented";
 
-    def MbMode(self, mode : int) -> str:
+    def MbMode(self, mode : int, mapToChange : str = None) -> str:
         return "Not implemented";
     
     def ClientMute(self, pid : int) -> str:
@@ -137,7 +137,7 @@ class IServerInterface():
     def ClientSound(self, soundName : str, clientId : int) -> str:
         return;
 
-    def Smsay(self, msg : str) -> str:
+    def SmSay(self, msg : str) -> str:
         return;
 
     def Test(self):
@@ -257,9 +257,9 @@ class RconInterface(AServerInterface):
         if self.IsOpened():
             return self._rcon.BatchExecute(vstrStorage, cmdList, sleepBetweenChunks, cleanUp);
 
-    def MbMode(self, mode : int) -> str:
+    def MbMode(self, mode : int, mapToChange : str = None) -> str:
         if self.IsOpened():
-            return self._rcon.MbMode(mode);
+            return self._rcon.MbMode(mode, mapToChange);
         return None;
     
     def ClientMute(self, pid : int) -> str:
@@ -370,9 +370,9 @@ class RconInterface(AServerInterface):
             return self._rcon.ClientSound(soundName, clientId);
         return None;
 
-    def SmSay(self, soundName : str, clientId : int) -> str:
+    def SmSay(self, msg : str) -> str:
         if self.IsOpened():
-            return self._rcon.SmSay(soundName, clientId);
+            return self._rcon.SmSay(msg);
         return None;
 
 #endregion RconCommands
@@ -567,7 +567,7 @@ class PtyInterface(AServerInterface):
     class SvSayProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -581,7 +581,7 @@ class PtyInterface(AServerInterface):
     class SayProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -595,7 +595,7 @@ class PtyInterface(AServerInterface):
     class SvTellProcessor(CommandProcessor):
         def __init__(self, cmd, message : str):
             super().__init__(cmd);
-            self._message = colors.stripColorCodes(message);
+            self._message = colors.StripColorCodes(message);
 
         def ParseLine(self, line) -> int:
             super().ParseLine(line);
@@ -797,7 +797,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "svsay %s"%strs[i];
-                proc = PtyInterface.SvSayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SvSayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;
@@ -808,7 +808,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "say %s"%strs[i];
-                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;
@@ -819,7 +819,7 @@ class PtyInterface(AServerInterface):
             result = "";
             for i in range(len(strs)):
                 cmdStr = "svtell %i %s"%(pid, strs[i]);
-                proc = PtyInterface.SayProcessor(colors.stripColorCodes(cmdStr),strs[i]);
+                proc = PtyInterface.SayProcessor(colors.StripColorCodes(cmdStr),strs[i]);
                 result += self.ExecuteCommand(cmdStr, proc);
             return result;
         return None;

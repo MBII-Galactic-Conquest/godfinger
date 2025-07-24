@@ -16,6 +16,12 @@ class Timeout:
             print("Timeout overflow.");
         else:
             self._overflow = False;
+
+    def Finish(self):
+        self._timeS = 0
+        self._startS = 0
+        self._endS = 0
+        self._overflow = False
     
     def IsSet(self):
         return (self.Left() > 0);

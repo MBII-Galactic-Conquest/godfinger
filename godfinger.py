@@ -674,8 +674,12 @@ class MBIIServer:
                 scorerPing = scoreParse[3]
                 scorerClientID = scoreParse[5]
                 playerScores[scorerClientID] = {"id" : scorerClientID, "name" : scorerName, "score" : scorerScore, "ping" : scorerPing}
-        scoreLine = scoreLine.strip()
-        teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
+        if scoreLine != None:
+            scoreLine = scoreLine.strip()
+            teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
+        else:
+            scoreLine = "red:0 blue:0"
+            teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
         exitReason = ' '.join(textsplit[1:])
         self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = logMessage.isStartup ) );
 
