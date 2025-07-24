@@ -10,7 +10,9 @@ MBAssets4.pk3 # MB2_SUP_ASSETS
     │   ├── playerstart # melancholy client_begin sound
     │   ├── thirtyseconds # 30 seconds remaining, hlvox
     │   ├── timetovote # hlvox, alt time to vote sound
-    │   └── welcome # sourcemod traditional, client, welcome sound
+    │   ├── welcome # sourcemod traditional, client, welcome sound
+    │   ├── loading # galactic conquest loading
+    │   └── planetzoom # galactic conquest planetzoom sound
     ├── announcer
     │   └── vote_now.wav # hlquake3 announcer, "VOTE NOW", generally louder
     └── barney

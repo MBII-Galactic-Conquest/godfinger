@@ -37,7 +37,7 @@ CONFIG_FALLBACK = \
     ],
     "blacklist":
     [
-
+    
     ]
 }
 """
@@ -214,5 +214,4 @@ def OnEvent(event) -> bool:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_PLAYER_SPAWN:
         return False;
-
     return False;

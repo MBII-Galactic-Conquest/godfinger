@@ -43,8 +43,8 @@ class Rcon(object):
     while ( self._timeout.IsSet() ):
       pass;
 
-  def _Send(self, payload, buffer_size=1024, waitForResponse=True): # This method shouldn't be used outside the scope of this object's
-                                              # wrappers.
+  def _Send(self, payload, buffer_size=1024, waitForResponse=True): 
+    """ This method shouldn't be used outside the scope of this object's wrappers. """
     curTick = time.time();
     if curTick - self._lastCheckTick >= self._frameTime:
       self._counter = 0;
@@ -145,6 +145,7 @@ class Rcon(object):
       self.execVstr(vstrStorage)
       
   def smsay(self, msg):
+    """ Sends the given message in SMOD chat. Only logged in SMODs will be able to see this chat message. The sender will be 'RCON'. """
     if not type(msg) == bytes:
       msg = bytes(msg, "UTF-8")
     return self._Send(b"\xff\xff\xff\xffrcon %b smsay %b" % (self.rcon_pwd, msg), waitForResponse=False)
@@ -172,6 +173,7 @@ class Rcon(object):
     return self._Send(b"\xff\xff\xff\xffrcon %b sndTeam %b %b" % (self.rcon_pwd, team, path), waitForResponse=False)
 
   def svtell(self, client, msg):
+    """ Sends the given message to the client with the given ID. """
     if not type(msg) == bytes:
       msg = bytes(msg, "UTF-8")
     if not type(client) == bytes:
