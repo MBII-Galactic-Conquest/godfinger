@@ -1,23 +1,26 @@
 #!/bin/bash
+set -e
 
 # Navigate up one level
 cd ../
 
 # Try to enter the bin directory, if it doesn't exist, show a message and wait for user input
 if ! cd ./bin; then
-    echo "Bin folder with dependencies does not exist. Press enter to continue..."
+    echo "Error: Bin folder with dependencies does not exist." >&2
+    echo "Please create the bin directory and try again."
     read -r input
     exit 1
 fi
 
-echo Configuring virtual environment, please wait...
+echo "Configuring virtual environment, please wait..."
 
 # Check if virtual environment exists, create it if not
-if ! test -f ../../venv/bin/activate; then
-    python -m venv ../../venv
+VENV_DIR="../../venv"
+if ! test -f "$VENV_DIR/bin/activate"; then
+    python3 -m venv "$VENV_DIR"
 fi
-source ../../venv/bin/activate
-echo Using python at
+source "$VENV_DIR/bin/activate"
+echo "Using python at"
 which python
 
 # Function to check if Python meets the required version
@@ -26,22 +29,18 @@ check_python_version() {
     INSTALLED_VERSION=$($1 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))")
 
     if [ -z "$INSTALLED_VERSION" ]; then
-        echo "Error: Unable to check Python version with $1 (possibly missing or permission denied)"
+        echo "Error: Unable to check Python version with $1 (possibly missing or permission denied)" >&2
         return 1
     fi
 
     echo "Installed Python version: $INSTALLED_VERSION"
     echo "Required Python version: $REQUIRED_VERSION"
 
-    # Compare versions directly (e.g., 3.12.1 > 3.12.0)
-    INSTALLED_VERSION_NUM=$(echo "$INSTALLED_VERSION" | tr -d '.')
-    REQUIRED_VERSION_NUM=$(echo "$REQUIRED_VERSION" | tr -d '.')
-
-    if [ "$INSTALLED_VERSION_NUM" -ge "$REQUIRED_VERSION_NUM" ]; then
+    if printf '%s\n' "$REQUIRED_VERSION" "$INSTALLED_VERSION" | sort -V | head -n1 | grep -q "$REQUIRED_VERSION"; then
         echo "Using $1 (Python $INSTALLED_VERSION)"
         return 0
     else
-        echo "Python version too old: $INSTALLED_VERSION (requires $REQUIRED_VERSION or newer)"
+        echo "Python version too old: $INSTALLED_VERSION (requires $REQUIRED_VERSION or newer)" >&2
         return 1
     fi
 }
@@ -54,7 +53,7 @@ elif command -v python &>/dev/null && check_python_version "python"; then
     PYTHON_CMD="python"
     PIP_CMD="pip"
 else
-    echo "Error: Python 3.12+ is required but not found."
+    echo "Error: Python 3.12+ is required but not found." >&2
     echo "Please install Python 3.12 or newer and try again."
     exit 1
 fi
@@ -65,7 +64,7 @@ $PIP_CMD install --upgrade pip
 
 # Install dependencies
 echo "Installing dependencies..."
-$PIP_CMD install -U -r requirements.txt --break-system-packages
+$PIP_CMD install -U -r requirements.txt
 
 # Wait for user input before exiting
 echo "Press enter to exit..."
