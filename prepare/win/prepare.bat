@@ -30,6 +30,15 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+:: Install Windows-specific dependencies
+echo Installing windows-specific dependencies...
+python -m pip install -U -r win_requirements.txt
+if %errorlevel% neq 0 (
+    echo Error installing dependencies. Press Enter to exit.
+    pause
+    exit /b
+)
+
 :: Run the prepare.py script
 echo Running ANSI-WIN1252 file-read-backwards patch...
 START /WAIT python ./prepare.py
