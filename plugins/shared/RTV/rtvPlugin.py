@@ -667,9 +667,9 @@ class RTV(object):
             # Process RTV request
             if not eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.append(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 wants to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             
             # Check if threshold reached to start vote
             if len(self._wantsToRTV) >= ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio']):
