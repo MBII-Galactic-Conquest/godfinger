@@ -33,7 +33,7 @@ USE_THREAD = False
 
 # Load environment variables
 def load_env_variables():
-    global DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, DISCORD_CHANNEL_ID, DISCORD_THREAD_ID, USE_THREAD
+    global DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, DISCORD_CHANNEL_ID, DISCORD_THREAD_ID, USE_THREAD, ADMIN_ROLE_ID
     env_file = os.path.join(os.path.dirname(__file__), "discordbot.env")
     if not os.path.exists(env_file):
         print(f"{env_file} not found. Creating one...")
@@ -77,9 +77,9 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
 # Called once when the platform starts
 def OnStart():
     if DISCORD_BOT_TOKEN and DISCORD_BOT_TOKEN.lower() != "your_token_here":
+        # Start Discord bot in a separate thread to avoid blocking the main application
         threading.Thread(target=start_discord_bot_thread, daemon=True).start()
-        threading.Thread(target=watch_bigdata_log, daemon=True).start()
-        print("Discord bot thread and log monitoring started!")
+        print("Discord bot thread started!")
     else:
         print("Discord bot token is missing. Bot will not start.")
     return True
@@ -90,12 +90,16 @@ async def start_discord_bot():
 
 # Start Discord bot in a separate thread
 def start_discord_bot_thread():
+    # Create a new event loop for this thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    # Run the Discord bot until it completes (e.g., disconnects)
     loop.run_until_complete(start_discord_bot())
+    # Close the loop when the bot stops
+    loop.close()
 
-# Monitor the bigdata.log file for new lines
-def watch_bigdata_log():
+# Asynchronous function to monitor the bigdata.log file for new lines
+async def async_watch_bigdata_log():
     global last_position, last_sent_message
     while True:
         try:
@@ -110,16 +114,24 @@ def watch_bigdata_log():
                 filtered_message = filter_message(message)
 
                 # Only send new lines (i.e., additions to the log)
-                if filtered_message != last_sent_message:
+                if filtered_message and filtered_message != last_sent_message:
                     last_sent_message = filtered_message  # Store the latest message sent
-                    asyncio.run_coroutine_threadsafe(send_to_discord(filtered_message), client.loop)
+                    await send_to_discord(filtered_message)
 
         except FileNotFoundError:
             print(f"{BIGDATA_LOG} not found. Waiting for the file to be created...")
         except Exception as e:
             print(f"Error monitoring log file: {e}")
 
-        time.sleep(1)  # Poll every 1 second
+        await asyncio.sleep(1)  # Poll every 1 second asynchronously
+
+# Event handler for when the bot is ready
+@client.event
+async def on_ready():
+    print(f'Logged in as {client.user} (ID: {client.user.id})')
+    print('------')
+    # Start the asynchronous log watcher as a background task
+    asyncio.create_task(async_watch_bigdata_log())
 
 # Function to filter out Discord or HTTP-related lines
 def filter_message(message):
@@ -197,8 +209,8 @@ async def send_part_to_discord(part):
         # Check if the message contains !admin
         if '!admin' in part.lower():
             # If the message has !admin, send it without a code block
-			# Will need svsay message to declare admins are informed. ::!IMPORTANT!::
-			# Will need sleep timer until admin can be called again. ::!IMPORTANT!::
+            # Will need svsay message to declare admins are informed. ::!IMPORTANT!::
+            # Will need sleep timer until admin can be called again. ::!IMPORTANT!::
             message_to_send = f"<@&{ADMIN_ROLE_ID}>\n\n```{part}```"
         else:
             # Send in code block for readability
