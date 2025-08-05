@@ -162,6 +162,9 @@ def check_embed_image_exists():
         EMBED_IMAGE = EMBED_IMAGE.strip()
     return EMBED_IMAGE
 
+# === Misc ===
+SERVER_EMPTIED = False
+
 # === Queue State ===
 player_queue = []
 queue_created_time = None
@@ -182,7 +185,20 @@ class pugBotPlugin(object):
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[PUG]", "lblue") + ": "
 
-# Removed 'self' from here as it's a global task
+# New asynchronous function to repeatedly ensure game_in_progress is True
+async def ensure_game_in_progress_repeatedly():
+    global SERVER_EMPTIED
+    global game_in_progress
+
+    if SERVER_EMPTIED:
+        return
+
+    for i in range(5):
+        if not game_in_progress: # Only set if it's not already true
+            game_in_progress = True
+            Log.debug(f"Explicitly setting game_in_progress to True (iteration {i+1}).")
+        await asyncio.sleep(1) # Wait for 1 second between attempts
+
 @tasks.loop(seconds=30)
 async def monitor_queue_task():
     global player_queue, last_join_time, last_queue_clear_time, game_in_progress
@@ -427,9 +443,11 @@ async def queue_join_slash(interaction: discord.Interaction):
     # If not blocked by game_in_progress or cooldown, proceed
     # Initial response must be sent within 3 seconds, so we defer long operations to followup or send ephemeral then public
     # For handle_queue_join, it sends multiple messages, so we'll send a deferred initial response then the actual messages.
-    await interaction.response.defer(ephemeral=True) # Defer the response as handle_queue_join will send messages
-    await handle_queue_join(interaction.user, interaction.channel)
-    await interaction.followup.send("Your join request has been processed!", ephemeral=True)
+
+    if not game_in_progress:
+        await interaction.response.defer(ephemeral=True)
+        await handle_queue_join(interaction.user, interaction.channel)
+        await interaction.followup.send("Your join request has been processed!", ephemeral=True)
 
 @queue_group.command(name='forcejoin', description="Admin: Force join the PUG queue, bypassing all checks.")
 @app_commands.checks.has_role(ADMIN_ROLE_ID) # Admin permission check
@@ -764,12 +782,18 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
+        global SERVER_EMPTIED
+
+        if SERVER_EMPTIED:
+            SERVER_EMPTIED = False
+
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
+        global SERVER_EMPTIED
 
         if player_queue or game_in_progress:
             Log.info("Server is empty, clearing any active PUG queue and applying cooldown.")
@@ -787,6 +811,8 @@ def OnEvent(event) -> bool:
 
             if check_if_gittracker_used():
                 create_cooldown_file()
+
+        SERVER_EMPTIED = True
 
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
@@ -810,6 +836,14 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_EXIT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
+
+        if game_in_progress:
+            Log.debug(f"MAPCHANGE event detected. Game was in progress. Triggering repeated game_in_progress assertion.")
+            asyncio.run_coroutine_threadsafe(
+                ensure_game_in_progress_repeatedly(),
+                bot.loop
+            )
+
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         return False
