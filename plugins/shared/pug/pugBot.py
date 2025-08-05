@@ -775,14 +775,13 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
-    global player_queue, last_queue_clear_time, game_in_progress
+    global player_queue, last_queue_clear_time, game_in_progress, SERVER_EMPTIED
 
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_BEGIN:
-        global SERVER_EMPTIED
 
         if SERVER_EMPTIED:
             SERVER_EMPTIED = False
@@ -793,7 +792,6 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
-        global SERVER_EMPTIED
 
         if player_queue or game_in_progress:
             Log.info("Server is empty, clearing any active PUG queue and applying cooldown.")
