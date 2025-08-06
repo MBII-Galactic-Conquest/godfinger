@@ -14,6 +14,9 @@ import lib.shared.colors as colors;
 import lib.shared.util as util;
 import lib.shared.client as client;
 import math;
+import lib.shared.pswd as pswd;
+import lib.shared.observer as observer;
+import psutil;
 
 IsUnix      = (os.name == "posix");
 IsWindows   = (os.name == "nt");
@@ -194,7 +197,7 @@ class AServerInterface(IServerInterface):
 
 
 class RconInterface(AServerInterface):
-    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False):
+    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.x86.exe"):
         super().__init__();
         self._logReaderLock                     = threading.Lock();
         self._logReaderThreadControl            = threadcontrol.ThreadControl();
@@ -205,8 +208,29 @@ class RconInterface(AServerInterface):
         self._rcon: remoteconsole.RCON          = remoteconsole.RCON( ( ipAddress, port ), bindAddr, password );
         self._testRetrospect                    = testRetrospect;
     
+        self._wdObserver = observer.Observer(self._OnWDEvent);
+        self._watchdog = pswd.ProcessWatchdog(procName);
+        self._watchdog.Subscribe(self._wdObserver);
+    
     def __del__(self):
         self.Close();
+    
+    def _OnWDEvent(self, event):
+        if event == pswd.WD_EVENT_PROCESS_UNAVAILABLE:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_unavailable"));
+        if event == pswd.WD_EVENT_PROCESS_EXISTING:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_existing"));
+        if event == pswd.WD_EVENT_PROCESS_STARTED:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_started"));
+        if event == pswd.WD_EVENT_PROCESS_DIED:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_died"));
+        if event == pswd.WD_EVENT_PROCESS_RESTARTED:
+            with self._queueLock:
+                self._workingMessageQueue.put(logMessage.LogMessage("wd_restarted"));
     
 #region RconCommands
 
@@ -380,6 +404,7 @@ class RconInterface(AServerInterface):
             return False
         if not self._rcon.Open():
             return False
+        self._watchdog.Start();
 
         # Check if the log file exists; if not, attempt to create it.
         if not os.path.exists(self._logPath):
@@ -442,6 +467,7 @@ class RconInterface(AServerInterface):
             self._rcon.Close();
             self._messageQueueSwap.queue.clear();
             self._workingMessageQueue.queue.clear();
+            self._watchdog.Stop();
             super().Close();
 
 

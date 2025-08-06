@@ -209,15 +209,15 @@ class MBIIServer:
         self._status = MBIIServer.STATUS_INIT;
         Log.info("Initializing Godfinger...");
         # Config load first
-        self._config = config.Config.fromJSON(CONFIG_DEFAULT_PATH)
+        self._config = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
         if self._config == None:
-            # handle config-less init
-            Log.error("Missing config.json, creating a fallback one, close the app, modify godfingerCfg.json and come back")
-            self._config = config.Config()
-            self._config.cfg = json.loads(CONFIG_FALLBACK)
-            f = open(CONFIG_DEFAULT_PATH, "wt")
-            f.write(CONFIG_FALLBACK)
-            f.close()
+            # # handle config-less init
+            # Log.error("Missing config.json, creating a fallback one, close the app, modify godfingerCfg.json and come back")
+            # self._config = config.Config()
+            # self._config.cfg = json.loads(CONFIG_FALLBACK)
+            # f = open(CONFIG_DEFAULT_PATH, "wt")
+            # f.write(CONFIG_FALLBACK)
+            # f.close()
             self._status = MBIIServer.STATUS_CONFIG_ERROR;
             return;
     
@@ -246,7 +246,8 @@ class MBIIServer:
                                                                     self._config.cfg["interfaces"]["rcon"]["Remote"]["password"],\
                                                                     os.path.join(self._config.cfg["MBIIPath"], self._config.cfg["interfaces"]["rcon"]["logFilename"]),\
                                                                     self._config.cfg["interfaces"]["rcon"]["logReadDelay"],
-                                                                    self._config.cfg["interfaces"]["rcon"]["Debug"]["TestRetrospect"]);
+                                                                    self._config.cfg["interfaces"]["rcon"]["Debug"]["TestRetrospect"],
+                                                                    procName=self._config.cfg["serverFileName"]);
         
         if self._svInterface == None:
             Log.error("Server interface was not initialized properly.");
@@ -415,6 +416,7 @@ class MBIIServer:
             self._restartTimeout.Set(timeout);
             self._lastRestartTick = timeout;
             self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger Restarting procedure started, ETA %s"%self._restartTimeout.LeftDHMS()));
+            Log.info("Restart issued, proceeding.");
     
     def Start(self):
         try:
@@ -495,6 +497,20 @@ class MBIIServer:
     
         elif line.startswith("gsess"):
             self.OnRealInit(message);
+            return;
+    
+        # maybe its better to move it outside of string parsing
+        if line.startswith("wd_"):
+            if line == "wd_unavailable":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_UNAVAILABLE,None));
+            elif line == "wd_existing":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_EXISTING,None));
+            elif line == "wd_started":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_STARTED,None));
+            elif line == "wd_died":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_DIED,None));
+            elif line == "wd_restarted":
+                self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_RESTARTED,None));
             return;
 
         lineParse = line.split()
