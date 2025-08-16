@@ -80,6 +80,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - `minimumVoteRatio`: Minimum participation ratio required for a valid vote.
 - `successTimeout` and `failureTimeout`: Cooldown periods after successful or failed votes.
 - `disableRecentlyPlayedMaps`: Time in seconds to avoid repeating recently played maps.
+- `disableRecentMapNomination`: Whether or not a recently played map can be nominated.
 - `skipVoting`: Whether to skip voting once majority is reached.
 - `secondTurnVoting`: Whether to allow second-round voting in case of ties.
 - `changeImmediately`: Whether to change maps immediately when a vote passes.
