@@ -170,6 +170,7 @@ CONFIG_FALLBACK = \
         "successTimeout" : 30,
         "failureTimeout" : 60,
         "disableRecentlyPlayedMaps" : 1800,
+        "disableRecentMapNomination" : true,
         "skipVoting" : true,
         "secondTurnVoting" : true,
         "changeImmediately" : true
@@ -831,8 +832,8 @@ class RTV(object):
             if self._mapContainer.FindMapWithName(mapToNom) != None and \
                len(self._nominations) < 5 and \
                not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and \
-               (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or \
-                (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
+                (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or mapToNom != self._mapName) and \
+                (not mapToNom in [x[0] for x in self._rtvRecentMaps] or self._config.cfg["rtv"]["disableRecentMapNomination"] == False):
                
                 mapObj = self._mapContainer.FindMapWithName(mapToNom)
                 # Update existing nomination
@@ -858,6 +859,8 @@ class RTV(object):
                     failReason = "map already nominated"
                 elif (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom == self._mapName):
                     failReason = "server does not allow nomination of current map"
+                elif (mapToNom in [x[0] for x in self._rtvRecentMaps] and self._config.cfg["rtv"]["disableRecentMapNomination"] == True):
+                    failReason = "cannot nominate recently played map"
                 else:
                     failReason = "unknown reason"
                 self.Say(f"Map could not be nominated: {failReason}")
