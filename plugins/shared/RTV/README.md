@@ -27,7 +27,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 ### `RTVPrefix`
 - **Description**: Command prefix for RTV/RTM commands.
 - **Example**: `"!"`
-- **Notes**: Set to `false` to disable prefix requirements.
+- **Notes**: Set to "" to disable prefix requirements.
 
 ### `requirePrefix`
 - **Description**: Whether commands must include the prefix to be recognized.
@@ -63,9 +63,9 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - `voteTime`: Time in seconds for the vote to last.
 - `voteAnnounceTimer`: How often to announce vote progress in seconds.
 - `voteRequiredRatio`: Minimum ratio of players needed to start a vote.
-- `automaticMaps`: Whether to automatically include all maps or use custom lists.
-- `primaryMaps` and `secondaryMaps`: Lists of maps to use for voting.
-- `useSecondaryMaps`: Whether to include secondary maps in voting (0 = none, 1 = some, 2 = all).
+- `automaticMaps`: Whether to automatically include all maps or use primary and (optionally) secondary lists.
+- `primaryMaps` and `secondaryMaps`: Lists of maps to use for voting. Primary maps are always able to be nominated and randomly selected for map votes. Secondary maps are subject to the settings below.
+- `useSecondaryMaps`: Whether to include secondary maps in voting (0 = none, 1 = secondary maps can be nominated but not randomly selected, 2 = secondary maps can be nominated and randomly selected).
 - `mapBanList`: List of maps that cannot be nominated or voted for.
 
 ### Advanced Settings
@@ -92,7 +92,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - `voteTime`: Time in seconds for the vote to last.
 - `voteAnnounceTimer`: How often to announce vote progress in seconds.
 - `voteRequiredRatio`: Minimum ratio of players needed to start a vote.
-- `modes_enabled`: List of game modes available for voting.
+- `modes_enabled`: List of game modes available for voting. These can be any of Open, Semi Authentic (broken as of writing this), Full Authentic, or Legends.
 - `emptyServerMode`: Mode to switch to when the server is empty.
 
 ### Advanced Settings
