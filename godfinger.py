@@ -545,9 +545,9 @@ class MBIIServer:
                 self.OnKill(message);
             elif lineParse[0] == "Exit:":
                 self.OnExit(message);
-            if lineParse[0] == "ClientConnect:":
+            elif lineParse[0] == "ClientConnect:":
                 self.OnClientConnect(message);
-            if lineParse[0] == "ClientBegin:":
+            elif lineParse[0] == "ClientBegin:":
                 self.OnClientBegin(message);
             elif lineParse[0] == "InitGame:":
                 self.OnInitGame(message);
@@ -665,10 +665,10 @@ class MBIIServer:
         scoreLine = None
         playerScores = {}
         for m in self._svInterface.GetMessages().queue:
-            if m.startswith("red:"):
+            if m.content.startswith("red:"):
                 scoreLine = m
-            elif m.startswith("score:"):
-                scoreParse = m.split()
+            elif m.content.startswith("score:"):
+                scoreParse = m.content.split()
                 scorerName = ' '.join(scoreParse[6:])
                 scorerScore = scoreParse[1]
                 scorerPing = scoreParse[3]
