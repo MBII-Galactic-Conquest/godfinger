@@ -341,6 +341,9 @@ async def handle_queue_join(member: discord.Member, channel: discord.TextChannel
     """Handles logic for a member joining the queue, called internally."""
     global player_queue, queue_created_time, last_join_time, last_queue_clear_time, game_in_progress
 
+    if game_in_progress:
+        return
+
     if member in player_queue:
         await channel.send(f"{member.mention}, you're already in the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`)")
         return
