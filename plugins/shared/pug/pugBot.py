@@ -669,6 +669,9 @@ async def queue_server_empty(content):
     if channel:
         await channel.send(content)
 
+async def shutdown_bot():
+        await bot.close()
+
 def check_if_gittracker_used():
     base_dir = os.path.join(os.path.dirname(__file__))
     cfg_path = os.path.normpath(os.path.join(base_dir, '..', '..', '..', 'godfingerCfg.json'))
@@ -771,6 +774,17 @@ def OnFinish():
     ClearExistingQueue();
     if check_persist_file_exists():
         clear_persist_file()
+
+    try:
+        if bot.is_closed() is False:
+            asyncio.run_coroutine_threadsafe(shutdown_bot(), bot.loop)
+    except Exception as e:
+        Log.error(f"Error shutting down Pick up Games bot: {e}", exc_info=True)
+
+    if thread.is_alive():
+        thread.join(timeout=5)
+        Log.info("Pick up Games bot thread successfully stopped.")
+
     pass
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
