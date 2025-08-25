@@ -38,7 +38,7 @@
 # Godfinger contributors:
 # 2cwldys (https://github.com/2cwldys),
 # ACHUTA/Mantlar, (https://github.com/mantlar)
-# ViceDice, (https://github.com/2cwldys)
+# ViceDice, (https://github.com/ViceDice)
 # Wookiee- (https://github.com/Wookiee-)
 #
 # RTV plugin created by ACHUTA
