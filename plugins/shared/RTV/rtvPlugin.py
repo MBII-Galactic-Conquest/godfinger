@@ -85,7 +85,8 @@ CONFIG_FALLBACK = \
     "floodProtection" :
     {
         "enabled" : false,
-        "seconds" : 0
+        "soft" : false,
+        "seconds" : 1.5
     },
     "showVoteCooldownTime" : 5,
     "rtv" : 
@@ -424,6 +425,7 @@ class RTVPlayer(player.Player):
     def __init__(self, cl: client.Client):
         super().__init__(cl)
         self._floodProtectionCooldown = Timeout()
+        self._lastCommand = None
 
 class RTV(object):
     """Main class implementing Rock the Vote (RTV) and Rock the Mode (RTM) functionality"""
@@ -653,9 +655,13 @@ class RTV(object):
         """Route chat command to appropriate handler"""
         command = cmdArgs[0]
         for c in self._commandList[teamId]:
-            if command in c and (self._config.cfg["floodProtection"]["enabled"] == False or player._floodProtectionCooldown.IsSet() == False):
+            if command in c:
                 if self._config.cfg["floodProtection"]["enabled"] == True:
+                    if player._floodProtectionCooldown.IsSet() == True and \
+                    ((self._config.cfg["floodProtection"]["soft"] == True and c == player._lastCommand) or self._config.cfg["floodProtection"]["soft"] == False):
+                        return False
                     player._floodProtectionCooldown.Set(self._config.cfg["floodProtection"]["seconds"])
+                    player._lastCommand = c
                 return self._commandList[teamId][c][1](player, teamId, cmdArgs)
         return False
 
