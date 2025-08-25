@@ -1,5 +1,7 @@
 import lib.shared.serverdata as serverdata
+import lib.shared.colors as colors
 import threading
+import logging
 import asyncio
 import discord
 import os
@@ -8,11 +10,16 @@ import re
 from dotenv import load_dotenv
 from datetime import datetime
 
+# Initialize the Logger
+Log = logging.getLogger(__name__)
+
 # Global variables
 SERVER_DATA = None
 BIGDATA_LOG = os.path.join("./", 'bigdata.log')
 last_position = 0  # Tracks the last read position of the log file
 last_sent_message = ""  # Store the last sent message to prevent re-sending
+bot_thread = None
+shutdown_event = threading.Event()
 
 # Define intents to specify what events the bot will listen to
 intents = discord.Intents.default()
@@ -30,6 +37,11 @@ DISCORD_CHANNEL_ID = None
 DISCORD_THREAD_ID = None
 ADMIN_ROLE_ID = None
 USE_THREAD = False
+
+class discordBotPlugin(object):
+    def __init__(self, serverData : serverdata.ServerData) -> None:
+        self._serverData : serverdata.ServerData = serverData
+        self._messagePrefix = colors.ColorizeText("[DISC]", "lblue") + ": "
 
 # Load environment variables
 def load_env_variables():
@@ -66,19 +78,37 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
     print("Initializing discordbot plugin!")
     SERVER_DATA = serverData  # Store server data
 
+    logMode = logging.INFO
+    if serverData.args.debug:
+        logMode = logging.DEBUG
+    if serverData.args.logfile != "":
+        logging.basicConfig(
+        filename=serverData.args.logfile,
+        level=logMode,
+        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+    else:
+        logging.basicConfig(
+        level=logMode,
+        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+
     # Load environment variables
     load_env_variables()
 
     if exports is not None:
         pass  # Export data if needed
 
+    global PluginInstance
+    PluginInstance = discordBotPlugin(serverData)
+
     return True  # Indicate plugin load success
 
 # Called once when the platform starts
 def OnStart():
+    global bot_thread
     if DISCORD_BOT_TOKEN and DISCORD_BOT_TOKEN.lower() != "your_token_here":
         # Start Discord bot in a separate thread to avoid blocking the main application
-        threading.Thread(target=start_discord_bot_thread, daemon=True).start()
+        bot_thread = threading.Thread(target=start_discord_bot_thread, daemon=True)
+        bot_thread.start()
         print("Discord bot thread started!")
     else:
         print("Discord bot token is missing. Bot will not start.")
@@ -94,9 +124,33 @@ def start_discord_bot_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     # Run the Discord bot until it completes (e.g., disconnects)
-    loop.run_until_complete(start_discord_bot())
-    # Close the loop when the bot stops
-    loop.close()
+    try:
+        loop.run_until_complete(client.start(DISCORD_BOT_TOKEN))
+    except Exception as e:
+        print(f"Error starting Discord bot: {e}")
+    finally:
+        loop.run_until_complete(client.close())
+        loop.stop()
+        loop.close()
+
+def stop_bot_thread():
+    global bot_thread
+    if bot_thread and bot_thread.is_alive():
+        Log.info("Signaling Discord bot thread to shut down...")
+        shutdown_event.set()  # Signal the log watcher to stop
+        future = asyncio.run_coroutine_threadsafe(client.close(), client.loop)
+        try:
+            future.result(timeout=5)  # Wait for the client to close with a timeout
+        except asyncio.TimeoutError:
+            Log.error("Timed out waiting for bot client to close gracefully.")
+        except Exception as e:
+            Log.error(f"Error during bot shutdown: {e}")
+        bot_thread.join(timeout=5)  # Wait for the thread to finish
+        if bot_thread.is_alive():
+            Log.debug("Warning: Discord bot thread did not terminate.")
+        else:
+            Log.info("Discord bot thread has been shut down.")
+        bot_thread = None
 
 # Asynchronous function to monitor the bigdata.log file for new lines
 async def async_watch_bigdata_log():
@@ -241,6 +295,7 @@ def OnLoop():
 
 # Called before the plugin is unloaded by the system
 def OnFinish():
+    stop_bot_thread()
     pass
 
 # Called from the system on some event raising
