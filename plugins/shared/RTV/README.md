@@ -46,12 +46,14 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 
 ### `floodProtection`
 - **Description**: Configuration for flood protection.
-  - `enabled`: Whether flood protection is enabled. If `true`, each player will have a timer set to `seconds` seconds every time they say a command.
+  - `enabled`: Whether flood protection is enabled. If `true`, each player will have a timer set to `seconds` seconds every time they say a command, during which they may not issue other commands. Timers are per player, so all players can use the plugin simultaneously without waiting.
+  - `soft` : If set to true, only enforces flood protection on the last command sent. This may help with usability but it will also make it easier for players to spam chat by alternating commands.
   - `seconds`: Time window in seconds for flood protection checks.
   - **Example**:
     ```json
     "floodProtection" : {
         "enabled" : true,
+        "soft" : false,
         "seconds" : 1.5
     }
     ```
