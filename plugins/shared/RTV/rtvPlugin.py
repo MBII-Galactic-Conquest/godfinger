@@ -87,6 +87,7 @@ CONFIG_FALLBACK = \
         "enabled" : false,
         "seconds" : 0
     },
+    "showVoteCooldownTime" : 5,
     "rtv" : 
     {
         "enabled" : true,
@@ -418,13 +419,19 @@ class RTMVote(RTVVote):
     def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtm"]["voteTime"], announceCount=1):
         super().__init__(voteOptions, voteTime, announceCount)
 
+class RTVPlayer(player.Player):
+    """ Specialized player class for RTV/RTM, implements RTV/RTM specific player variables  """
+    def __init__(self, cl: client.Client):
+        super().__init__(cl)
+        self._floodProtectionCooldown = Timeout()
+
 class RTV(object):
     """Main class implementing Rock the Vote (RTV) and Rock the Mode (RTM) functionality"""
     def __init__(self, serverData : serverdata.ServerData):
         # Configuration setup
-        self._config : config.Config = DEFAULT_CFG        
+        self._config : config.Config = DEFAULT_CFG
         self._themeColor = self._config.cfg["pluginThemeColor"]
-        self._players : dict[player.Player] = {}
+        self._players : dict[RTVPlayer] = {}
         self._serverData : serverdata.ServerData = serverData
         
         # RTV state tracking
@@ -642,11 +649,13 @@ class RTV(object):
             sleep(1)
         self._serverData.interface.MapReload(mapToChange)
     
-    def HandleChatCommand(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+    def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
         """Route chat command to appropriate handler"""
         command = cmdArgs[0]
         for c in self._commandList[teamId]:
-            if command in c:
+            if command in c and (self._config.cfg["floodProtection"]["enabled"] == False or player._floodProtectionCooldown.IsSet() == False):
+                if self._config.cfg["floodProtection"]["enabled"] == True:
+                    player._floodProtectionCooldown.Set(self._config.cfg["floodProtection"]["seconds"])
                 return self._commandList[teamId][c][1](player, teamId, cmdArgs)
         return False
 
@@ -982,7 +991,7 @@ class RTV(object):
             if self._currentVote != None:
                 self._AnnounceVote()
             else:
-                self.Say("No vote to display!")
+                self.Say(f"No vote to display. Type {colors.ColorizeText('!rtv', self._themeColor)} in chat to {colors.ColorizeText('Rock the Vote', self._themeColor)}!")
 
     # only included if not already defined in another plugin
     def HandleHelp(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -1007,7 +1016,7 @@ class RTV(object):
             Log.debug(f"Received chat message from client {eventClient.GetId()}")
             commandPrefix = self._config.cfg["RTVPrefix"]
             capture = False
-            eventPlayer : player.Player = self._players[eventClient.GetId()]
+            eventPlayer : RTVPlayer = self._players[eventClient.GetId()]
             eventPlayerId = eventPlayer.GetId()
             
             if eventPlayer != None:
@@ -1026,7 +1035,7 @@ class RTV(object):
     
     def OnClientConnect(self, eventClient : client.Client):
         """Handle new client connection"""
-        newPlayer = Player(eventClient)
+        newPlayer = RTVPlayer(eventClient)
         self._OnNewPlayer(newPlayer)
         return False
 
@@ -1183,7 +1192,7 @@ class RTV(object):
         """Initialize plugin with current players"""
         allClients = self._serverData.API.GetAllClients()
         for cl in allClients:
-            newPlayer = player.Player(cl)
+            newPlayer = RTVPlayer(cl)
             self._OnNewPlayer(newPlayer)
         return True
 
@@ -1196,10 +1205,10 @@ class RTV(object):
 class RTVNomination(object):
     """Represents a player's map nomination"""
     def __init__(self, player, map):
-        self._player = player
-        self._map = map
+        self._player : RTVPlayer = player
+        self._map : Map = map
 
-    def GetPlayer(self) -> player.Player:
+    def GetPlayer(self) -> RTVPlayer:
         """Get nominating player"""
         return self._player
 
