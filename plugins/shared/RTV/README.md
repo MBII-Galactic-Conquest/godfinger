@@ -58,6 +58,11 @@ This document explains the configuration options for the RTV/RTM plugin for the 
     }
     ```
 
+### `showVoteCooldownTime`
+- **Description**: The cooldown time for the `!showvote`/`!showrtv` command. Can be set to 0 to disable.
+- **Possible Values**: Any valid number (with or without decimals)
+- **Example**: 30 (the showvote command will be disabled for all players for 30 seconds)
+
 ## RTV (Rock the Vote) Configuration
 
 ### Core Settings
