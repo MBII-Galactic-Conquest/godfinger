@@ -452,7 +452,8 @@ class RTV(object):
                     ("nomlist", "nominationlist", "nominatelist", "noml") : ("!nomlist - displays a list of nominations for the next map", self.HandleNomList),
                     ("search", "mapsearch") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
                     ('help', "cmds") : ("!help - display help about a given command, or all commands if no command is given", self.HandleHelp),
-                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)  # handle decimal votes
+                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote),  # handle decimal votes
+                    ("showvote", "showrtv") : ("!showvote - shows the current vote stats if a vote is active", self.HandleShowVote)
                 },
                 # Team-specific commands (only vote commands for other teams)
                 teams.TEAM_EVIL : {
@@ -484,6 +485,7 @@ class RTV(object):
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
+        self._announceCooldown = Timeout()
         
         # Configure say method based on settings
         if self._config.cfg["useSayOnly"] == True:
@@ -972,6 +974,15 @@ class RTV(object):
         else:
             self.Say("No map nominations to display.")
         return capture
+
+    def HandleShowVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+        """ Handle show vote command """
+        if not self._announceCooldown.IsSet():
+            self._announceCooldown.Set(self._config.cfg["showVoteCooldownTime"])
+            if self._currentVote != None:
+                self._AnnounceVote()
+            else:
+                self.Say("No vote to display!")
 
     # only included if not already defined in another plugin
     def HandleHelp(self, player : player.Player, teamId : int, cmdArgs : list[str]):
