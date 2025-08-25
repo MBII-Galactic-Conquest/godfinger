@@ -99,7 +99,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - `voteTime`: Time in seconds for the vote to last.
 - `voteAnnounceTimer`: How often to announce vote progress in seconds.
 - `voteRequiredRatio`: Minimum ratio of players needed to start a vote.
-- `modes_enabled`: List of game modes available for voting. These can be any of Open, Semi Authentic (broken as of writing this), Full Authentic, or Legends.
+- `modes_enabled`: List of game modes available for voting. These can be any of Open, Semi Authentic (broken as of writing this), Duel, Full Authentic, or Legends.
 - `emptyServerMode`: Mode to switch to when the server is empty.
 
 ### Advanced Settings
