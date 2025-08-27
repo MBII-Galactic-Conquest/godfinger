@@ -89,6 +89,8 @@ CONFIG_FALLBACK = \
         "seconds" : 1.5
     },
     "showVoteCooldownTime" : 5,
+    "maxMapPageSize" : 950,
+    "maxSearchPageSize" : 950,
     "rtv" : 
     {
         "enabled" : true,
@@ -275,13 +277,15 @@ class MapContainer(object):
     def __init__(self, mapArray : list[Map], pluginInstance):
         self._mapCount = 0
         self._mapDict = {}
+        self._pages = []
+        self.plugin : RTV = pluginInstance
         
         # Get configuration from plugin instance
-        primaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["primaryMaps"]]
-        secondaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["secondaryMaps"]]
-        mapBanList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["mapBanList"]]
-        useSecondaryMaps = pluginInstance._config.cfg["rtv"]["useSecondaryMaps"]
-        automaticMaps = pluginInstance._config.cfg["rtv"]["automaticMaps"]
+        primaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["primaryMaps"]]
+        secondaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["secondaryMaps"]]
+        mapBanList = [x.lower() for x in self.plugin._config.cfg["rtv"]["mapBanList"]]
+        useSecondaryMaps = self.plugin._config.cfg["rtv"]["useSecondaryMaps"]
+        automaticMaps = self.plugin._config.cfg["rtv"]["automaticMaps"]
         
         # Process maps based on configuration
         if automaticMaps:
@@ -306,6 +310,7 @@ class MapContainer(object):
                 del self._mapDict[m]
         
         self._mapCount = len(self._mapDict.keys())
+        self._CreatePages()
     
     def GetAllMaps(self) -> list[Map]:
         """Get all available maps"""
@@ -345,6 +350,25 @@ class MapContainer(object):
             if m.lower() == name_lower:
                 return self._mapDict[m]
         return None
+
+    def _CreatePages(self) -> None:
+        """Generate cached pages for map list"""
+        pages = []
+        pageStr = ""
+        for map in self._mapDict.values():
+            if len(pageStr) < self.plugin._config.cfg["maxMapPageSize"]:
+                pageStr += map.GetMapName() + ", "
+            else:
+                pageStr = pageStr[:-2]
+                pages.append(pageStr)
+                pageStr = map.GetMapName() + ", "
+        if len(pageStr) > 2:
+            pages.append(pageStr[:-2])
+        self._pages = pages
+    
+    def GetPageCount(self) -> int:
+        """Get total number of pages"""
+        return len(self._pages)
 
 class RTVVote(object):
     """Base class for handling voting systems (RTV and RTM)"""
@@ -500,13 +524,20 @@ class RTV(object):
         if self._config.cfg["useSayOnly"] == True:
             self.SvSay = self.Say
 
-    def Say(self, saystr):
-        """Send message to all players"""
-        return self._serverData.interface.Say(self._messagePrefix + saystr)
+    def Say(self, saystr : str, usePrefix : bool = True):
+        """Send console message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.Say(prefix + saystr)
 
-    def SvSay(self, saystr):
-        """Send server message to all players"""
-        return self._serverData.interface.SvSay(self._messagePrefix + saystr)
+    def SvSay(self, saystr : str, usePrefix : bool = True):
+        """Send chat message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvSay(prefix + saystr)
+    
+    def SvTell(self, pid: int, saystr : str, usePrefix : bool = True):
+        """Send chat message to one player given their ID"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvTell(pid, prefix + saystr)
 
     def _getAllPlayers(self):
         """Get all connected players"""
@@ -886,38 +917,24 @@ class RTV(object):
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
         """Handle !maplist command - show available maps"""
         capture = False
-        eventPlayer = player
-        eventPlayerId = eventPlayer.GetId()
-        currentVote = self._currentVote
-        votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        
-        # Process command if valid
-        if len(cmdArgs) == 2:
+        if len(cmdArgs) == 1:
+            # Show usage message with total pages
+            num_pages = self._mapContainer.GetPageCount()
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!maplist <page>', self._themeColor)}, valid pages {colors.ColorizeText('1-' + str(num_pages), self._themeColor)}")
             capture = True
-            # Build paginated map list
-            pages = []
-            pageStr = ""
-            for map in self._mapContainer.GetAllMaps():
-                if len(pageStr) < 950:
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
+        elif len(cmdArgs) == 2:
+            capture = True
+            # Get page from cached pages
+            try:
+                page_index = int(cmdArgs[1]) - 1
+                if page_index < 0:
+                    raise ValueError
+                if page_index >= len(self._mapContainer._pages):
+                    self.SvSay(f"Index out of range! (1-{len(self._mapContainer._pages)})")
                 else:
-                    pageStr = pageStr[:-2]
-                    pages.append(pageStr)
-                    pageStr = ""
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
-            pages.append(pageStr[:-2])
-            
-            # Show requested page
-            if cmdArgs[1].isdecimal():
-                pageIndex = int(cmdArgs[1])
-                if 1 <= pageIndex <= len(pages):
-                    self.Say(pages[pageIndex - 1])
-                else:
-                    self.Say(f"Index out of range! (1-{len(pages)})")
-            else:
-                self.Say(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+                    self.SvSay(self._mapContainer._pages[page_index])
+            except (ValueError, IndexError):
+                self.SvSay(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -940,7 +957,7 @@ class RTV(object):
                         mapName = colors.HighlightSubstr(mapName, index, index + len(searchTerm), self._themeColor)
                     
                     # Add to results page
-                    if len(mapStr) + len(mapName) < 950:
+                    if len(mapStr) + len(mapName) < self._config.cfg["maxSearchPageSize"]:
                         mapStr += mapName
                         mapStr += ', '
                     else:
@@ -955,7 +972,7 @@ class RTV(object):
             
             # Display results
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix}Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
+                self.SvTell(player.GetId(), f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
@@ -963,6 +980,8 @@ class RTV(object):
                 batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
+        else:
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!search <searchterm1> [searchterm2] [...]', self._themeColor)}")
         return capture
 
     def HandleDecimalVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
