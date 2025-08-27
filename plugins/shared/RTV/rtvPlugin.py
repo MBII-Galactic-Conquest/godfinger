@@ -523,13 +523,20 @@ class RTV(object):
         if self._config.cfg["useSayOnly"] == True:
             self.SvSay = self.Say
 
-    def Say(self, saystr):
-        """Send message to all players"""
-        return self._serverData.interface.Say(self._messagePrefix + saystr)
+    def Say(self, saystr : str, usePrefix : bool = True):
+        """Send console message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.Say(prefix + saystr)
 
-    def SvSay(self, saystr):
-        """Send server message to all players"""
-        return self._serverData.interface.SvSay(self._messagePrefix + saystr)
+    def SvSay(self, saystr : str, usePrefix : bool = True):
+        """Send chat message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvSay(prefix + saystr)
+    
+    def SvTell(self, pid: int, saystr : str, usePrefix : bool = True):
+        """Send chat message to one player given their ID"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvTell(pid, prefix + saystr)
 
     def _getAllPlayers(self):
         """Get all connected players"""
@@ -964,7 +971,7 @@ class RTV(object):
             
             # Display results
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix}Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
+                self.SvTell(player.GetId(), f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:

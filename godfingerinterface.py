@@ -53,7 +53,7 @@ class IServerInterface():
     def Say(self, text : str ) -> str:
         return "Not implemented";
 
-    def SvTell(self, text : str, pid : int ) -> str:
+    def SvTell(self, pid : int, text : str) -> str:
         return "Not implemented";
 
     def TeamSay(self, players, team, vstrStorage, msg):
