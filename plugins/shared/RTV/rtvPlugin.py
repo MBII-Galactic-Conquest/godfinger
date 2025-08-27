@@ -919,7 +919,7 @@ class RTV(object):
         if len(cmdArgs) == 1:
             # Show usage message with total pages
             num_pages = self._mapContainer.GetPageCount()
-            self.SvSay(self._messagePrefix + f"Usage: !maplist <page>, valid pages 1-{num_pages}")
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!maplist <page>', self._themeColor)}, valid pages {colors.ColorizeText('1-' + str(num_pages), self._themeColor)}")
             capture = True
         elif len(cmdArgs) == 2:
             capture = True
@@ -979,6 +979,8 @@ class RTV(object):
                 batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
+        else:
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!search <searchterm1> [searchterm2] [...]', self._themeColor)}")
         return capture
 
     def HandleDecimalVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
