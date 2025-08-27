@@ -278,13 +278,14 @@ class MapContainer(object):
         self._mapCount = 0
         self._mapDict = {}
         self._pages = []
+        self.plugin : RTV = pluginInstance
         
         # Get configuration from plugin instance
-        primaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["primaryMaps"]]
-        secondaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["secondaryMaps"]]
-        mapBanList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["mapBanList"]]
-        useSecondaryMaps = pluginInstance._config.cfg["rtv"]["useSecondaryMaps"]
-        automaticMaps = pluginInstance._config.cfg["rtv"]["automaticMaps"]
+        primaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["primaryMaps"]]
+        secondaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["secondaryMaps"]]
+        mapBanList = [x.lower() for x in self.plugin._config.cfg["rtv"]["mapBanList"]]
+        useSecondaryMaps = self.plugin._config.cfg["rtv"]["useSecondaryMaps"]
+        automaticMaps = self.plugin._config.cfg["rtv"]["automaticMaps"]
         
         # Process maps based on configuration
         if automaticMaps:
@@ -355,7 +356,7 @@ class MapContainer(object):
         pages = []
         pageStr = ""
         for map in self._mapDict.values():
-            if len(pageStr) < 950:
+            if len(pageStr) < self.plugin._config.cfg["maxMapPageSize"]:
                 pageStr += map.GetMapName() + ", "
             else:
                 pageStr = pageStr[:-2]
@@ -956,7 +957,7 @@ class RTV(object):
                         mapName = colors.HighlightSubstr(mapName, index, index + len(searchTerm), self._themeColor)
                     
                     # Add to results page
-                    if len(mapStr) + len(mapName) < 950:
+                    if len(mapStr) + len(mapName) < self._config.cfg["maxSearchPageSize"]:
                         mapStr += mapName
                         mapStr += ', '
                     else:
