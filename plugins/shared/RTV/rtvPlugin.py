@@ -89,6 +89,8 @@ CONFIG_FALLBACK = \
         "seconds" : 1.5
     },
     "showVoteCooldownTime" : 5,
+    "maxMapPageSize" : 950,
+    "maxSearchPageSize" : 950,
     "rtv" : 
     {
         "enabled" : true,
@@ -275,6 +277,7 @@ class MapContainer(object):
     def __init__(self, mapArray : list[Map], pluginInstance):
         self._mapCount = 0
         self._mapDict = {}
+        self._pages = []
         
         # Get configuration from plugin instance
         primaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["primaryMaps"]]
@@ -306,6 +309,7 @@ class MapContainer(object):
                 del self._mapDict[m]
         
         self._mapCount = len(self._mapDict.keys())
+        self._CreatePages()
     
     def GetAllMaps(self) -> list[Map]:
         """Get all available maps"""
@@ -345,6 +349,25 @@ class MapContainer(object):
             if m.lower() == name_lower:
                 return self._mapDict[m]
         return None
+
+    def _CreatePages(self) -> None:
+        """Generate cached pages for map list"""
+        pages = []
+        pageStr = ""
+        for map in self._mapDict.values():
+            if len(pageStr) < 950:
+                pageStr += map.GetMapName() + ", "
+            else:
+                pageStr = pageStr[:-2]
+                pages.append(pageStr)
+                pageStr = map.GetMapName() + ", "
+        if len(pageStr) > 2:
+            pages.append(pageStr[:-2])
+        self._pages = pages
+    
+    def GetPageCount(self) -> int:
+        """Get total number of pages"""
+        return len(self._pages)
 
 class RTVVote(object):
     """Base class for handling voting systems (RTV and RTM)"""
@@ -886,38 +909,24 @@ class RTV(object):
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
         """Handle !maplist command - show available maps"""
         capture = False
-        eventPlayer = player
-        eventPlayerId = eventPlayer.GetId()
-        currentVote = self._currentVote
-        votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        
-        # Process command if valid
-        if len(cmdArgs) == 2:
+        if len(cmdArgs) == 1:
+            # Show usage message with total pages
+            num_pages = self._mapContainer.GetPageCount()
+            self.SvSay(self._messagePrefix + f"Usage: !maplist <page>, valid pages 1-{num_pages}")
             capture = True
-            # Build paginated map list
-            pages = []
-            pageStr = ""
-            for map in self._mapContainer.GetAllMaps():
-                if len(pageStr) < 950:
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
+        elif len(cmdArgs) == 2:
+            capture = True
+            # Get page from cached pages
+            try:
+                page_index = int(cmdArgs[1]) - 1
+                if page_index < 0:
+                    raise ValueError
+                if page_index >= len(self._mapContainer._pages):
+                    self.SvSay(f"Index out of range! (1-{len(self._mapContainer._pages)})")
                 else:
-                    pageStr = pageStr[:-2]
-                    pages.append(pageStr)
-                    pageStr = ""
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
-            pages.append(pageStr[:-2])
-            
-            # Show requested page
-            if cmdArgs[1].isdecimal():
-                pageIndex = int(cmdArgs[1])
-                if 1 <= pageIndex <= len(pages):
-                    self.Say(pages[pageIndex - 1])
-                else:
-                    self.Say(f"Index out of range! (1-{len(pages)})")
-            else:
-                self.Say(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+                    self.SvSay(self._mapContainer._pages[page_index])
+            except (ValueError, IndexError):
+                self.SvSay(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
