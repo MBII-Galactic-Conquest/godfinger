@@ -29,6 +29,11 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - **Example**: `"!"`
 - **Notes**: Set to "" to disable prefix requirements.
 
+### `caseSensitiveCommands`
+- **Description**: Whether command matching should be case-sensitive.
+- **Possible Values**: true or false
+- **Example**: false
+
 ### `requirePrefix`
 - **Description**: Whether commands must include the prefix to be recognized.
 - **Possible Values**: `true` or `false`
@@ -57,6 +62,16 @@ This document explains the configuration options for the RTV/RTM plugin for the 
         "seconds" : 1.5
     }
     ```
+
+### `maxMapPageSize`
+- **Description**: Maximum size (in characters) of each page for map list commands.
+- **Possible Values**: Any valid number
+- **Example**: 950
+
+### `maxSearchPageSize`
+- **Description**: Maximum size (in characters) of each page for search results.
+- **Possible Values**: Any valid number
+- **Example**: 950
 
 ### `showVoteCooldownTime`
 - **Description**: The cooldown time for the `!showvote`/`!showrtv` command. Can be set to 0 to disable.
