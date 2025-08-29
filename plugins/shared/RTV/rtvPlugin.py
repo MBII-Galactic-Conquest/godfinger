@@ -79,6 +79,7 @@ CONFIG_FALLBACK = \
     "pluginThemeColor" : "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
+    "caseSensitiveCommands" : false,
     "requirePrefix" : false,
     "kickProtectedNames" : true,
     "useSayOnly" : false,
@@ -685,6 +686,8 @@ class RTV(object):
     def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
         """Route chat command to appropriate handler"""
         command = cmdArgs[0]
+        if self._config.cfg["caseSensitiveCommands"] == False:
+            command = command.lower()
         for c in self._commandList[teamId]:
             if command in c:
                 if self._config.cfg["floodProtection"]["enabled"] == True:
