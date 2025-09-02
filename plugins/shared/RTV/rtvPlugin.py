@@ -49,6 +49,7 @@ from enum import Enum, auto
 import json
 import logging
 import os
+import re
 from math import ceil, floor
 from random import sample
 from time import sleep, time
@@ -81,6 +82,7 @@ CONFIG_FALLBACK = \
     "RTVPrefix": "!",
     "caseSensitiveCommands" : false,
     "requirePrefix" : false,
+    "protectedNames" : ["admin", "server"],
     "kickProtectedNames" : true,
     "useSayOnly" : false,
     "floodProtection" :
@@ -458,7 +460,7 @@ class RTV(object):
         # Configuration setup
         self._config : config.Config = DEFAULT_CFG
         self._themeColor = self._config.cfg["pluginThemeColor"]
-        self._players : dict[RTVPlayer] = {}
+        self._players : dict[int, RTVPlayer] = {}
         self._serverData : serverdata.ServerData = serverData
         
         # RTV state tracking
@@ -1100,9 +1102,11 @@ class RTV(object):
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]])
         return False
 
-    def OnClientChange(self, eventClient, eventData):
-        """Handle client changes (not implemented)"""
-        return False
+    def OnClientChange(self, eventClient : client.Client, eventData : dict):
+        """Handle client changes"""
+        if self._config.cfg["kickProtectedNames"] == True:
+            kickClientIfProtectedName(eventClient)
+
 
     def OnServerInit(self, data):
         """Handle server initialization (round start)"""
@@ -1261,17 +1265,21 @@ def OnStart():
     if not PluginInstance.Start():
         return False
     
-    # Kick protected names if enabled
+    # Kick protected names if enabled TODO this should probably be made its own plugin at some point
     if PluginInstance._config.cfg["kickProtectedNames"] == True:
         for i in PluginInstance._serverData.API.GetAllClients():
-            nameStripped = colors.StripColorCodes(i.GetName().lower())
-            if nameStripped == "admin" or nameStripped == "server":
-                PluginInstance._serverData.interface.ClientKick(i.GetId())
+            kickClientIfProtectedName(i)
     
     # Report startup time
     loadTime = time() - startTime
     PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"RTV started in {loadTime:.2f} seconds!")
-    return True  # indicate plugin start success
+    return True 
+
+def kickClientIfProtectedName(client : client.Client):
+    nameStripped = colors.StripColorCodes(client.GetName().lower())
+    nameStripped = re.sub(":|-|\.|,|;|=|\/|\\|\||`|~|\"|\'|[|]|(|)|_", "", nameStripped)
+    if nameStripped in [x.lower() for x in PluginInstance._config.cfg["protectedNames"]]:
+        PluginInstance._serverData.interface.ClientKick(client.GetId()) # indicate plugin start success
 
 # Called each loop tick from the system
 def OnLoop():

@@ -44,6 +44,11 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - **Possible Values**: `true` or `false`
 - **Example**: `true`
 
+### `protectedNames`
+- **Description**: List of protected names (e.g., "admin", "server"). Case insensitive.
+- **Possible Values**: Any string value
+- **Example**: ["admin", "server"]
+
 ### `useSayOnly`
 - **Description**: Whether to use `say` instead of `svsay` for messages.
 - **Possible Values**: `true` or `false`
