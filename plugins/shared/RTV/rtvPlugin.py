@@ -38,7 +38,7 @@
 # Godfinger contributors:
 # 2cwldys (https://github.com/2cwldys),
 # ACHUTA/Mantlar, (https://github.com/mantlar)
-# ViceDice, (https://github.com/2cwldys)
+# ViceDice, (https://github.com/ViceDice)
 # Wookiee- (https://github.com/Wookiee-)
 #
 # RTV plugin created by ACHUTA
@@ -49,6 +49,7 @@ from enum import Enum, auto
 import json
 import logging
 import os
+import re
 from math import ceil, floor
 from random import sample
 from time import sleep, time
@@ -79,14 +80,20 @@ CONFIG_FALLBACK = \
     "pluginThemeColor" : "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
+    "caseSensitiveCommands" : false,
     "requirePrefix" : false,
+    "protectedNames" : ["admin", "server"],
     "kickProtectedNames" : true,
     "useSayOnly" : false,
     "floodProtection" :
     {
         "enabled" : false,
-        "seconds" : 0
+        "soft" : false,
+        "seconds" : 1.5
     },
+    "showVoteCooldownTime" : 5,
+    "maxMapPageSize" : 950,
+    "maxSearchPageSize" : 950,
     "rtv" : 
     {
         "enabled" : true,
@@ -273,13 +280,15 @@ class MapContainer(object):
     def __init__(self, mapArray : list[Map], pluginInstance):
         self._mapCount = 0
         self._mapDict = {}
+        self._pages = []
+        self.plugin : RTV = pluginInstance
         
         # Get configuration from plugin instance
-        primaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["primaryMaps"]]
-        secondaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["secondaryMaps"]]
-        mapBanList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["mapBanList"]]
-        useSecondaryMaps = pluginInstance._config.cfg["rtv"]["useSecondaryMaps"]
-        automaticMaps = pluginInstance._config.cfg["rtv"]["automaticMaps"]
+        primaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["primaryMaps"]]
+        secondaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["secondaryMaps"]]
+        mapBanList = [x.lower() for x in self.plugin._config.cfg["rtv"]["mapBanList"]]
+        useSecondaryMaps = self.plugin._config.cfg["rtv"]["useSecondaryMaps"]
+        automaticMaps = self.plugin._config.cfg["rtv"]["automaticMaps"]
         
         # Process maps based on configuration
         if automaticMaps:
@@ -304,6 +313,7 @@ class MapContainer(object):
                 del self._mapDict[m]
         
         self._mapCount = len(self._mapDict.keys())
+        self._CreatePages()
     
     def GetAllMaps(self) -> list[Map]:
         """Get all available maps"""
@@ -343,6 +353,25 @@ class MapContainer(object):
             if m.lower() == name_lower:
                 return self._mapDict[m]
         return None
+
+    def _CreatePages(self) -> None:
+        """Generate cached pages for map list"""
+        pages = []
+        pageStr = ""
+        for map in self._mapDict.values():
+            if len(pageStr) < self.plugin._config.cfg["maxMapPageSize"]:
+                pageStr += map.GetMapName() + ", "
+            else:
+                pageStr = pageStr[:-2]
+                pages.append(pageStr)
+                pageStr = map.GetMapName() + ", "
+        if len(pageStr) > 2:
+            pages.append(pageStr[:-2])
+        self._pages = pages
+    
+    def GetPageCount(self) -> int:
+        """Get total number of pages"""
+        return len(self._pages)
 
 class RTVVote(object):
     """Base class for handling voting systems (RTV and RTM)"""
@@ -418,13 +447,20 @@ class RTMVote(RTVVote):
     def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtm"]["voteTime"], announceCount=1):
         super().__init__(voteOptions, voteTime, announceCount)
 
+class RTVPlayer(player.Player):
+    """ Specialized player class for RTV/RTM, implements RTV/RTM specific player variables  """
+    def __init__(self, cl: client.Client):
+        super().__init__(cl)
+        self._floodProtectionCooldown = Timeout()
+        self._lastCommand = None
+
 class RTV(object):
     """Main class implementing Rock the Vote (RTV) and Rock the Mode (RTM) functionality"""
     def __init__(self, serverData : serverdata.ServerData):
         # Configuration setup
-        self._config : config.Config = DEFAULT_CFG        
+        self._config : config.Config = DEFAULT_CFG
         self._themeColor = self._config.cfg["pluginThemeColor"]
-        self._players : dict[player.Player] = {}
+        self._players : dict[int, RTVPlayer] = {}
         self._serverData : serverdata.ServerData = serverData
         
         # RTV state tracking
@@ -443,7 +479,7 @@ class RTV(object):
             {
                 # Global commands
                 teams.TEAM_GLOBAL : {
-                    ("rtv", "rock the vote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
+                    ("rtv", "rockthevote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
                     ("rtm", "rockthemode") : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
                     ("unrtm", "unrockthemode") : ("!unrtm - revoke your vote to start the next RTM vote", self.HandleUnRTM),
                     ("unrtv", "unrockthevote") : ("!<unrtv | unrockthevote> - cancel your vote to start the next Map vote", self.HandleUnRTV),
@@ -452,7 +488,8 @@ class RTV(object):
                     ("nomlist", "nominationlist", "nominatelist", "noml") : ("!nomlist - displays a list of nominations for the next map", self.HandleNomList),
                     ("search", "mapsearch") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
                     ('help', "cmds") : ("!help - display help about a given command, or all commands if no command is given", self.HandleHelp),
-                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)  # handle decimal votes
+                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote),  # handle decimal votes
+                    ("showvote", "showrtv") : ("!showvote - shows the current vote stats if a vote is active", self.HandleShowVote)
                 },
                 # Team-specific commands (only vote commands for other teams)
                 teams.TEAM_EVIL : {
@@ -484,18 +521,26 @@ class RTV(object):
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
+        self._announceCooldown = Timeout()
         
         # Configure say method based on settings
         if self._config.cfg["useSayOnly"] == True:
             self.SvSay = self.Say
 
-    def Say(self, saystr):
-        """Send message to all players"""
-        return self._serverData.interface.Say(self._messagePrefix + saystr)
+    def Say(self, saystr : str, usePrefix : bool = True):
+        """Send console message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.Say(prefix + saystr)
 
-    def SvSay(self, saystr):
-        """Send server message to all players"""
-        return self._serverData.interface.SvSay(self._messagePrefix + saystr)
+    def SvSay(self, saystr : str, usePrefix : bool = True):
+        """Send chat message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvSay(prefix + saystr)
+    
+    def SvTell(self, pid: int, saystr : str, usePrefix : bool = True):
+        """Send chat message to one player given their ID"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvTell(pid, prefix + saystr)
 
     def _getAllPlayers(self):
         """Get all connected players"""
@@ -640,11 +685,19 @@ class RTV(object):
             sleep(1)
         self._serverData.interface.MapReload(mapToChange)
     
-    def HandleChatCommand(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+    def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
         """Route chat command to appropriate handler"""
         command = cmdArgs[0]
+        if self._config.cfg["caseSensitiveCommands"] == False:
+            command = command.lower()
         for c in self._commandList[teamId]:
             if command in c:
+                if self._config.cfg["floodProtection"]["enabled"] == True:
+                    if player._floodProtectionCooldown.IsSet() == True and \
+                    ((self._config.cfg["floodProtection"]["soft"] == True and c == player._lastCommand) or self._config.cfg["floodProtection"]["soft"] == False):
+                        return False
+                    player._floodProtectionCooldown.Set(self._config.cfg["floodProtection"]["seconds"])
+                    player._lastCommand = c
                 return self._commandList[teamId][c][1](player, teamId, cmdArgs)
         return False
 
@@ -869,38 +922,24 @@ class RTV(object):
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
         """Handle !maplist command - show available maps"""
         capture = False
-        eventPlayer = player
-        eventPlayerId = eventPlayer.GetId()
-        currentVote = self._currentVote
-        votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        
-        # Process command if valid
-        if len(cmdArgs) == 2:
+        if len(cmdArgs) == 1:
+            # Show usage message with total pages
+            num_pages = self._mapContainer.GetPageCount()
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!maplist <page>', self._themeColor)}, valid pages {colors.ColorizeText('1-' + str(num_pages), self._themeColor)}")
             capture = True
-            # Build paginated map list
-            pages = []
-            pageStr = ""
-            for map in self._mapContainer.GetAllMaps():
-                if len(pageStr) < 950:
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
+        elif len(cmdArgs) == 2:
+            capture = True
+            # Get page from cached pages
+            try:
+                page_index = int(cmdArgs[1]) - 1
+                if page_index < 0:
+                    raise ValueError
+                if page_index >= len(self._mapContainer._pages):
+                    self.SvSay(f"Index out of range! (1-{len(self._mapContainer._pages)})")
                 else:
-                    pageStr = pageStr[:-2]
-                    pages.append(pageStr)
-                    pageStr = ""
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
-            pages.append(pageStr[:-2])
-            
-            # Show requested page
-            if cmdArgs[1].isdecimal():
-                pageIndex = int(cmdArgs[1])
-                if 1 <= pageIndex <= len(pages):
-                    self.Say(pages[pageIndex - 1])
-                else:
-                    self.Say(f"Index out of range! (1-{len(pages)})")
-            else:
-                self.Say(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+                    self.SvSay(self._mapContainer._pages[page_index])
+            except (ValueError, IndexError):
+                self.SvSay(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -923,7 +962,7 @@ class RTV(object):
                         mapName = colors.HighlightSubstr(mapName, index, index + len(searchTerm), self._themeColor)
                     
                     # Add to results page
-                    if len(mapStr) + len(mapName) < 950:
+                    if len(mapStr) + len(mapName) < self._config.cfg["maxSearchPageSize"]:
                         mapStr += mapName
                         mapStr += ', '
                     else:
@@ -938,7 +977,7 @@ class RTV(object):
             
             # Display results
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix}Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
+                self.SvTell(player.GetId(), f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
@@ -946,6 +985,8 @@ class RTV(object):
                 batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
+        else:
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!search <searchterm1> [searchterm2] [...]', self._themeColor)}")
         return capture
 
     def HandleDecimalVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
@@ -973,6 +1014,15 @@ class RTV(object):
             self.Say("No map nominations to display.")
         return capture
 
+    def HandleShowVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+        """ Handle show vote command """
+        if not self._announceCooldown.IsSet():
+            self._announceCooldown.Set(self._config.cfg["showVoteCooldownTime"])
+            if self._currentVote != None:
+                self._AnnounceVote()
+            else:
+                self.Say(f"No vote to display. Type {colors.ColorizeText('!rtv', self._themeColor)} in chat to {colors.ColorizeText('Rock the Vote', self._themeColor)}!")
+
     # only included if not already defined in another plugin
     def HandleHelp(self, player : player.Player, teamId : int, cmdArgs : list[str]):
         capture = True
@@ -996,7 +1046,7 @@ class RTV(object):
             Log.debug(f"Received chat message from client {eventClient.GetId()}")
             commandPrefix = self._config.cfg["RTVPrefix"]
             capture = False
-            eventPlayer : player.Player = self._players[eventClient.GetId()]
+            eventPlayer : RTVPlayer = self._players[eventClient.GetId()]
             eventPlayerId = eventPlayer.GetId()
             
             if eventPlayer != None:
@@ -1015,7 +1065,7 @@ class RTV(object):
     
     def OnClientConnect(self, eventClient : client.Client):
         """Handle new client connection"""
-        newPlayer = Player(eventClient)
+        newPlayer = RTVPlayer(eventClient)
         self._OnNewPlayer(newPlayer)
         return False
 
@@ -1032,6 +1082,14 @@ class RTV(object):
             dcPlayerId = eventClient.GetId()
             if dcPlayerId in self._players:
                 del self._players[dcPlayerId]
+                if dcPlayerId in self._wantsToRTV:
+                    self._wantsToRTV.remove(dcPlayerId)
+                if dcPlayerId in self._wantsToRTM:
+                    self._wantsToRTM.remove(dcPlayerId)
+                if self._currentVote != None:
+                    for i in self._currentVote._playerVotes:
+                        if dcPlayerId in self._currentVote._playerVotes[i]:
+                            self._currentVote._playerVotes[i].remove(dcPlayerId)
             else:
                 Log.warning(f"Player ID {dcPlayerId} does not exist in RTV players but there was an attempt to remove it")
         return False
@@ -1052,9 +1110,11 @@ class RTV(object):
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]])
         return False
 
-    def OnClientChange(self, eventClient, eventData):
-        """Handle client changes (not implemented)"""
-        return False
+    def OnClientChange(self, eventClient : client.Client, eventData : dict):
+        """Handle client changes"""
+        if self._config.cfg["kickProtectedNames"] == True:
+            kickClientIfProtectedName(eventClient)
+
 
     def OnServerInit(self, data):
         """Handle server initialization (round start)"""
@@ -1172,7 +1232,7 @@ class RTV(object):
         """Initialize plugin with current players"""
         allClients = self._serverData.API.GetAllClients()
         for cl in allClients:
-            newPlayer = player.Player(cl)
+            newPlayer = RTVPlayer(cl)
             self._OnNewPlayer(newPlayer)
         return True
 
@@ -1185,10 +1245,10 @@ class RTV(object):
 class RTVNomination(object):
     """Represents a player's map nomination"""
     def __init__(self, player, map):
-        self._player = player
-        self._map = map
+        self._player : RTVPlayer = player
+        self._map : Map = map
 
-    def GetPlayer(self) -> player.Player:
+    def GetPlayer(self) -> RTVPlayer:
         """Get nominating player"""
         return self._player
 
@@ -1213,17 +1273,21 @@ def OnStart():
     if not PluginInstance.Start():
         return False
     
-    # Kick protected names if enabled
+    # Kick protected names if enabled TODO this should probably be made its own plugin at some point
     if PluginInstance._config.cfg["kickProtectedNames"] == True:
         for i in PluginInstance._serverData.API.GetAllClients():
-            nameStripped = colors.StripColorCodes(i.GetName().lower())
-            if nameStripped == "admin" or nameStripped == "server":
-                PluginInstance._serverData.interface.ClientKick(i.GetId())
+            kickClientIfProtectedName(i)
     
     # Report startup time
     loadTime = time() - startTime
-    PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"RTV started in {loadTime:.2f} seconds!")
-    return True  # indicate plugin start success
+    PluginInstance.Say(f"RTV started in {loadTime:.2f} seconds!")
+    return True 
+
+def kickClientIfProtectedName(client : client.Client):
+    nameStripped = colors.StripColorCodes(client.GetName().lower())
+    nameStripped = re.sub(":|-|\.|,|;|=|\/|\\|\||`|~|\"|\'|[|]|(|)|_", "", nameStripped)
+    if nameStripped in [x.lower() for x in PluginInstance._config.cfg["protectedNames"]]:
+        PluginInstance._serverData.interface.ClientKick(client.GetId()) # indicate plugin start success
 
 # Called each loop tick from the system
 def OnLoop():
