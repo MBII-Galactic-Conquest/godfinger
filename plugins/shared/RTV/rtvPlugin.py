@@ -479,7 +479,7 @@ class RTV(object):
             {
                 # Global commands
                 teams.TEAM_GLOBAL : {
-                    ("rtv", "rock the vote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
+                    ("rtv", "rockthevote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
                     ("rtm", "rockthemode") : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
                     ("unrtm", "unrockthemode") : ("!unrtm - revoke your vote to start the next RTM vote", self.HandleUnRTM),
                     ("unrtv", "unrockthevote") : ("!<unrtv | unrockthevote> - cancel your vote to start the next Map vote", self.HandleUnRTV),
@@ -1082,6 +1082,14 @@ class RTV(object):
             dcPlayerId = eventClient.GetId()
             if dcPlayerId in self._players:
                 del self._players[dcPlayerId]
+                if dcPlayerId in self._wantsToRTV:
+                    self._wantsToRTV.remove(dcPlayerId)
+                if dcPlayerId in self._wantsToRTM:
+                    self._wantsToRTM.remove(dcPlayerId)
+                if self._currentVote != None:
+                    for i in self._currentVote._playerVotes:
+                        if dcPlayerId in self._currentVote._playerVotes[i]:
+                            self._currentVote._playerVotes[i].remove(dcPlayerId)
             else:
                 Log.warning(f"Player ID {dcPlayerId} does not exist in RTV players but there was an attempt to remove it")
         return False
@@ -1272,7 +1280,7 @@ def OnStart():
     
     # Report startup time
     loadTime = time() - startTime
-    PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"RTV started in {loadTime:.2f} seconds!")
+    PluginInstance.Say(f"RTV started in {loadTime:.2f} seconds!")
     return True 
 
 def kickClientIfProtectedName(client : client.Client):
