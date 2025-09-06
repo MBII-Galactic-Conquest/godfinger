@@ -137,6 +137,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
    - `!rtm` or `!rockthemode`: Start an RTM vote.
    - `!nominate <map>`: Nominate a map for the next RTV vote.
    - `!maplist <#>`: Display the server's map list (paginated).
+   - `!nomlist` or `!noml` : Display list of current nominations. 
    - `!search <query>`: Search for maps by name.
    - `!help`: Display help for commands.
 
