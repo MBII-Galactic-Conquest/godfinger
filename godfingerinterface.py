@@ -386,10 +386,11 @@ class RconInterface(AServerInterface):
                     stop = control.stop;
                 if not stop:
                     # Parse server log line
-                    lines = log.readlines();
-                    if len(lines) > 0:
+                    lines = log.read()
+                    linesSplit = lines.split("\n");
+                    if len(linesSplit) > 0:
                         with self._queueLock:
-                            for line in lines:
+                            for line in linesSplit:
                                 if len(line) > 0:
                                     line = line[7:];
                                     self._workingMessageQueue.put(logMessage.LogMessage(line));
