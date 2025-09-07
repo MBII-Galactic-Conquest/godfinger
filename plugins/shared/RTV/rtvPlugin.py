@@ -66,6 +66,8 @@ import lib.shared.colors as colors
 from lib.shared.player import Player
 from lib.shared.timeout import Timeout
 
+Log = logging.getLogger(__name__)
+
 # Global server data instance
 SERVER_DATA = None
 
@@ -232,11 +234,11 @@ MBMODE_ID_MAP = {
 if DEFAULT_CFG == None:
     DEFAULT_CFG = config.Config()
     DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
+    Log.error(f"Could not open config file at {os.path.dirname(__file__) + 'rtvConfig.json, ensure the file is a valid JSON file in the correct file path.'}")
     with open(DEFAULT_CFG_PATH, "wt") as f:
         f.write(CONFIG_FALLBACK)
 
 # Initialize logger
-Log = logging.getLogger(__name__)
 
 class MapPriorityType(Enum):
     """Enumeration for map priority types"""
