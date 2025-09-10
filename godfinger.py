@@ -830,10 +830,10 @@ class MBIIServer:
             if len(smod_info) == 2:
                 # Extract name and admin ID
                 name_part = smod_info[0]
-                match = re.search(r'^(?:\^?\d+)?(.+?)\((adminID: \d+)\)$', name_part)
+                match = re.search(r'^(?:\^?\d+)?(.+?)\((adminID: (\d+))\)$', name_part)
                 if match:
                     data['smod_name'] = match.group(1).strip()
-                    data['smod_id'] = match.group(2)
+                    data['smod_id'] = match.group(3)
                     data['smod_ip'] = smod_info[1].split(')')[0]
             
             # Extract command information
