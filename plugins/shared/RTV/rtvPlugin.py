@@ -845,9 +845,9 @@ class RTV(object):
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.remove(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already didn't want to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
         return capture
         
 
@@ -864,9 +864,9 @@ class RTV(object):
             # Process revocation
             if eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.remove(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
         return capture
 
     def HandleMapNom(self, player : player.Player, teamId : int, cmdArgs : list[str]):
