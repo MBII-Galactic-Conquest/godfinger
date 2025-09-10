@@ -420,6 +420,7 @@ class MBIIServer:
             Log.info("Restart issued, proceeding.");
     
     def Start(self):
+        # a = 0/0
         try:
             # check for server process running first
             sv_fname = self._config.cfg["serverFileName"];
@@ -829,10 +830,10 @@ class MBIIServer:
             if len(smod_info) == 2:
                 # Extract name and admin ID
                 name_part = smod_info[0]
-                match = re.search(r'^(?:\^?\d+)?(.+?)\((adminID: \d+)\)$', name_part)
+                match = re.search(r'^(?:\^?\d+)?(.+?)\((adminID: (\d+))\)$', name_part)
                 if match:
                     data['smod_name'] = match.group(1).strip()
-                    data['smod_id'] = match.group(2)
+                    data['smod_id'] = match.group(3)
                     data['smod_ip'] = smod_info[1].split(')')[0]
             
             # Extract command information
@@ -905,21 +906,27 @@ def InitLogger():
         print("DEBUGGING MODE.");
         loggingMode = logging.DEBUG;
     if Args.logfile:
-        print("Logging into file");
-        loggingFile = Args.logfile;
+        # Add timestamp to log file so they don't get overwritten
+        if os.path.exists(Args.logfile):
+            newLogfile = Args.logfile + '-' + time.strftime("%m%d%Y_%H%M%S", time.localtime(time.time()))
+            Args.logfile = newLogfile
+        else:
+            newLogfile = Args.logfile
+        print(f"Logging into file {newLogfile}");
+        loggingFile = newLogfile;
     
     if loggingFile != "":
         logging.basicConfig(
         filename = loggingFile,
         level = loggingMode,
-        filemode = 'w+',
+        filemode = 'a',
         #level=logging.INFO,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s',
         )
     else:
         logging.basicConfig(
         level = loggingMode,
-        filemode = 'w+',
+        filemode = 'a',
         #level=logging.INFO,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s',
         )
@@ -950,6 +957,7 @@ def main():
                 if Server.restartOnCrash:
                     runAgain = True;
                     Server = MBIIServer();
+                    int_status = Server.GetStatus();
                     if int_status == MBIIServer.STATUS_INIT:
                         continue  # start new server instance
                     else:
