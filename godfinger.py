@@ -420,6 +420,7 @@ class MBIIServer:
             Log.info("Restart issued, proceeding.");
     
     def Start(self):
+        # a = 0/0
         try:
             # check for server process running first
             sv_fname = self._config.cfg["serverFileName"];
@@ -905,21 +906,27 @@ def InitLogger():
         print("DEBUGGING MODE.");
         loggingMode = logging.DEBUG;
     if Args.logfile:
-        print("Logging into file");
-        loggingFile = Args.logfile;
+        # Add timestamp to log file so they don't get overwritten
+        if os.path.exists(Args.logfile):
+            newLogfile = Args.logfile + '-' + time.strftime("%m%d%Y_%H%M%S", time.localtime(time.time()))
+            Args.logfile = newLogfile
+        else:
+            newLogfile = Args.logfile
+        print(f"Logging into file {newLogfile}");
+        loggingFile = newLogfile;
     
     if loggingFile != "":
         logging.basicConfig(
         filename = loggingFile,
         level = loggingMode,
-        filemode = 'w+',
+        filemode = 'a',
         #level=logging.INFO,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s',
         )
     else:
         logging.basicConfig(
         level = loggingMode,
-        filemode = 'w+',
+        filemode = 'a',
         #level=logging.INFO,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s',
         )
@@ -950,6 +957,7 @@ def main():
                 if Server.restartOnCrash:
                     runAgain = True;
                     Server = MBIIServer();
+                    int_status = Server.GetStatus();
                     if int_status == MBIIServer.STATUS_INIT:
                         continue  # start new server instance
                     else:
