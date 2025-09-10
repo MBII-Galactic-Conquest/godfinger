@@ -59,6 +59,7 @@ if exist "%venvp%" (
         pause
         exit /b
     )
+    pause
 
 ) else (
     REM If the virtual environment doesn't exist
