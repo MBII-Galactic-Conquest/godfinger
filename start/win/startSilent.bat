@@ -52,7 +52,7 @@ if exist "%venvp%" (
     )
 
     REM Run godfinger script
-    python ./godfinger.py -lf "./bigdata.log"
+    python ./godfinger.py -lf "./logs/bigdata.log"
     if %errorlevel% neq 0 (
         echo Error running godfinger.py. Press Enter to exit.
         pause
