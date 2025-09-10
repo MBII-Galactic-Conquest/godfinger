@@ -1387,6 +1387,22 @@ def OnEvent(event) -> bool:
 def GetAllMaps() -> list[Map]:
     """Scan PK3 files in MBII directories to discover available maps"""
     mbiiDir = DEFAULT_CFG.cfg["MBIIPath"] + "\\"
+    if not os.path.exists(mbiiDir):
+        # try to find the MBII directory relatively
+        Log.info(f"Directory {mbiiDir} does not exist. Attempting to resolve relatively...")
+        searchDir = os.getcwd()
+        while True:
+            if os.path.exists(os.path.join(searchDir, "MBII")):
+                mbiiDir = os.path.join(searchDir, "MBII")
+                Log.info(f"SUCCESS! Found MBII directory at {mbiiDir}.")
+                break
+            else:
+                oldDir = searchDir
+                searchDir = os.path.dirname(searchDir)
+                if oldDir == searchDir:
+                    # we've hit the top
+                    Log.error(f"FAILURE. No MBII directory found. Will try and go ahead with the path in the config but will probably crash.")
+                    break
     mapList = []
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]; # base comes next so it wont override MBII dir contents if files match
     for dir in dirsToProcess:
