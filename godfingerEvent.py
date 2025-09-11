@@ -18,6 +18,7 @@ GODFINGER_EVENT_TYPE_REAL_INIT          = 13; # gsess mallocd message indicating
 GODFINGER_EVENT_TYPE_PLAYER_SPAWN       = 14; # player spawned event, data : dict of vars
 GODFINGER_EVENT_TYPE_CLIENT_BEGIN       = 15; # just a client begin signal, called each time the client window is refreshed ( post connect, spawn, team switch, maybe something else )
 GODFINGER_EVENT_TYPE_SERVER_EMPTY       = 16; # A server empty signal, fired before last client is removed from client list due to disconnect, no specific data.
+GODFINGER_EVENT_TYPE_SMOD_COMMAND       = 17; # An event that fires if any smod command other than smsay is recorded
 
 GODFINGER_EVENT_TYPE_WD_UNAVAILABLE     = 1000; # watchdog raised event, game process is not active, happens only upon startup of GF
 GODFINGER_EVENT_TYPE_WD_EXISTING        = 1001; # watchdog raised event, game process is exiting upon GF startup
@@ -104,3 +105,7 @@ class SmodSayEvent(Event):
 class ServerEmptyEvent(Event):
     def __init__(self, data : dict = {}, isStartup=False):
         super().__init__(GODFINGER_EVENT_TYPE_SERVER_EMPTY, data, isStartup);
+
+class SmodCommandEvent(Event):
+    def __init__(self, data : dict = {}, isStartup=False):
+        super().__init__(GODFINGER_EVENT_TYPE_SMOD_COMMAND, data, isStartup);

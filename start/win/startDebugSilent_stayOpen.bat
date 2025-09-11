@@ -9,6 +9,7 @@ echo %python_version% | findstr /R "^3\.[1-9][2-9]" > nul
 if %errorlevel% neq 0 (
     echo Error: Python 3.12+ is required but not found.
     echo Please install Python 3.12 or higher and try again.
+    pause
     exit /b 1
 )
 
@@ -52,12 +53,13 @@ if exist "%venvp%" (
     )
 
     REM Run godfinger script
-    python ./godfinger.py --debug -lf "./bigdata.log"
+    python ./godfinger.py --debug -lf "./logs/bigdata.log"
     if %errorlevel% neq 0 (
         echo Error running godfinger.py. Press Enter to exit.
         pause
         exit /b
     )
+    pause
 
 ) else (
     REM If the virtual environment doesn't exist

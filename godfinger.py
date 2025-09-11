@@ -1,6 +1,7 @@
 
 # platform imports
-import os;
+import os
+import re;
 import time;
 import json;
 import threading;
@@ -419,6 +420,7 @@ class MBIIServer:
             Log.info("Restart issued, proceeding.");
     
     def Start(self):
+        # a = 0/0
         try:
             # check for server process running first
             sv_fname = self._config.cfg["serverFileName"];
@@ -535,6 +537,8 @@ class MBIIServer:
                     pass
                 elif lineParse[1] == "smsay:":   # smod chat smsay (admin-only chat message)
                     self.OnSmsay(message)
+                elif lineParse[1] == "command":
+                    self.OnSmodCommand(message)
             elif lineParse[1] == "say:":  # Handle say messages by players (not server)
                 self.OnChatMessage(message)
             elif lineParse[1] == "sayteam:":
@@ -802,6 +806,58 @@ class MBIIServer:
             # somehow malformed smsay message 
             pass
 
+    def OnSmodCommand(self, logMessage : logMessage.LogMessage):
+        Log.debug(f"SmodCommand change event received: {logMessage.content}")
+        data = {}
+        log_message = logMessage.content
+        data = {
+            'smod_name': None,
+            'smod_id': None,
+            'smod_ip': None,
+            'command': None,
+            'target_name': None,
+            'target_id': None,
+            'target_ip': None
+        }
+
+        # Split the message into parts based on the command structure
+        parts = log_message.split(' executed by ')
+        
+        # Parse SMOD executor information
+        if len(parts) >= 2:
+            # Extract SMOD details from first part
+            smod_info = parts[1].split(' (IP: ')
+            if len(smod_info) == 2:
+                # Extract name and admin ID
+                name_part = smod_info[0]
+                match = re.search(r'^(?:\^?\d+)?(.+?)\((adminID: (\d+))\)$', name_part)
+                if match:
+                    data['smod_name'] = match.group(1).strip()
+                    data['smod_id'] = match.group(3)
+                    data['smod_ip'] = smod_info[1].split(')')[0]
+            
+            # Extract command information
+            command_part = parts[0].split(' (')
+            if len(command_part) >= 1:
+                command_match = re.search(r'SMOD command \((.*)\) executed', log_message)
+                if command_match:
+                    data['command'] = command_match.group(1).lower()
+        
+        # Check for target information
+        if ' against ' in log_message:
+            target_part = log_message.split(' against ')[1]
+            target_info = target_part.split(' (IP: ')[0]
+            target_match = re.search(r'^(?:\^?\d+)?(.+?)\((IP: .+?)\)$', target_part)
+            if target_match:
+                data['target_name'] = target_match.group(1).strip()
+                data['target_ip'] = target_match.group(2).split(':')[0]
+                
+                # Try to extract target ID if present
+                id_match = re.search(r'\((\d+)\)', target_info)
+                if id_match:
+                    data['target_id'] = id_match.group(1)
+        self._pluginManager.Event(godfingerEvent.SmodCommandEvent(data));
+
     # API export functions 
     def API_GetClientById(self, id):
         return self._clientManager.GetClientById(id);
@@ -850,21 +906,27 @@ def InitLogger():
         print("DEBUGGING MODE.");
         loggingMode = logging.DEBUG;
     if Args.logfile:
-        print("Logging into file");
-        loggingFile = Args.logfile;
+        # Add timestamp to log file so they don't get overwritten
+        if os.path.exists(Args.logfile):
+            newLogfile = Args.logfile + '-' + time.strftime("%m%d%Y_%H%M%S", time.localtime(time.time()))
+            Args.logfile = newLogfile
+        else:
+            newLogfile = Args.logfile
+        print(f"Logging into file {newLogfile}");
+        loggingFile = newLogfile;
     
     if loggingFile != "":
         logging.basicConfig(
         filename = loggingFile,
         level = loggingMode,
-        filemode = 'w+',
+        filemode = 'a',
         #level=logging.INFO,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s',
         )
     else:
         logging.basicConfig(
         level = loggingMode,
-        filemode = 'w+',
+        filemode = 'a',
         #level=logging.INFO,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s',
         )
@@ -895,6 +957,7 @@ def main():
                 if Server.restartOnCrash:
                     runAgain = True;
                     Server = MBIIServer();
+                    int_status = Server.GetStatus();
                     if int_status == MBIIServer.STATUS_INIT:
                         continue  # start new server instance
                     else:

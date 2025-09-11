@@ -66,6 +66,8 @@ import lib.shared.colors as colors
 from lib.shared.player import Player
 from lib.shared.timeout import Timeout
 
+Log = logging.getLogger(__name__)
+
 # Global server data instance
 SERVER_DATA = None
 
@@ -232,11 +234,11 @@ MBMODE_ID_MAP = {
 if DEFAULT_CFG == None:
     DEFAULT_CFG = config.Config()
     DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
+    Log.error(f"Could not open config file at {os.path.dirname(__file__) + 'rtvConfig.json, ensure the file is a valid JSON file in the correct file path.'}")
     with open(DEFAULT_CFG_PATH, "wt") as f:
         f.write(CONFIG_FALLBACK)
 
 # Initialize logger
-Log = logging.getLogger(__name__)
 
 class MapPriorityType(Enum):
     """Enumeration for map priority types"""
@@ -822,9 +824,9 @@ class RTV(object):
             # Process RTM request
             if not eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.append(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 wants to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             
             # Check if threshold reached to start vote
             if len(self._wantsToRTM) >= ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio']):
@@ -843,9 +845,9 @@ class RTV(object):
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.remove(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already didn't want to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
         return capture
         
 
@@ -862,9 +864,9 @@ class RTV(object):
             # Process revocation
             if eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.remove(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
         return capture
 
     def HandleMapNom(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -1385,6 +1387,22 @@ def OnEvent(event) -> bool:
 def GetAllMaps() -> list[Map]:
     """Scan PK3 files in MBII directories to discover available maps"""
     mbiiDir = DEFAULT_CFG.cfg["MBIIPath"] + "\\"
+    if not os.path.exists(mbiiDir):
+        # try to find the MBII directory relatively
+        Log.info(f"Directory {mbiiDir} does not exist. Attempting to resolve relatively...")
+        searchDir = os.getcwd()
+        while True:
+            if os.path.exists(os.path.join(searchDir, "MBII")):
+                mbiiDir = os.path.join(searchDir, "MBII")
+                Log.info(f"SUCCESS! Found MBII directory at {mbiiDir}.")
+                break
+            else:
+                oldDir = searchDir
+                searchDir = os.path.dirname(searchDir)
+                if oldDir == searchDir:
+                    # we've hit the top
+                    Log.error(f"FAILURE. No MBII directory found. Will try and go ahead with the path in the config but will probably crash.")
+                    break
     mapList = []
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]; # base comes next so it wont override MBII dir contents if files match
     for dir in dirsToProcess:
