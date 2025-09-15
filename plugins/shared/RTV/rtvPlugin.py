@@ -1287,7 +1287,7 @@ def OnStart():
 
 def kickClientIfProtectedName(client : client.Client):
     nameStripped = colors.StripColorCodes(client.GetName().lower())
-    nameStripped = re.sub(":|-|\.|,|;|=|\/|\\|\||`|~|\"|\'|[|]|(|)|_", "", nameStripped)
+    nameStripped = re.sub(r":|-|\.|,|;|=|\/|\\|\||`|~|\"|\'|[|]|(|)|_", "", nameStripped)
     if nameStripped in [x.lower() for x in PluginInstance._config.cfg["protectedNames"]]:
         PluginInstance._serverData.interface.ClientKick(client.GetId()) # indicate plugin start success
 
