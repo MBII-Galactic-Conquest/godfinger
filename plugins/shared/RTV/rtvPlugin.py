@@ -1082,12 +1082,16 @@ class RTV(object):
         """Handle client disconnection"""
         if reason != godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN:
             dcPlayerId = eventClient.GetId()
+            dcPlayer = self._players[dcPlayerId]
             if dcPlayerId in self._players:
-                del self._players[dcPlayerId]
                 if dcPlayerId in self._wantsToRTV:
                     self._wantsToRTV.remove(dcPlayerId)
                 if dcPlayerId in self._wantsToRTM:
                     self._wantsToRTM.remove(dcPlayerId)
+                for nom in self._nominations:
+                    if nom.GetPlayer().GetId() == dcPlayerId:
+                        self._nominations.remove(nom)
+                del self._players[dcPlayerId]
                 if self._currentVote != None:
                     for i in self._currentVote._playerVotes:
                         if dcPlayerId in self._currentVote._playerVotes[i]:
