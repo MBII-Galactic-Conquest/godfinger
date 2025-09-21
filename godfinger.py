@@ -702,7 +702,7 @@ class MBIIServer:
         playerScores = {}
         for m in self._svInterface.GetMessages().queue:
             if m.content.startswith("red:"):
-                scoreLine = m
+                scoreLine = m.content
             elif m.content.startswith("score:"):
                 scoreParse = m.content.split()
                 scorerName = ' '.join(scoreParse[6:])
