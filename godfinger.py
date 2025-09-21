@@ -205,6 +205,8 @@ class MBIIServer:
         self._isRestarting = False
         self._pluginManager = None
         self._svInterface = None
+        self._gatheringExitData = False
+        self._exitLogMessages = []
 
         startTime = time.time();
         self._status = MBIIServer.STATUS_INIT;
@@ -534,6 +536,17 @@ class MBIIServer:
         l = len(lineParse);
         # we shouldn't ever see blank lines in the server log if it isn't tampered with but just in case
         if l > 1:
+            # first, because exit is a multi-line log entry, we have to do some stupid BS to record it
+            if self._gatheringExitData:
+                if lineParse[0].startswith("red:"):
+                    self._exitLogMessages.append(message)
+                elif lineParse[0] == "score:":
+                    self._exitLogMessages.append(message)
+                else:
+                    # we've reached the end
+                    self.OnExit(self._exitLogMessages);
+                    self._exitLogMessages = []
+                    self._gatheringExitData = False
             if lineParse[0] == "SMOD":  # Handle SMOD commands
                 if lineParse[1] == "say:":      # smod server say (admin message)
                     pass
@@ -550,7 +563,8 @@ class MBIIServer:
             elif lineParse[0] == "Kill:":
                 self.OnKill(message);
             elif lineParse[0] == "Exit:":
-                self.OnExit(message);
+                self._gatheringExitData = True
+                self._exitLogMessages.append(message)
             elif lineParse[0] == "ClientConnect:":
                 self.OnClientConnect(message);
             elif lineParse[0] == "ClientBegin:":
@@ -694,13 +708,13 @@ class MBIIServer:
                     self._pluginManager.Event(godfingerEvent.ClientChangedEvent(cl, {"team": old_team}, logMessage.isStartup))
             self._pluginManager.Event(godfingerEvent.KillEvent(cl, clVictim, weapon_str, {"tk": isTK}, logMessage.isStartup))
         
-    def OnExit(self, logMessage : logMessage.LogMessage):
-        textified = logMessage.content;
+    def OnExit(self, logMessages : list[logMessage.LogMessage]):
+        textified = self._exitLogMessages[0].content;
         textsplit = textified.split()
         Log.debug("Exit log entry %s", textified);
         scoreLine = None
         playerScores = {}
-        for m in self._svInterface.GetMessages().queue:
+        for m in logMessages:
             if m.content.startswith("red:"):
                 scoreLine = m.content
             elif m.content.startswith("score:"):
@@ -717,7 +731,7 @@ class MBIIServer:
             scoreLine = "red:0 blue:0"
             teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
         exitReason = ' '.join(textsplit[1:])
-        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = logMessage.isStartup ) );
+        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = self._exitLogMessages[0].isStartup ) );
 
 
     def OnClientConnect(self, logMessage : logMessage.LogMessage):
