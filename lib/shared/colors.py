@@ -29,6 +29,7 @@ COLOR_CODES = \
 
 # returns a copy of text string with added color wrappings
 def ColorizeText(text, colorName, originalColorCode = "default"):
+    text = str(text)
     return "" + COLOR_CODES[colorName] + text + COLOR_CODES[originalColorCode];
 
 def HighlightSubstr(text, startIndex, endIndex, colorCode, originalColorCode="default"):
