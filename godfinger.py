@@ -711,7 +711,7 @@ class MBIIServer:
     def OnExit(self, logMessages : list[logMessage.LogMessage]):
         textified = self._exitLogMessages[0].content;
         textsplit = textified.split()
-        Log.debug("Exit log entry %s", textified);
+        Log.debug("Exit log entry %s", [x.content for x in logMessages]);
         scoreLine = None
         playerScores = {}
         for m in logMessages:
