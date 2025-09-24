@@ -34,3 +34,5 @@ gtConfig.json
 *.DB
 ignored/*
 venv/*
+
+/logs/*

@@ -15,7 +15,7 @@ Log = logging.getLogger(__name__)
 
 # Global variables
 SERVER_DATA = None
-BIGDATA_LOG = os.path.join("./", 'bigdata.log')
+BIGDATA_LOG = None
 last_position = 0  # Tracks the last read position of the log file
 last_sent_message = ""  # Store the last sent message to prevent re-sending
 bot_thread = None
@@ -90,7 +90,8 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
         logging.basicConfig(
         level=logMode,
         format='%(asctime)s %(levelname)08s %(name)s %(message)s')
-
+    global BIGDATA_LOG
+    BIGDATA_LOG = serverData.args.logfile
     # Load environment variables
     load_env_variables()
 

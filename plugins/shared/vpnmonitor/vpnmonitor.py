@@ -38,7 +38,8 @@ CONFIG_FALLBACK = \
     "blacklist":
     [
     
-    ]
+    ],
+    "svsayOnAction" : true
 }
 """
 global VPNMonitorConfig;
@@ -56,6 +57,7 @@ class VPNMonitor():
         self._status = 0;
         self._serverData = serverData;
         self.config = VPNMonitorConfig;
+        self._messagePrefix = "^9[VPN]^7: "
         if self.config.cfg["apikey"] == "your_api_key":
             self._status -1;
             Log.error("Please specify valid api key in vpnmonitorCfg.json");
@@ -79,7 +81,7 @@ class VPNMonitor():
         allClients = self._serverData.API.GetAllClients();
         for cl in allClients:
             vpnType = self.GetIpVpnType(cl.GetIp());
-            self.ProcessVpnClient(id, cl.GetIp(), vpnType);
+            self.ProcessVpnClient(cl, vpnType);
         if self._status == 0:
             return True;
         else:
@@ -92,7 +94,7 @@ class VPNMonitor():
         vpnType = self.GetClientVPNType(client);
         if vpnType < 0:
             return False;
-        self.ProcessVpnClient(client.GetId(), client.GetIp(), vpnType);
+        self.ProcessVpnClient(client, vpnType);
         return False;
         
     
@@ -128,7 +130,9 @@ class VPNMonitor():
         
         return vpnType;
 
-    def ProcessVpnClient(self, id, ip, vpnType):
+    def ProcessVpnClient(self, client : client.Client, vpnType : int):
+        ip = client.GetIp()
+        id = client.GetId()
         blockable = self.config.GetValue("block", []);
         if vpnType in blockable:
             Log.debug("Kicking a player with ip %s due to VPN block rules" % ip);
@@ -136,6 +140,8 @@ class VPNMonitor():
                 Log.debug("Banning ip %s" % ip)
                 self._serverData.interface.ClientBan(ip);
             self._serverData.interface.ClientKick(id);
+            if self.config.cfg["svsayOnAction"] == True:
+                self._serverData.interface.SvSay(self._messagePrefix + f"Kicked player {client.GetName()}^7 for suspected VPN usage.")
             return;
         
         blacklist = self.config.cfg["blacklist"];
@@ -145,6 +151,8 @@ class VPNMonitor():
                 Log.debug("Banning ip %s" % ip)
                 self._serverData.interface.ClientBan(ip);
             self._serverData.interface.ClientKick(id);
+            if self.config.cfg["svsayOnAction"] == True:
+                self._serverData.interface.SvSay(self._messagePrefix + f"Kicked player {client.GetName()}^7 for suspected VPN usage.")
             return;
 
     def OnClientDisconnect(self, client : client.Client, reason, data ) -> bool:

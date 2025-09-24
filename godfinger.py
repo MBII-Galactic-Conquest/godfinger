@@ -205,6 +205,8 @@ class MBIIServer:
         self._isRestarting = False
         self._pluginManager = None
         self._svInterface = None
+        self._gatheringExitData = False
+        self._exitLogMessages = []
 
         startTime = time.time();
         self._status = MBIIServer.STATUS_INIT;
@@ -384,6 +386,8 @@ class MBIIServer:
                         name = playerSplit[3];
                         for i in range(extraName):
                             name += " " + playerSplit[4 + i];
+                        if name[-2] == "^" and name[-1] == "7":
+                            name = name[:-2].strip()
                         if name[0] == '(' and name[-1] == ')':
                             name = name[1:-1]   # strip only first and last '(' and ')' chars
                         Log.debug("Status client info addr %s, id %s, name \"%s\"" %(addr, id, name));
@@ -532,6 +536,17 @@ class MBIIServer:
         l = len(lineParse);
         # we shouldn't ever see blank lines in the server log if it isn't tampered with but just in case
         if l > 1:
+            # first, because exit is a multi-line log entry, we have to do some stupid BS to record it
+            if self._gatheringExitData:
+                if lineParse[0].startswith("red:"):
+                    self._exitLogMessages.append(message)
+                elif lineParse[0] == "score:":
+                    self._exitLogMessages.append(message)
+                else:
+                    # we've reached the end
+                    self.OnExit(self._exitLogMessages);
+                    self._exitLogMessages = []
+                    self._gatheringExitData = False
             if lineParse[0] == "SMOD":  # Handle SMOD commands
                 if lineParse[1] == "say:":      # smod server say (admin message)
                     pass
@@ -548,7 +563,8 @@ class MBIIServer:
             elif lineParse[0] == "Kill:":
                 self.OnKill(message);
             elif lineParse[0] == "Exit:":
-                self.OnExit(message);
+                self._gatheringExitData = True
+                self._exitLogMessages.append(message)
             elif lineParse[0] == "ClientConnect:":
                 self.OnClientConnect(message);
             elif lineParse[0] == "ClientBegin:":
@@ -645,32 +661,62 @@ class MBIIServer:
 
 
     def OnKill(self, logMessage : logMessage.LogMessage):
-        textified = logMessage.content;
-        Log.debug("Kill log entry %s", textified);
-        splitted = textified.split();
-        pidNum = splitted[1];
-        victimNum = splitted[2];
-        cl = self._clientManager.GetClientById(int(pidNum));
-        clVictim = self._clientManager.GetClientById(int(victimNum));
-        if cl != None and clVictim != None:
-            weaponStr = splitted[-1];
+        textified = logMessage.content
+        Log.debug("Kill log entry %s", textified)
+        
+        # Split the log message into parts
+        parts = textified.split(": ", 2)  # Split into two parts at the first colon
+        if len(parts) < 2:
+            Log.error("Invalid kill log format: %s", textified)
+            return
+        
+        # Extract the numeric part and the rest of the message
+        kill_part, numeric_part, message_part = parts
+        
+        # Extract killer and victim player IDs
+        pids = numeric_part.split()
+        if len(pids) < 3:
+            Log.error("Invalid kill log format: %s", textified)
+            return
+        
+        killer_pid = int(pids[0])
+        victim_pid = int(pids[1])
+
+        # Get client references
+        cl = self._clientManager.GetClientById(killer_pid)
+        clVictim = self._clientManager.GetClientById(victim_pid)
+
+        tk_part = message_part.replace(cl.GetName(), "", 1).replace(clVictim.GetName(), "", 1).split()
+        isTK = (tk_part[0] == "teamkilled")
+        # Split the message part to isolate the kill details
+        message_parts = message_part.split()
+        if len(message_parts) < 4:
+            Log.error("Invalid kill log format: %s", textified)
+            return
+
+        # Extract weapon info
+        weapon_str = message_parts[-1]
+        
+        
+        
+        if cl is not None and clVictim is not None:
             if cl is clVictim:
-                if weaponStr == "MOD_WENTSPECTATOR":
-                    # dude changed their team to spectator with self kill
-                    oldTeam = cl.GetTeamId();
-                    cl._teamId = teams.TEAM_SPEC;
-                    self._pluginManager.Event( godfingerEvent.ClientChangedEvent(cl, {"team":oldTeam} , isStartup = logMessage.isStartup))
-            self._pluginManager.Event( godfingerEvent.KillEvent(cl, clVictim, weaponStr, None, isStartup = logMessage.isStartup ) );
-    
-    def OnExit(self, logMessage : logMessage.LogMessage):
-        textified = logMessage.content;
+                if weapon_str == "MOD_WENTSPECTATOR":
+                    # Handle team change to spectator
+                    old_team = cl.GetTeamId()
+                    cl._teamId = teams.TEAM_SPEC
+                    self._pluginManager.Event(godfingerEvent.ClientChangedEvent(cl, {"team": old_team}, logMessage.isStartup))
+            self._pluginManager.Event(godfingerEvent.KillEvent(cl, clVictim, weapon_str, {"tk": isTK}, logMessage.isStartup))
+        
+    def OnExit(self, logMessages : list[logMessage.LogMessage]):
+        textified = self._exitLogMessages[0].content;
         textsplit = textified.split()
-        Log.debug("Exit log entry %s", textified);
+        Log.debug("Exit log entry %s", [x.content for x in logMessages]);
         scoreLine = None
         playerScores = {}
-        for m in self._svInterface.GetMessages().queue:
+        for m in logMessages:
             if m.content.startswith("red:"):
-                scoreLine = m
+                scoreLine = m.content
             elif m.content.startswith("score:"):
                 scoreParse = m.content.split()
                 scorerName = ' '.join(scoreParse[6:])
@@ -685,7 +731,7 @@ class MBIIServer:
             scoreLine = "red:0 blue:0"
             teamScores = dict(map(lambda a: a.split(":"), scoreLine.split()))
         exitReason = ' '.join(textsplit[1:])
-        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = logMessage.isStartup ) );
+        self._pluginManager.Event( godfingerEvent.ExitEvent( {"reason" : exitReason, "teamScores" : teamScores, "playerScores" : playerScores}, isStartup = self._exitLogMessages[0].isStartup ) );
 
 
     def OnClientConnect(self, logMessage : logMessage.LogMessage):
