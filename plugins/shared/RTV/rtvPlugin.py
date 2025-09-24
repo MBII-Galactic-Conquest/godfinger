@@ -1390,7 +1390,7 @@ def OnEvent(event) -> bool:
 # Helper function to get all map names from currently installed PK3 files located in MBII directory and base directory next to MBII
 def GetAllMaps() -> list[Map]:
     """Scan PK3 files in MBII directories to discover available maps"""
-    mbiiDir = DEFAULT_CFG.cfg["MBIIPath"] + "\\"
+    mbiiDir = os.path.abspath(DEFAULT_CFG.cfg["MBIIPath"])
     if not os.path.exists(mbiiDir):
         # try to find the MBII directory relatively
         Log.info(f"Directory {mbiiDir} does not exist. Attempting to resolve relatively...")
@@ -1409,10 +1409,10 @@ def GetAllMaps() -> list[Map]:
                     break
     mapList = []
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]; # base comes next so it wont override MBII dir contents if files match
-    for dir in dirsToProcess:
-        for filename in os.listdir(dir):
+    for sub_dir in dirsToProcess:
+        for filename in os.listdir(sub_dir):
             if filename.endswith(".pk3"):
-                with ZipFile(dir + "\\" + filename) as file:
+                with ZipFile(os.path.join(sub_dir, filename)) as file:
                     zipNameList = file.namelist()
                     for name in zipNameList:
                         # Process BSP files as map objects

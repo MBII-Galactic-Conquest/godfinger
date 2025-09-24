@@ -35,4 +35,4 @@ def HighlightSubstr(text, startIndex, endIndex, colorCode, originalColorCode="de
     return text[:startIndex] + COLOR_CODES[colorCode] + text[startIndex:endIndex] + COLOR_CODES[originalColorCode] + text[endIndex:]
 
 def StripColorCodes(text) -> str:
-    return re.sub("(\\^\\d)", '', text)
+    return re.sub(r"(\^\d)", '', text)
