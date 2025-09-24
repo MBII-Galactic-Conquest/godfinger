@@ -56,8 +56,11 @@ class DatabaseLite(ADatabase):
             cursor.execute(query);
             self._connection.commit();
             if withResponse:
-                return cursor.fetchall();
+                a = cursor.fetchall();
+                cursor.close()
+                return a
             else:
+                cursor.close()
                 return None;
         return None;
 
