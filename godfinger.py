@@ -521,18 +521,6 @@ class MBIIServer:
 
         lineParse = line.split()
         
-        # There's a bug with the server logging where a newline is not appended if a 
-        # player is dropped due to no launcher, leading to lines getting skipped.
-        # We need to check for this message and add the skipped line directly into the
-        # Queue's deque object if this is the case            
-        badLine = "^3^1Please start the game via ^1launcher and keep it ^1running!"
-        idx = line.find(badLine)
-        if idx != -1:
-            skippedLine = line[idx + len(badLine):]
-            # strip timestamp
-            skippedLine = skippedLine[7:]
-            #if len(skippedLine) > 0:
-            #    self._logMessagesQueue.queue.appendleft(logMessage.LogMessage(skippedLine, False));
         l = len(lineParse);
         # we shouldn't ever see blank lines in the server log if it isn't tampered with but just in case
         if l > 1:
