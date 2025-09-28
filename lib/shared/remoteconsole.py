@@ -1,9 +1,12 @@
 import socket;
+import logging
 import sys;
 import time;
 import lib.shared.timeout as  timeout;
 import lib.shared.buffer as buffer;
 import threading;
+
+Log = logging.getLogger(__name__)
 
 class RCON(object):
     def __init__(self, address, bindAddr, password):
@@ -69,7 +72,7 @@ class RCON(object):
                 try:
                     result += self._sock.recv(count);
                 except socket.timeout:
-                        break;
+                    break;
         self._bytesRead += len(result);
         return result;
     
@@ -129,6 +132,7 @@ class RCON(object):
                     try:
                         self._Send(payload);
                         if not self._ReadResponse(responseSize, timeout):
+                            Log.warn(f'Message with payload {str(payload)} not received after {timeout} seconds, will attempt to resend.')
                             continue;
                         else:
                             result = self._PopUnread();
