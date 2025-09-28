@@ -375,10 +375,16 @@ class RconInterface(AServerInterface):
             return self._rcon.SmSay(msg);
         return None;
 
+    def Exec(self, filename : str) -> str:
+        if self.IsOpened():
+            return self._rcon.Exec(filename);
+        return None
+
 #endregion RconCommands
 
     def ParseLogThreadHandler(self, control, sleepTime):
-        with open(self._logPath, "r") as log:
+        encoding = 'utf-8' if IsUnix else 'ansi'
+        with open(self._logPath, "r", encoding=encoding, errors="replace") as log:
             log.seek(0, io.SEEK_END)
             while True:
                 stop = False;
