@@ -375,6 +375,11 @@ class RconInterface(AServerInterface):
             return self._rcon.SmSay(msg);
         return None;
 
+    def Exec(self, filename : str) -> str:
+        if self.IsOpened():
+            return self._rcon.Exec(filename);
+        return None
+
 #endregion RconCommands
 
     def ParseLogThreadHandler(self, control, sleepTime):

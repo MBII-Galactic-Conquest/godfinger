@@ -363,3 +363,18 @@ class RCON(object):
         if not type(msg) == bytes:
             msg = bytes(msg, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self._password, msg));
+
+    def Exec(self, filename : str, quiet : bool = False):
+        """
+        Executes a script file with the given filename.
+        If the filename does not have a file extension, .cfg will be added to the end of the filename.
+        The file must be in the /MBII/ directory prior to the server starting. After the file is indexed
+        by the server however, the contents can be changed and changes will be reflected.
+        """
+        if not type(filename) == bytes:
+            filename = bytes(filename, "UTF-8")
+        if quiet:
+            cmd = b'execq'
+        else:
+            cmd = b'exec'
+        return self.Request(b"\xff\xff\xff\xffrcon %b %b %b" % (self._password, cmd, filename))
