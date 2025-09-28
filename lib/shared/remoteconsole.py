@@ -1,9 +1,12 @@
 import socket;
+import logging
 import sys;
 import time;
 import lib.shared.timeout as  timeout;
 import lib.shared.buffer as buffer;
 import threading;
+
+Log = logging.getLogger(__name__)
 
 class RCON(object):
     def __init__(self, address, bindAddr, password):
@@ -69,7 +72,7 @@ class RCON(object):
                 try:
                     result += self._sock.recv(count);
                 except socket.timeout:
-                        break;
+                    break;
         self._bytesRead += len(result);
         return result;
     
@@ -129,6 +132,7 @@ class RCON(object):
                     try:
                         self._Send(payload);
                         if not self._ReadResponse(responseSize, timeout):
+                            Log.warn(f'Message with payload {str(payload)} not received after {timeout} seconds, will attempt to resend.')
                             continue;
                         else:
                             result = self._PopUnread();
@@ -359,3 +363,18 @@ class RCON(object):
         if not type(msg) == bytes:
             msg = bytes(msg, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self._password, msg));
+
+    def Exec(self, filename : str, quiet : bool = False):
+        """
+        Executes a script file with the given filename.
+        If the filename does not have a file extension, .cfg will be added to the end of the filename.
+        The file must be in the /MBII/ directory prior to the server starting. After the file is indexed
+        by the server however, the contents can be changed and changes will be reflected.
+        """
+        if not type(filename) == bytes:
+            filename = bytes(filename, "UTF-8")
+        if quiet:
+            cmd = b'execq'
+        else:
+            cmd = b'exec'
+        return self.Request(b"\xff\xff\xff\xffrcon %b %b %b" % (self._password, cmd, filename))
