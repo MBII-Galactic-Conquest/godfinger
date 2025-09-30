@@ -519,7 +519,7 @@ class RTV(object):
         self._wantsToRTM = []
         self._rtvCooldown = Timeout()
         self._rtmCooldown = Timeout()
-        self._rtvRecentMaps : list[tuple(Map, Timeout)] = []
+        self._rtvRecentMaps : list[tuple(str, Timeout)] = []
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
@@ -883,19 +883,32 @@ class RTV(object):
             mapToNom = cmdArgs[1]
             playerHasNomination = eventPlayer in [x.GetPlayer() for x in self._nominations]
             
-            # Validate nomination
-            if self._mapContainer.FindMapWithName(mapToNom) != None and \
-               len(self._nominations) < 5 and \
-               not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and \
-                (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or mapToNom != self._mapName) and \
-                (not mapToNom in [x[0] for x in self._rtvRecentMaps] or self._config.cfg["rtv"]["disableRecentMapNomination"] == False):
-               
-                mapObj = self._mapContainer.FindMapWithName(mapToNom)
+            # Find the map object
+            mapObj = self._mapContainer.FindMapWithName(mapToNom)
+            
+            # Check each validation condition separately for clearer error reporting
+            if mapObj == None:
+                failReason = "map was not found"
+            elif len(self._nominations) >= 5:
+                failReason = "nomination list full"
+            elif mapObj in [x.GetMap() for x in self._nominations]:
+                failReason = "map already nominated"
+            elif self._config.cfg["rtv"]["allowNominateCurrentMap"] == False and mapToNom.lower() == self._mapName.lower():
+                failReason = "server does not allow nomination of current map"
+            elif mapToNom.lower() in [x[0].lower() for x in self._rtvRecentMaps] and self._config.cfg["rtv"]["disableRecentMapNomination"] == True:
+                timeRemaining = [x[1].LeftDHMS() for x in self._rtvRecentMaps if x[0].lower() == mapToNom.lower()][0]
+                failReason = f"cannot nominate recently played map for {colors.ColorizeText(timeRemaining, self._themeColor)}"
+            else:
+                # All validations passed - process the nomination
+                failReason = None
+                
                 # Update existing nomination
                 if playerHasNomination:
                     for i in self._nominations:
                         if i.GetPlayer() == eventPlayer:
                             self._nominations.remove(i)
+                            break
+                
                 # Add new nomination
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
                 
@@ -904,21 +917,11 @@ class RTV(object):
                     self.SvSay(f"Player {eventPlayer.GetName()}^7 changed their nomination to {colors.ColorizeText(mapToNom, self._themeColor)}!")
                 else:
                     self.SvSay(f"Player {eventPlayer.GetName()}^7 nominated {colors.ColorizeText(mapToNom, self._themeColor)} for RTV!")
-            else:
-                # Handle invalid nomination
-                if not self._mapContainer.FindMapWithName(mapToNom):
-                    failReason = "map was not found"
-                elif len(self._nominations) >= 5:
-                    failReason = "nomination list full"
-                elif self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations]:
-                    failReason = "map already nominated"
-                elif (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom == self._mapName):
-                    failReason = "server does not allow nomination of current map"
-                elif (mapToNom in [x[0] for x in self._rtvRecentMaps] and self._config.cfg["rtv"]["disableRecentMapNomination"] == True):
-                    failReason = "cannot nominate recently played map"
-                else:
-                    failReason = "unknown reason"
+            
+            # Handle validation failure
+            if failReason != None:
                 self.Say(f"Map could not be nominated: {failReason}")
+        
         return capture
 
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
