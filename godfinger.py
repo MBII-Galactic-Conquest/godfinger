@@ -674,7 +674,7 @@ class MBIIServer:
         cl = self._clientManager.GetClientById(killer_pid)
         clVictim = self._clientManager.GetClientById(victim_pid)
         if cl is None or clVictim is None:
-            Log.debug(f"Player {cl.GetName()} killed NPC, ignoring kill, full line: {textified}")
+            Log.debug(f"Player killed NPC, ignoring kill, full line: {textified}")
             return False
 
         tk_part = message_part.replace(cl.GetName(), "", 1).replace(clVictim.GetName(), "", 1).split()
