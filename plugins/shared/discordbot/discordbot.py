@@ -20,6 +20,7 @@ last_position = 0  # Tracks the last read position of the log file
 last_sent_message = ""  # Store the last sent message to prevent re-sending
 bot_thread = None
 shutdown_event = threading.Event()
+log_watcher_task = None
 
 # Define intents to specify what events the bot will listen to
 intents = discord.Intents.default()
@@ -139,6 +140,20 @@ def stop_bot_thread():
     if bot_thread and bot_thread.is_alive():
         Log.info("Signaling Discord bot thread to shut down...")
         shutdown_event.set()  # Signal the log watcher to stop
+
+        if log_watcher_task:
+            Log.info("Cancelling log watcher task...")
+            # Schedule cancellation on the client's event loop
+            future_cancel = asyncio.run_coroutine_threadsafe(log_watcher_task.cancel(), client.loop)
+            try:
+                future_cancel.result(timeout=1) # Wait briefly for cancellation
+                Log.info("Log watcher task cancelled.")
+            except asyncio.TimeoutError:
+                Log.error("Timed out waiting for log watcher task to cancel.")
+            except Exception as e:
+                Log.error(f"Error during log watcher cancellation: {e}")
+            log_watcher_task = None
+
         future = asyncio.run_coroutine_threadsafe(client.close(), client.loop)
         try:
             future.result(timeout=5)  # Wait for the client to close with a timeout
@@ -187,6 +202,7 @@ async def on_ready():
     print('------')
     # Start the asynchronous log watcher as a background task
     asyncio.create_task(async_watch_bigdata_log())
+    log_watcher_task = asyncio.create_task(async_watch_bigdata_log())
 
 # Function to filter out Discord or HTTP-related lines
 def filter_message(message):
