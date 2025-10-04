@@ -673,7 +673,7 @@ class MBIIServer:
         # Get client references
         cl = self._clientManager.GetClientById(killer_pid)
         clVictim = self._clientManager.GetClientById(victim_pid)
-        if clVictim is None:
+        if cl is None or clVictim is None:
             Log.error(f"Warning: Kill message received with missing victim client object: {message_part}")
             return
 
