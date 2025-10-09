@@ -17,6 +17,7 @@ CONFIG_FALLBACK = \
 """{
     "prefix":"^5[AutoMessage] ^7",
     "interval": 5,
+    "allowLastMessageTwice" : false,
     "messages": [
         "Message 1",
         "Message 2",
@@ -42,6 +43,8 @@ class Automessage():
         self._threadLock = threading.Lock();
         self._threadControl = threadcontrol.ThreadControl();
         self._thread = threading.Thread(target=self._main_thread, daemon=True, args=(self._threadControl, self.config.cfg["interval"]));
+        self._allowLastMessageTwice = self.config.cfg["allowLastMessageTwice"]
+        self._lastMessage = ""
 
     def Start(self) -> bool:
         self._thread.start();
@@ -52,7 +55,17 @@ class Automessage():
             self._threadControl.stop = True;
     
     def SendAutoMessage(self):
-        message = random.choice(self.config.cfg['messages'])
+        messages = self.config.cfg['messages']
+        if len(messages) == 0:
+            message = "Error: No messages configured in automessageCfg.json"
+        elif len(messages) == 1:
+            message = messages[0]
+        else:
+            message = random.choice(messages)
+            if not self._allowLastMessageTwice:
+                while message == self._lastMessage:
+                    message = random.choice(messages)
+        self._lastMessage = message
         self._serverData.interface.SvSay(self.config.cfg["prefix"] + message);
 
     def _main_thread(self, control, interval):
