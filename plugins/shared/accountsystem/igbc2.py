@@ -26,6 +26,18 @@ DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
 # Initialize logger
 Log = logging.getLogger(__name__)
 
+# START OF ADDED CODE FOR FALLBACK CONFIGURATION
+# Fallback configuration data to prevent AttributeError if bankingConfig.json is missing
+FALLBACK_CFG_DATA = {
+    "themecolor": "yellow",
+    "kill_awards": {
+        "kill": 10,
+        "suicide": -5,
+        "teamkill": -20
+    }
+}
+# END OF ADDED CODE FOR FALLBACK CONFIGURATION
+
 class Payment:
     def __init__(self, sender_account, target_account, amount: int):
         self.sender_account = sender_account
@@ -49,13 +61,23 @@ class BankingPlugin:
 
     def __init__(self, server_data: ServerData):
         self._register_commands()
-        self.config = DEFAULT_CFG
+
+        # START OF MODIFIED CODE FOR CONFIG LOADING
+        # Check if config loading failed and use fallback data
+        if DEFAULT_CFG is None:
+            Log.warning("Default config failed to load from file. Using fallback configuration.")
+            # Create a minimal mock config object to prevent AttributeError: 'NoneType' object has no attribute 'cfg'
+            self.config = type('MockConfig', (object,), {'cfg': FALLBACK_CFG_DATA})()
+        else:
+            self.config = DEFAULT_CFG
+        # END OF MODIFIED CODE FOR CONFIG LOADING
+
         self.server_data = server_data
         self.accountsystem_xprts = None
 
         self.get_account_by_uid = None
         self.get_account_data_val_by_pid = None
-        
+
         self.get_account_data_val_by_uid = None
 
         self.set_account_data_val_by_pid = None
@@ -66,7 +88,7 @@ class BankingPlugin:
         self.themecolor = self.config.cfg["themecolor"]
         self.msg_prefix = f'{colors.COLOR_CODES[self.themecolor]}[Bank]^7: '
         self._is_initialized = False
-        
+
         self.pending_payments = {}  # sender_id: Payment
         self.pending_bounties = {}  # issuer_id: Bounty
         self.active_bounties = {}  # target_id: Bounty
@@ -101,7 +123,7 @@ class BankingPlugin:
         """Check if player has any pending actions"""
         return (player_id in self.pending_payments or
                 player_id in self.pending_bounties)
-    
+
     def _handle_pay(self, player: Player, team_id: int, args: list[str]) -> bool:
         """Handle !pay command"""
         if self.has_pending_action(player.GetId()):
@@ -135,10 +157,10 @@ class BankingPlugin:
         if self.get_credits(player.GetId()) < amount:
             self.SvTell(player.GetId(), "Insufficient funds")
             return True
-        
+
         player_account = self.get_account_by_pid(player.GetId())
         target_account = self.get_account_by_pid(target_id)
-        
+
         if confirm:
             # Transfer credits immediately
             if self.transfer_credits(player_account.user_id, target_account.user_id, amount):
@@ -202,7 +224,7 @@ class BankingPlugin:
         if self.has_pending_action(player.GetId()):
             self.SvTell(player.GetId(), "You already have a pending transaction!")
             return True
-    
+
         if len(args) < 3:
             self.SvTell(player.GetId(), "Usage: !bounty <pfx> <amount>")
             return True
@@ -229,18 +251,18 @@ class BankingPlugin:
         # Check if target is on the same team (prevent friendly bounties)
         player_team = player.GetTeamId()
         target_team = target.GetTeamId()
-        
+
         # Only allow bounties between opposing teams (TEAM_GOOD vs TEAM_EVIL)
-        if (player_team == target_team and 
+        if (player_team == target_team and
             teams.IsRealTeam(player_team) and teams.IsRealTeam(target_team)):
             self.SvTell(player.GetId(), "You cannot place bounties on teammates!")
             return True
-        
+
         # Also prevent bounties on spectators or from spectators
         if player_team == teams.TEAM_SPEC:
             self.SvTell(player.GetId(), "Spectators cannot place bounties!")
             return True
-        
+
         if target_team == teams.TEAM_SPEC:
             self.SvTell(player.GetId(), "You cannot place bounties on spectators!")
             return True
@@ -320,7 +342,7 @@ class BankingPlugin:
         else:
             self.SvTell(pid, "No pending transactions to cancel.")
         return True
-    
+
     def _handle_balance(self, player: Player, team_id: int,
                         args: list[str]) -> bool:
         pid = player.GetId()
@@ -367,39 +389,39 @@ class BankingPlugin:
     def _handle_mod_credits(self, playerName, smodId, adminIP, cmdArgs):
         """Handle smod !modifycredits command - modify a player's credits"""
         Log.info(f"SMOD {playerName} (ID: {smodId}, IP: {adminIP}) executing modifycredits command with args: {cmdArgs}")
-        
+
         if len(cmdArgs) < 3:
             Log.warning(f"SMOD {playerName} provided insufficient arguments for modifycredits: {cmdArgs}")
             self.server_data.interface.SmSay(self.msg_prefix + "Usage: !modifycredits <playerid> <amount>")
             return True
-        
+
         try:
             # Parse arguments
             target_player_id = int(cmdArgs[1])
             credit_amount = int(cmdArgs[2])
-            
+
             Log.debug(f"Parsed modifycredits args - Target ID: {target_player_id}, Amount: {credit_amount}")
-            
+
             # Find the target player
             target_client = None
             for client in self.server_data.API.GetAllClients():
                 if client.GetId() == target_player_id:
                     target_client = client
                     break
-            
+
             if target_client is None:
                 Log.warning(f"SMOD {playerName} attempted to modify credits for non-existent player ID: {target_player_id}")
                 self.server_data.interface.SmSay(self.msg_prefix + f"Player with ID {target_player_id} not found.")
                 return True
-            
+
             # Get the target player object (assuming you have a similar player tracking system)
             if target_player_id not in self.account_manager.accounts:
                 Log.warning(f"SMOD {playerName} attempted to modify credits for player {target_client.GetName()} (ID: {target_player_id}) with no account data")
                 self.server_data.interface.SmSay(self.msg_prefix + f"Player data for ID {target_player_id} not available.")
                 return True
-            
+
             target_player = self.account_manager.accounts[target_player_id]
-            
+
             # Modify the player's credits in their account_data
             if hasattr(target_player, 'account_data') and 'credits' in target_player.account_data:
                 old_credits = target_player.account_data['credits']
@@ -411,77 +433,77 @@ class BankingPlugin:
                     new_credits = 0
                 else:
                     self.add_credits(target_player_id, credit_amount)
-                
+
                 Log.info(f"SMOD {playerName} modified credits for {target_player.player_name} (ID: {target_player_id}): {old_credits} -> {new_credits} (change: {credit_amount})")
-                
+
                 # Send confirmation messages
                 action_word = "added" if credit_amount > 0 else "removed"
                 abs_amount = abs(credit_amount)
-                
+
                 self.server_data.interface.SmSay(
-                    self.msg_prefix + 
+                    self.msg_prefix +
                     f"Admin {playerName}^7 {action_word} {abs_amount} credits {'to' if action_word == 'added' else 'from'} {target_player.player_name}^7. "
                     f"Credits: {old_credits} -> {new_credits}"
                 )
-                
+
                 # Optionally notify the target player
                 self.SvTell(
-                    target_player_id, 
+                    target_player_id,
                     f"SMOD {action_word} {colors.ColorizeText(str(abs_amount), self.themecolor)} credits. "
                     f"New balance: {colors.ColorizeText(str(new_credits), self.themecolor)} credits."
                 )
-                
+
             else:
                 Log.warning(f"SMOD {playerName} attempted to modify credits for {target_player.player_name} (ID: {target_player_id}) but player has no credit data")
                 self.server_data.interface.SmSay(self.msg_prefix + f"Player {target_player.player_name}^7 has no credit data available.")
-            
+
         except ValueError as e:
             Log.error(f"SMOD {playerName} provided invalid arguments for modifycredits: {cmdArgs} - ValueError: {e}")
             self.server_data.interface.SmSay("Invalid player ID or credit amount. Both must be numbers.")
         except Exception as e:
             Log.error(f"Error in modifycredits command by SMOD {playerName}: {str(e)}")
             self.server_data.interface.SmSay(f"Error modifying credits: {str(e)}")
-        
+
         return True
 
     def _handle_reset_bounties(self, playerName, smodID, adminIP, cmdArgs):
         """Handle smod !resetbounties command - clear all active bounties"""
         Log.info(f"SMOD {playerName} (ID: {smodID}, IP: {adminIP}) executing resetbounties command")
-        
+
         if not self.active_bounties:
             self.server_data.interface.SmSay(self.msg_prefix + "No active bounties to clear.")
             return True
-        
+
         bounty_count = len(self.active_bounties)
-        
+
         # Notify all affected players before clearing
         for target_id, bounty in self.active_bounties.items():
             target_acc = bounty.target_account
             # target_id = target_acc.player_id
-            
+
             # Notify the target
             self.SvTell(target_id, f"Your bounty of {bounty.amount} credits has been cleared by SMOD.")
-            
+
             # Notify the issuer if they're still online
             if bounty.issuer_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
                 self.SvTell(bounty.issuer_account.player_id, f"Your bounty on {bounty.target_account.player_name}^7 has been cleared by SMOD.")
-        
+
         # Clear all active bounties
         self.active_bounties.clear()
-        
+
         # Announce to server
         self.server_data.interface.SmSay(self.msg_prefix + f"Admin {playerName}^7 cleared {bounty_count} active bounties.")
-        
+
         Log.info(f"SMOD {playerName} cleared {bounty_count} active bounties")
         return True
 
     def initialize_banking_table(self):
         """
         Creates the banking table in the SQLite database if it doesn't exist.
-        
+
         Args:
             db_connection (sqlite3.Connection): The connection to the SQLite database.
-            
+
         Returns:
             bool: True if the table was created or already exists, False otherwise.
         """
@@ -576,7 +598,7 @@ class BankingPlugin:
         """Transfer credits between two players"""
         if amount <= 0:
             return False
-            
+
         sender_account = self.get_account_by_uid(sender_id)
         receiver_account = self.get_account_by_uid(receiver_id)
         if sender_account and receiver_account:
@@ -626,9 +648,10 @@ class BankingPlugin:
         """Save player's credits on disconnect using user_id"""
         pid = event.client.GetId()
         if pid in self.account_manager.accounts.keys():
-            to_set = self.get_credits_by_pid(pid, 'credits')
-            self.set_credits(pid, to_set)
-        
+            to_set = self.get_credits_by_pid(pid) # Changed to use get_credits_by_pid without the explicit key argument
+            if to_set is not None:
+                self.set_credits(pid, to_set)
+
         # Clean up pending transactions
         if pid in self.pending_payments:
             payment = self.pending_payments[pid]
@@ -636,14 +659,14 @@ class BankingPlugin:
             # Notify the target player if they're still online
             if payment.target_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
                 self.SvTell(payment.target_account.player_id, "Payment canceled - sender disconnected.")
-        
+
         if pid in self.pending_bounties:
             bounty = self.pending_bounties[pid]
             del self.pending_bounties[pid]
             # Notify the target player if they're still online
             if bounty.target_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
                 self.SvTell(bounty.target_account.player_id, "Bounty canceled - issuer disconnected.")
-        
+
         # Clean up active bounties on this player
         if pid in self.active_bounties:
             bounty = self.active_bounties[pid]
@@ -651,7 +674,7 @@ class BankingPlugin:
             # Notify the issuer if they're still online
             if bounty.issuer_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
                 self.SvTell(bounty.issuer_account.player_id, f"Bounty on {bounty.target_account.player_name}^7 canceled - target disconnected.")
-        
+
         return False
 
     def _on_kill(self, event: Event):
@@ -734,7 +757,7 @@ def init_accountsystem_xprts(plugin : BankingPlugin):
         "GetAccountByUserID").pointer
     plugin.get_account_data_val_by_pid = plugin.accountsystem_xprts.Get(
         "GetAccountDataValByPID").pointer
-    
+
     plugin.get_account_data_val_by_uid = plugin.accountsystem_xprts.Get(
         "GetAccountDataValByUID").pointer
 
@@ -755,7 +778,8 @@ def OnLoop() -> bool:
 
 def OnFinish():
     global banking_plugin
-    if banking_plugin:
+    # Corrected potential NameError by checking if banking_plugin is defined in the global scope
+    if 'banking_plugin' in globals() and banking_plugin:
         del banking_plugin
         banking_plugin = None
 
