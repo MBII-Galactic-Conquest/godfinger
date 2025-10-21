@@ -106,8 +106,8 @@ class VPNMonitor():
     def GetIpVpnType(self, ip : str ) -> int:
         whitelist = self.config.cfg["whitelist"];
         if ip in whitelist:
-            if not self._serverData.args.debug:
-                return -1;
+            Log.debug("IP %s is whitelisted, skipping VPN check.", ip);
+            return -1;
     
         Log.debug("Getting vpn associated with ip address %s", ip);
         existing = self._database.ExecuteQuery("SELECT vpn FROM iplist WHERE ip=\""+ip+"\"", True);
