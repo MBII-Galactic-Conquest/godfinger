@@ -576,6 +576,10 @@ class MBIIServer:
     def OnPlayer(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
         Log.debug("On Player log entry %s ", textified)
+
+        # Initialize cl to None to prevent UnboundLocalError
+        cl = None
+
         posUi = textified.find("u")
         if posUi != -1:
             ui = textified[posUi + USERINFO_LEN + 1 : len(textified)-1]
@@ -583,6 +587,7 @@ class MBIIServer:
             splitted = pi.split()
             pidNum = int(splitted[1])
             cl = self._clientManager.GetClientById(pidNum)
+
             if cl != None:
                 splitui = ui.split("\\") # should be always last
                 vars = {}
@@ -609,7 +614,10 @@ class MBIIServer:
                     self._pluginManager.Event( godfingerEvent.PlayerSpawnEvent ( cl, vars,  isStartup = logMessage.isStartup ) ) # a newly spawned client
             else:
                 Log.warning("Client \"Player\" event with client is None.")
-        self._pluginManager.Event( godfingerEvent.PlayerEvent(cl, {"text":textified}, isStartup = logMessage.isStartup))   
+
+        # Only call PlayerEvent if cl was successfully retrieved
+        if cl != None:
+            self._pluginManager.Event( godfingerEvent.PlayerEvent(cl, {"text":textified}, isStartup = logMessage.isStartup))
 
 
     def OnKill(self, logMessage : logMessage.LogMessage):
