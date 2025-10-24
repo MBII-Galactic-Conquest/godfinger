@@ -782,7 +782,7 @@ class MBIIServer:
         configStr = textified[len("InitGame: \\"):len(textified)]
         vars = {}
         splitted = configStr.split("\\")
-        for index in range (0, len(splitted), 2):
+        for index in range (0, len(splitted) - 1, 2):
             vars[splitted[index]] = splitted[index+1]
             
         if "mapname" in vars:

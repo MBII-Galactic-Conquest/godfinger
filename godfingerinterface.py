@@ -408,11 +408,10 @@ class RconInterface(AServerInterface):
         logFile = None
         try:
             if IsUnix:
-                logFile = FileReadBackwards(self._logPath, encoding="utf-8")
-            else:
-                # FIX: Use 'latin-1' encoding. It maps all 256 possible bytes,
-                # guaranteeing no UnicodeDecodeError for arbitrary log file content.
                 logFile = FileReadBackwards(self._logPath, encoding="latin-1")
+            else:
+                logFile = FileReadBackwards(self._logPath, encoding="latin-1")
+
 
             for line in logFile:
                 line = line[7:]
