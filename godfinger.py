@@ -568,90 +568,10 @@ class MBIIServer:
         if len(parts) > 1:
             # The chat message content is expected to be the second part (index 1)
             message : str = parts[1]
-            if message.startswith("!"):
-                cmdArgs = message[1:].split()
-                if cmdArgs and cmdArgs[0] == "help":
-                    # Handle help command directly
-                    self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
-                    return  # Don't pass to plugins
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
         else:
             # Handle the malformed message (missing quotes)
-            Log.warning(f"Malformed chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
-
-    def HandleChatHelp(self, senderClient, teamId, cmdArgs):
-        """Handle !help command for regular chat"""
-        commandAliasList = self._serverData.GetServerVar("registeredCommands")
-        if commandAliasList is None:
-            commandAliasList = []
-        
-        if len(cmdArgs) > 1:
-            # Looking for specific command help
-            commandName = cmdArgs[1].lower()
-            for commandAlias, helpText in commandAliasList:
-                if commandName == commandAlias.lower():
-                    self._svInterface.Say('^1[Godfinger]: ^7' + helpText)
-                    return True
-            # Command not found
-            self._svInterface.Say(f"^1[Godfinger]:^7 Couldn't find chat command: {commandName}")
-        else:
-            # List all available commands
-            commandStr = "Available commands (Say !help <command> for details): " + ', '.join([aliases for aliases, _ in commandAliasList])
-            maxStrLen = 950
-            if len(commandStr) > maxStrLen:
-                messages = []
-                # Break into batches for more efficient execution
-                while len(commandStr) > maxStrLen:
-                    splitIndex = commandStr.rfind(',', 0, maxStrLen)
-                    if splitIndex == -1:
-                        splitIndex = maxStrLen
-                    msg = commandStr[:splitIndex]
-                    commandStr = commandStr[splitIndex+1:].strip()
-                    messages.append(msg)
-                if len(commandStr) > 0:
-                    messages.append(commandStr)
-                self._svInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
-            else:
-                self._svInterface.Say('^1[Godfinger]: ^7' + commandStr)
-        
-        return True
-
-    def HandleSmodHelp(self, playerName, smodID, adminIP, cmdArgs):
-        """Handle !help command for smod"""
-        smodCommandAliasList = self._serverData.GetServerVar("registeredSmodCommands")
-        if smodCommandAliasList is None:
-            smodCommandAliasList = []
-        
-        if len(cmdArgs) > 1:
-            # Looking for specific command help
-            commandName = cmdArgs[1].lower()
-            for commandAliases, helpText in smodCommandAliasList:
-                if commandName in [alias.lower() for alias in commandAliases]:
-                    self._svInterface.SmSay(helpText)
-                    return True
-            # Command not found
-            self._svInterface.SmSay(f"Couldn't find smod command: {commandName}")
-        else:
-            # List all available smod commands
-            allCommands = ', '.join([aliases for aliases, _ in smodCommandAliasList])
-            commandStr = "Smod commands: " + allCommands
-            maxStrLen = 100
-            if len(commandStr) > maxStrLen:
-                messages = []
-                # Break into batches for more efficient execution
-                while len(commandStr) > maxStrLen:
-                    splitIndex = commandStr.rfind(',', 0, maxStrLen)
-                    if splitIndex == -1:
-                        splitIndex = maxStrLen
-                    msg = commandStr[:splitIndex]
-                    commandStr = commandStr[splitIndex+1:].strip()
-                    messages.append(msg)
-                if len(commandStr) > 0:
-                    messages.append(commandStr)
-                self._svInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
-            else:
-                self._svInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
-        return True
+            # Log.warning(f"Malformed chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
 
     def OnChatMessageTeam(self, logMessage : logMessage.LogMessage):
         messageRaw = logMessage.content
@@ -666,7 +586,7 @@ class MBIIServer:
             Log.debug("Team chat meassge %s, from client %s" % (messageRaw, str(senderClient)))
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) )
         else:
-            Log.warning(f"Malformed team chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
+            # Log.warning(f"Malformed team chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
     
     def OnPlayer(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
@@ -695,15 +615,25 @@ class MBIIServer:
                 for index in range (0, len(splitui) - 1, 2):
                     vars[splitui[index]] = splitui[index+1]
                 with cl._lock:
-                    newTeamId = teams.TranslateTeam(vars["team"])
+
+                    newTeamId = cl.GetTeamId() # Default to current team to prevent unnecessary updates/crashes
+
+                    if "team" in vars:
+                        newTeamId = teams.TranslateTeam(vars["team"])
+                    else:
+                        Log.warning(f"OnPlayer event is missing 'team' variable for client ID {cl.GetId()}")
+
+                    # Now proceed with the team change check using the safely determined newTeamId
                     if cl.GetTeamId() != newTeamId:
                         # client team changed
                         changedOld["team"] = cl.GetTeamId()
                         cl._teamId = newTeamId
+
                     if "name" in vars:
                         if cl.GetName() != vars["name"]:
                             changedOld["name"] = cl.GetName()
                             cl._name = vars["name"]
+
                     if "ja_guid" in vars:
                         if cl._jaguid != vars["ja_guid"]:
                             changedOld["ja_guid"] = cl._jaguid
@@ -723,22 +653,50 @@ class MBIIServer:
     def OnKill(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
         Log.debug("Kill log entry %s", textified)
-        
-        # Split the log message into parts
-        parts = textified.split(": ", 2)  # Split into two parts at the first colon
-        if len(parts) < 2:
-            Log.error("Invalid kill log format: %s", textified)
-            return
-        
-        # Extract the numeric part and the rest of the message
-        kill_part, numeric_part, message_part = parts
-        
+
+        # Split the log message into parts using ': ' as the delimiter, limiting to 2 splits.
+        # This results in a list of up to 3 parts (before ':', numeric part, message part).
+        parts = textified.split(": ", 2)
+
+        # Initialize variables to a safe state
+        kill_part = ""
+        numeric_part = ""
+        message_part = ""
+
+        # --- FIX: Safe Unpacking Logic ---
+        if len(parts) >= 3:
+            # Standard case: 3 or more parts found
+            kill_part = parts[0]
+            numeric_part = parts[1]
+            # Rejoin the remaining parts in case there were extra ': ' delimiters in the message
+            # Note: We rejoin with ': ' because that was the original split delimiter
+            message_part = ": ".join(parts[2:])
+
+        elif len(parts) == 2:
+            # Fix: Handle the 'expected 3, got 2' case.
+            # This means the numeric part (pids) is likely missing.
+            # Log.warning(f"Malformed Kill message (expected 3 parts, got 2). Log: {textified}")
+            kill_part = parts[0]
+            numeric_part = ""
+            message_part = parts[1]
+
+        else:
+            # Handle cases with 1 or 0 delimiters (severely malformed)
+            # Log.error(f"Severely malformed Kill message (only {len(parts)} parts). Log: {textified}")
+            return # Abort processing for invalid format
+        # --- END FIX ---
+
+        # Check if the numeric part (containing PIDs) was found/extracted
+        if not numeric_part:
+            Log.error(f"Kill message missing Player IDs. Log: {textified}")
+            return # Cannot proceed without PIDs
+
         # Extract killer and victim player IDs
         pids = numeric_part.split()
         if len(pids) < 3:
-            Log.error("Invalid kill log format: %s", textified)
+            Log.error("Invalid kill log format (pids): %s", textified)
             return
-        
+
         killer_pid = int(pids[0])
         victim_pid = int(pids[1])
 
@@ -751,17 +709,16 @@ class MBIIServer:
 
         tk_part = message_part.replace(cl.GetName(), "", 1).replace(clVictim.GetName(), "", 1).split()
         isTK = (tk_part[0] == "teamkilled")
+
         # Split the message part to isolate the kill details
         message_parts = message_part.split()
         if len(message_parts) < 4:
-            Log.error("Invalid kill log format: %s", textified)
+            Log.error("Invalid kill log format (message parts): %s", textified)
             return
 
         # Extract weapon info
         weapon_str = message_parts[-1]
-        
-        
-        
+
         if cl is not None and clVictim is not None:
             if cl is clVictim:
                 if weapon_str == "MOD_WENTSPECTATOR":
@@ -805,24 +762,26 @@ class MBIIServer:
         token_to_check = lineParse[3 + extraName]
 
         try:
-            # 1. Strip color codes (e.g., '^6')
+            # 1. Strip color codes (e.g., '^6'), which might be mistaken for part of a number.
+            #    The 'colors' utility is imported in godfingerinterface and assumed available here.
             stripped_token = colors.StripColorCodes(token_to_check)
-            # 2. Strip surrounding punctuation (e.g., '(', ')') and whitespace
+
+            # 2. Strip surrounding punctuation (like '(', ')') and whitespace.
             cleaned_token = stripped_token.strip("()").strip()
 
-            # 3. Safely convert the cleaned token to an integer
+            # 3. Safely convert the cleaned token to an integer.
             id = int(cleaned_token)
 
         except ValueError:
-            # If the token is still not a valid integer (e.g., 'passif'), handle gracefully
-            Log.warning(f"OnClientConnect: Malformed ID token '{token_to_check}' encountered. Falling back to lineParse[1] for client ID.")
+            # If the token is still not a valid integerhandle gracefully.
+            # Log.warning(f"OnClientConnect: Malformed ID token '{token_to_check}' encountered. Falling back to lineParse[1] for client ID.")
 
-            # Fallback: Attempt to use the client ID from the known position (index 1)
+            # Fallback: Attempt to use the client ID from the known primary position (index 1).
             try:
                 id = int(lineParse[1])
             except (ValueError, IndexError):
-                id = -1 # Safe sentinel value if all parsing fails
-        id = int(lineParse[3 + extraName])
+                # If all parsing fails, set a sentinel value that can be handled downstream.
+                id = -1
         ip = lineParse[-1].strip(")")
         name = lineParse[1]
         for i in range(extraName):
@@ -835,7 +794,7 @@ class MBIIServer:
             self._clientManager.AddClient(newClient) # make sure its added BEFORE events are processed
             self._pluginManager.Event( godfingerEvent.ClientConnectEvent( newClient, None, isStartup = logMessage.isStartup ) )
         else:
-            Log.warning(f"Duplicate client with ID {id} connected, ignoring")
+            #Log.warning(f"Duplicate client with ID {id} connected, ignoring")
             pass
 
     def OnClientBegin(self, logMessage : logMessage.LogMessage ):
@@ -929,13 +888,6 @@ class MBIIServer:
             senderName = ' '.join(lineSplit[2:adminIDIndex])
             senderIP = lineSplit[adminIDIndex + 3].strip("):")
             message = ' '.join(lineSplit[adminIDIndex + 4:])
-            messageLower = message.lower()
-            cmdArgs = messageLower.split()
-            if cmdArgs and cmdArgs[0].startswith("!"):
-                command = cmdArgs[0][1:]  # Remove the !
-                if command == "help":
-                    self.HandleSmodHelp(senderName, smodID, senderIP, cmdArgs)
-                    return True  # Command handled, don't pass to plugins
             self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message, isStartup = logMessage.isStartup))
         else:
             # Handle the malformed message: log a warning and skip processing the event
