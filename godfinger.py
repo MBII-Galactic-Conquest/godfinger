@@ -643,22 +643,50 @@ class MBIIServer:
     def OnKill(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
         Log.debug("Kill log entry %s", textified)
-        
-        # Split the log message into parts
-        parts = textified.split(": ", 2)  # Split into two parts at the first colon
-        if len(parts) < 2:
-            Log.error("Invalid kill log format: %s", textified)
-            return
-        
-        # Extract the numeric part and the rest of the message
-        kill_part, numeric_part, message_part = parts
-        
+
+        # Split the log message into parts using ': ' as the delimiter, limiting to 2 splits.
+        # This results in a list of up to 3 parts (before ':', numeric part, message part).
+        parts = textified.split(": ", 2)
+
+        # Initialize variables to a safe state
+        kill_part = ""
+        numeric_part = ""
+        message_part = ""
+
+        # --- FIX: Safe Unpacking Logic ---
+        if len(parts) >= 3:
+            # Standard case: 3 or more parts found
+            kill_part = parts[0]
+            numeric_part = parts[1]
+            # Rejoin the remaining parts in case there were extra ': ' delimiters in the message
+            # Note: We rejoin with ': ' because that was the original split delimiter
+            message_part = ": ".join(parts[2:])
+
+        elif len(parts) == 2:
+            # Fix: Handle the 'expected 3, got 2' case.
+            # This means the numeric part (pids) is likely missing.
+            Log.warning(f"Malformed Kill message (expected 3 parts, got 2). Log: {textified}")
+            kill_part = parts[0]
+            numeric_part = ""
+            message_part = parts[1]
+
+        else:
+            # Handle cases with 1 or 0 delimiters (severely malformed)
+            Log.error(f"Severely malformed Kill message (only {len(parts)} parts). Log: {textified}")
+            return # Abort processing for invalid format
+        # --- END FIX ---
+
+        # Check if the numeric part (containing PIDs) was found/extracted
+        if not numeric_part:
+            Log.error(f"Kill message missing Player IDs. Log: {textified}")
+            return # Cannot proceed without PIDs
+
         # Extract killer and victim player IDs
         pids = numeric_part.split()
         if len(pids) < 3:
-            Log.error("Invalid kill log format: %s", textified)
+            Log.error("Invalid kill log format (pids): %s", textified)
             return
-        
+
         killer_pid = int(pids[0])
         victim_pid = int(pids[1])
 
@@ -671,17 +699,16 @@ class MBIIServer:
 
         tk_part = message_part.replace(cl.GetName(), "", 1).replace(clVictim.GetName(), "", 1).split()
         isTK = (tk_part[0] == "teamkilled")
+
         # Split the message part to isolate the kill details
         message_parts = message_part.split()
         if len(message_parts) < 4:
-            Log.error("Invalid kill log format: %s", textified)
+            Log.error("Invalid kill log format (message parts): %s", textified)
             return
 
         # Extract weapon info
         weapon_str = message_parts[-1]
-        
-        
-        
+
         if cl is not None and clVictim is not None:
             if cl is clVictim:
                 if weapon_str == "MOD_WENTSPECTATOR":
@@ -725,24 +752,26 @@ class MBIIServer:
         token_to_check = lineParse[3 + extraName]
 
         try:
-            # 1. Strip color codes (e.g., '^6')
+            # 1. Strip color codes (e.g., '^6'), which might be mistaken for part of a number.
+            #    The 'colors' utility is imported in godfingerinterface and assumed available here.
             stripped_token = colors.StripColorCodes(token_to_check)
-            # 2. Strip surrounding punctuation (e.g., '(', ')') and whitespace
+
+            # 2. Strip surrounding punctuation (like '(', ')') and whitespace.
             cleaned_token = stripped_token.strip("()").strip()
 
-            # 3. Safely convert the cleaned token to an integer
+            # 3. Safely convert the cleaned token to an integer.
             id = int(cleaned_token)
 
         except ValueError:
-            # If the token is still not a valid integer (e.g., 'passif'), handle gracefully
+            # If the token is still not a valid integerhandle gracefully.
             Log.warning(f"OnClientConnect: Malformed ID token '{token_to_check}' encountered. Falling back to lineParse[1] for client ID.")
 
-            # Fallback: Attempt to use the client ID from the known position (index 1)
+            # Fallback: Attempt to use the client ID from the known primary position (index 1).
             try:
                 id = int(lineParse[1])
             except (ValueError, IndexError):
-                id = -1 # Safe sentinel value if all parsing fails
-        id = int(lineParse[3 + extraName])
+                # If all parsing fails, set a sentinel value that can be handled downstream.
+                id = -1
         ip = lineParse[-1].strip(")")
         name = lineParse[1]
         for i in range(extraName):
