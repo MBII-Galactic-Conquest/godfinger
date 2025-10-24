@@ -827,7 +827,7 @@ class MBIIServer:
             Log.warning(f"Duplicate client with ID {id} connected, ignoring")
             pass
 
-    def OnClientBegin(self, logMessage : logMessage.LogMessage ):
+    def OnClientBegin(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content;
         #Log.debug("Client begin log entry %s", textified);
         lineParse = textified.split();
@@ -837,7 +837,7 @@ class MBIIServer:
             pass;
             #Log.debug("Client is not none, sending begin event to plugins.");
             self._pluginManager.Event( godfingerEvent.ClientBeginEvent( client, {}, isStartup = logMessage.isStartup ) );
-    
+
     def OnClientDisconnect(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content;
         Log.debug("Client disconnect log entry %s", textified); 
