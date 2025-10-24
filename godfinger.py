@@ -722,6 +722,26 @@ class MBIIServer:
         Log.debug("Client connect log entry %s", textified)
         lineParse = textified.split()
         extraName = len(lineParse) - 6
+        token_to_check = lineParse[3 + extraName]
+
+        try:
+            # 1. Strip color codes (e.g., '^6')
+            stripped_token = colors.StripColorCodes(token_to_check)
+            # 2. Strip surrounding punctuation (e.g., '(', ')') and whitespace
+            cleaned_token = stripped_token.strip("()").strip()
+
+            # 3. Safely convert the cleaned token to an integer
+            id = int(cleaned_token)
+
+        except ValueError:
+            # If the token is still not a valid integer (e.g., 'passif'), handle gracefully
+            Log.warning(f"OnClientConnect: Malformed ID token '{token_to_check}' encountered. Falling back to lineParse[1] for client ID.")
+
+            # Fallback: Attempt to use the client ID from the known position (index 1)
+            try:
+                id = int(lineParse[1])
+            except (ValueError, IndexError):
+                id = -1 # Safe sentinel value if all parsing fails
         id = int(lineParse[3 + extraName])
         ip = lineParse[-1].strip(")")
         name = lineParse[1]
