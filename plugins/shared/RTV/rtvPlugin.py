@@ -489,7 +489,6 @@ class RTV(object):
                     ("nom", "nominate", "mapnom") : ("!nominate <map> - nominates a map for the next round of voting", self.HandleMapNom),
                     ("nomlist", "nominationlist", "nominatelist", "noml") : ("!nomlist - displays a list of nominations for the next map", self.HandleNomList),
                     ("search", "mapsearch") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
-                    ('help', "cmds") : ("!help - display help about a given command, or all commands if no command is given", self.HandleHelp),
                     ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote),  # handle decimal votes
                     ("showvote", "showrtv") : ("!showvote - shows the current vote stats if a vote is active", self.HandleShowVote)
                 },
@@ -1027,22 +1026,6 @@ class RTV(object):
             else:
                 self.Say(f"No vote to display. Type {colors.ColorizeText('!rtv', self._themeColor)} in chat to {colors.ColorizeText('Rock the Vote', self._themeColor)}!")
 
-    # only included if not already defined in another plugin
-    def HandleHelp(self, player : player.Player, teamId : int, cmdArgs : list[str]):
-        capture = True
-        commandAliasList = self._serverData.GetServerVar("registeredCommands")
-        if len(cmdArgs) > 1:
-            for i in commandAliasList:
-                if cmdArgs[1] == i[0]:
-                    saystr = i[1]
-                    self.Say(saystr)
-                    return capture
-            # couldn't find command
-            self.Say(f"Couldn't find chat command {colors.ColorizeText(cmdArgs[1], self._themeColor)}")
-        else:
-            saystr = ', '.join([x[0] for x in commandAliasList])
-            self.Say(colors.ColorizeText("(Say !help <command> for help on a specific command): ", self._themeColor) + saystr)
-        return capture
         
     def OnChatMessage(self, eventClient : client.Client, eventMessage : str, eventTeamID : int):
         """Handle incoming chat messages and route commands"""
@@ -1333,13 +1316,20 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
     if exports != None:
         exports.Add("StartRTVVote", API_StartRTVVote)
     
+    # Register SMOD commands
+    new_smod_commands = []
+    r_smod_commands = serverData.GetServerVar("registeredSmodCommands")
+    if r_smod_commands:
+        new_smod_commands.extend(r_smod_commands)
+    
+    for cmd in PluginInstance._smodCommandList:
+        for alias in cmd:
+            new_smod_commands.append((alias, PluginInstance._smodCommandList[cmd][0]))
+    SERVER_DATA.SetServerVar("registeredSmodCommands", new_smod_commands)
+
     # Register commands with server
     newVal = []
-    # Check for existing help command from another plugin before using this plugin's
     rCommands = PluginInstance._serverData.GetServerVar("registeredCommands")
-    if rCommands != None and 'help' in [x for x, _ in rCommands]:
-        del PluginInstance._commandList[teams.TEAM_GLOBAL][('help', "cmds")]
-
     if rCommands != None:
         newVal.extend(rCommands)
     for cmd in PluginInstance._commandList[teams.TEAM_GLOBAL]:
