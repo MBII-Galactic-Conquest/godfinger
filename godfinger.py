@@ -553,25 +553,40 @@ class MBIIServer:
                 self.OnClientUserInfoChanged(message)
             else:
                 return
-    
+
     def OnChatMessage(self, logMessage : logMessage.LogMessage):
         messageRaw = logMessage.content
         lineParse = messageRaw.split()
         senderId = int(lineParse[0].strip(":"))
         senderClient = self._clientManager.GetClientById(senderId)
         Log.debug("Chat message %s, from client %s" % (messageRaw, str(senderClient)) )
-        message : str = messageRaw.split("\"")[1]   # quote characters cannot appear in chat messages, meaning that index 1 will always contain the whole chat message
-        self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
+
+        # Split the raw message by the quote character
+        parts = messageRaw.split("\"")
+
+        # Check if the list has at least 2 parts (meaning there was at least one quote)
+        if len(parts) > 1:
+            # The chat message content is expected to be the second part (index 1)
+            message : str = parts[1]
+            self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
+        else:
+            # Handle the malformed message (missing quotes)
+            Log.warning(f"Malformed chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
 
     def OnChatMessageTeam(self, logMessage : logMessage.LogMessage):
         messageRaw = logMessage.content
         lineParse = messageRaw.split()
         senderId = int(lineParse[0].strip(":"))
         senderClient = self._clientManager.GetClientById(senderId)
-        message : str = messageRaw.split("\"")[1] 
-        Log.debug("Team chat meassge %s, from client %s" % (messageRaw, str(senderClient)))
-        self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) )
-    
+
+        # Apply the same robust check for team chat
+        parts = messageRaw.split("\"")
+        if len(parts) > 1:
+            message : str = parts[1]
+            Log.debug("Team chat meassge %s, from client %s" % (messageRaw, str(senderClient)))
+            self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) )
+        else:
+            Log.warning(f"Malformed team chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
     
     def OnPlayer(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
@@ -800,15 +815,18 @@ class MBIIServer:
         textified = logMessage.content
         Log.debug(f"Smod say event received: {textified}")
         lineSplit = textified.split()
-        adminIDIndex = lineSplit.index('(adminID:')
-        if adminIDIndex != -1:
+
+        # Check if the token '(adminID:' is present in the list before trying to get its index.
+        # This prevents the ValueError.
+        if '(adminID:' in lineSplit:
+            adminIDIndex = lineSplit.index('(adminID:')
             smodID = lineSplit[adminIDIndex + 1].strip(")")
             senderName = ' '.join(lineSplit[2:adminIDIndex])
             senderIP = lineSplit[adminIDIndex + 3].strip("):")
             message = ' '.join(lineSplit[adminIDIndex + 4:])
             self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message, isStartup = logMessage.isStartup))
         else:
-            # somehow malformed smsay message 
+            # Handle the malformed message: log a warning and skip processing the event
             pass
 
     def OnSmodCommand(self, logMessage : logMessage.LogMessage):
