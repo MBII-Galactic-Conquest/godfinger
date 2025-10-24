@@ -604,10 +604,15 @@ class MBIIServer:
             cl = self._clientManager.GetClientById(pidNum)
 
             if cl != None:
-                splitui = ui.split("\\") # should be always last
+                splitui = ui.split("\\")
                 vars = {}
                 changedOld = {}
-                for index in range (0, len(splitui), 2):
+
+                # FIX: Set the upper bound of the loop to be len(splitui) - 1
+                # This ensures the loop always stops when the last valid key is reached
+                # which leaves a safe index+1 for the corresponding value.
+                # len(splitui) - 1 works for both odd and even lengths.
+                for index in range (0, len(splitui) - 1, 2):
                     vars[splitui[index]] = splitui[index+1]
                 with cl._lock:
                     newTeamId = teams.TranslateTeam(vars["team"])
