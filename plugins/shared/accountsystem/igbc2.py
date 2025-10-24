@@ -110,6 +110,8 @@ class BankingPlugin:
                              self._handle_bounty),
                 ("cancel",): ("!cancel - Cancel pending transaction",
                              self._handle_cancel),
+                ("bounties",): ("!bounties - View active bounties",
+                              self._handle_bounties),
             }
         }
         self._smodCommandList = {
@@ -326,6 +328,20 @@ class BankingPlugin:
             # self.SvTell(target_id, f"{player.GetName()}^7 wants to place a bounty on you for {amount} credits.")
         return True
 
+    def _handle_bounties(self, player: Player, team_id: int, args: list[str]) -> bool:
+        """Handle !bounties command - display all active bounties"""
+        if not self.active_bounties:
+            self.SvTell(player.GetId(), "No active bounties.")
+            return True
+
+        bounties = []
+        for target_id, bounty in self.active_bounties.items():
+            target_acc = bounty.target_account
+            bounties.append(f"{target_acc.player_name}^7: {colors.ColorizeText('$' + str(bounty.amount), self.themecolor)}")
+
+        self.Say("Active Bounties: " + ", ".join(bounties))
+        return True
+    
     def check_bounty(self, victim_id: int, killer_id: int) -> None:
         """Check for active bounties on killed player"""
         if victim_id in self.active_bounties:
