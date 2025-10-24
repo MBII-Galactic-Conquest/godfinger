@@ -1,103 +1,103 @@
-import sqlite3;
+import sqlite3
 
 
 class ADatabase():
     def __init__(self, path : str, name : str):
-        self._name : str = name;
-        self._path : str = path;
+        self._name : str = name
+        self._path : str = path
 
     def IsOpened(self) -> bool:
-        pass;
+        pass
     
     def Open(self) -> bool:   
-        pass;
+        pass
     
     def Close(self):
-        pass;
+        pass
 
     def ExecuteQuery(self, query : str):
-        pass;
+        pass
     
     def FetchQuery(self):
-        print("Fetch query unimplemented");
+        print("Fetch query unimplemented")
     
     def LoadExtension(self, extpath : str):
-        pass;
+        pass
 
     def GetName(self) -> str:
-        return self._name;
+        return self._name
 
 # Good enough, but not good in general.
 class DatabaseLite(ADatabase):
     def __init__(self, path : str, name : str):
-        super().__init__(path, name);
-        self._connection = None;
+        super().__init__(path, name)
+        self._connection = None
 
     def IsOpened(self) -> bool:
-        return self._connection != None;
+        return self._connection != None
 
     def Open(self) -> bool:
         if self.IsOpened():
-            self.Close();
-        self._connection = sqlite3.connect(self._path);
+            self.Close()
+        self._connection = sqlite3.connect(self._path)
         if self.IsOpened():
-            return True;
+            return True
         else:
-            return False;
+            return False
 
     def Close(self):
         if self.IsOpened():
-            self._connection.close();
-            self._connection = None;
+            self._connection.close()
+            self._connection = None
 
     def ExecuteQuery(self, query : str, withResponse = False) -> list[any]:
         if self.IsOpened():
-            cursor = self._connection.cursor();
-            cursor.execute(query);
-            self._connection.commit();
+            cursor = self._connection.cursor()
+            cursor.execute(query)
+            self._connection.commit()
             if withResponse:
-                a = cursor.fetchall();
+                a = cursor.fetchall()
                 cursor.close()
                 return a
             else:
                 cursor.close()
-                return None;
-        return None;
+                return None
+        return None
 
-    def LoadExtension(self, extpath  : str): # Will work only if python is compiled with --enable-loadable-sqlite-extensions flag, it's not for distributions.
+    def LoadExtension(self, extpath : str):
         if self.IsOpened():
-            print("Loading db ext : " + extpath);
+            print("Loading db ext : " + extpath)
             self._connection.enable_load_extension(True)
-            self._connection.load_extension(extpath);
+            self._connection.load_extension(extpath)
             self._connection.enable_load_extension(False)
 
 class DatabaseManager():
 
-    DBM_RESULT_ERROR = -2;
-    DBM_RESULT_ALREADY_EXISTS = -1;
-    DBM_RESULT_OK = 0;
+    DBM_RESULT_ERROR = -2
+    DBM_RESULT_ALREADY_EXISTS = -1
+    DBM_RESULT_OK = 0
     
 
     def __init__(self):
-        self._databases : dict[str, ADatabase] = {};
+        self._databases : dict[str, ADatabase] = {}
     
     def __del__(self):
         for k in self._databases:
-            db = self._databases[k];
-            db.Close();
+            db = self._databases[k]
+            db.Close()
 
     def GetDatabase(self, name : str) -> ADatabase:
         if name in self._databases:
-            return self._databases[name];
+            return self._databases[name]
         else:
-            return None;
+            return None
 
     def AddDatabase(self, db : ADatabase) -> int:
         if self.GetDatabase(db.GetName()) != None:
-            return DatabaseManager.DBM_RESULT_ALREADY_EXISTS;
+            return DatabaseManager.DBM_RESULT_ALREADY_EXISTS
         else:
-            self._databases[db.GetName()] = db;
-            return DatabaseManager.DBM_RESULT_OK;
+            self._databases[db.GetName()] = db
+            return DatabaseManager.DBM_RESULT_OK
 
     def CreateDatabase(self, path : str, name : str) -> int:
         """
@@ -110,11 +110,11 @@ class DatabaseManager():
         :return: DBM_RESULT_OK | DBM_RESULT_ALREADY_EXISTS | DBM_RESULT_ERROR
         """
         if self.GetDatabase(name) != None:
-            return DatabaseManager.DBM_RESULT_ALREADY_EXISTS;
+            return DatabaseManager.DBM_RESULT_ALREADY_EXISTS
         else:
-            newdb = DatabaseLite(path, name);
+            newdb = DatabaseLite(path, name)
             if newdb.Open():
-                self.AddDatabase(newdb);
+                self.AddDatabase(newdb)
             else:
-                return DatabaseManager.DBM_RESULT_ERROR;
-            return DatabaseManager.DBM_RESULT_OK;
+                return DatabaseManager.DBM_RESULT_ERROR
+            return DatabaseManager.DBM_RESULT_OK

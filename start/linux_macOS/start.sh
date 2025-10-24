@@ -47,7 +47,7 @@ if test -f venv/bin/activate; then
     $PYTHON_CMD ./update.py
     cd ../
     ./cleanup.sh
-    $PYTHON_CMD ./godfinger.py
+    $PYTHON_CMD ./godfinger.py &
     read -p "Press Enter to continue..."
 else
     echo "Virtual environment does not exist or was created improperly, please run prepare.sh in the prepare directory. Aborting."
