@@ -105,7 +105,7 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
 def OnStart():
     global PluginInstance
     startTime = time()
-    resetTKVstr = '"settk 0 0;wait 1;settk 1 0;wait 1;settk 2 0;wait 1;settk 3 0;settk 4 0;wait 1;settk 5 0;wait 1;settk 6 0;settk 7 0;wait 1;settk 8 0;wait 9;settk 10 0;wait 1;settk 11 0;settk 12 0;wait 1;settk 13 0;wait 1;settk 14 0;settk 15 0;wait 1;settk 16 0;wait 1;settk 17 0;wait 1;settk 18 0;settk 19 0;wait 1;settk 20 0;wait 1;settk 21 0;settk 22 0;wait 1;settk 23 0;wait 1;settk 24 0;wait 1;settk 25 0;settk 26 0;wait 1;settk 27 0;wait 1;settk 28 0;settk 29 0;wait 1;settk 30 0;wait 1;settk 31 0"'
+    resetTKVstr = r'"settk 0 0;wait 1;settk 1 0;wait 1;settk 2 0;wait 1;settk 3 0;settk 4 0;wait 1;settk 5 0;wait 1;settk 6 0;settk 7 0;wait 1;settk 8 0;wait 9;settk 10 0;wait 1;settk 11 0;settk 12 0;wait 1;settk 13 0;wait 1;settk 14 0;settk 15 0;wait 1;settk 16 0;wait 1;settk 17 0;wait 1;settk 18 0;settk 19 0;wait 1;settk 20 0;wait 1;settk 21 0;settk 22 0;wait 1;settk 23 0;wait 1;settk 24 0;wait 1;settk 25 0;settk 26 0;wait 1;settk 27 0;wait 1;settk 28 0;settk 29 0;wait 1;settk 30 0;wait 1;settk 31 0"'
     PluginInstance._serverData.interface.SetVstr('clearTK', resetTKVstr)
     loadTime = time() - startTime
     # PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"TK Manager started in {loadTime:.2f} seconds!")
