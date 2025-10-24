@@ -746,17 +746,16 @@ class RTV(object):
                 blacklist.extend([x.GetMapName() for x in self._mapContainer.GetAllMaps() if x.GetPriority() == MapPriorityType.MAPTYPE_SECONDARY])
             if not self._config.cfg["rtv"]["allowNominateCurrentMap"]:
                 blacklist.append(self._mapName.lower())
+
+            # Filter out nominations to prevent duplicates
+            blacklist.extend([n.GetMap().GetMapName().lower() for n in self._nominations])
                 
             # Add nominated maps
             for nom in self._nominations:
                 voteChoices.append(nom.GetMap())
                 
             # Get random maps to fill options
-            choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=blacklist)
-            
-            # Filter out nominations to prevent duplicates
-            nomination_names = {n.GetMap().GetMapName().lower() for n in self._nominations}
-            choices = [m for m in choices if m.GetMapName().lower() not in nomination_names]
+            choices = self._mapContainer.GetRandomMaps(5 - len(voteChoices), blacklist=blacklist)
             
             # Clear nominations and build final list
             self._nominations.clear()
