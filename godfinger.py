@@ -615,15 +615,25 @@ class MBIIServer:
                 for index in range (0, len(splitui) - 1, 2):
                     vars[splitui[index]] = splitui[index+1]
                 with cl._lock:
-                    newTeamId = teams.TranslateTeam(vars["team"])
+
+                    newTeamId = cl.GetTeamId() # Default to current team to prevent unnecessary updates/crashes
+
+                    if "team" in vars:
+                        newTeamId = teams.TranslateTeam(vars["team"])
+                    else:
+                        Log.warning(f"OnPlayer event is missing 'team' variable for client ID {cl.GetId()}")
+
+                    # Now proceed with the team change check using the safely determined newTeamId
                     if cl.GetTeamId() != newTeamId:
                         # client team changed
                         changedOld["team"] = cl.GetTeamId()
                         cl._teamId = newTeamId
+
                     if "name" in vars:
                         if cl.GetName() != vars["name"]:
                             changedOld["name"] = cl.GetName()
                             cl._name = vars["name"]
+
                     if "ja_guid" in vars:
                         if cl._jaguid != vars["ja_guid"]:
                             changedOld["ja_guid"] = cl._jaguid
