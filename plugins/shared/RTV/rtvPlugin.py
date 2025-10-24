@@ -519,7 +519,7 @@ class RTV(object):
         self._wantsToRTM = []
         self._rtvCooldown = Timeout()
         self._rtmCooldown = Timeout()
-        self._rtvRecentMaps : list[tuple(str, Timeout)] = []
+        self._rtvRecentMaps : list[tuple[str, Timeout]] = []
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
