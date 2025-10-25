@@ -937,11 +937,11 @@ class RTV(object):
                 if page_index < 0:
                     raise ValueError
                 if page_index >= len(self._mapContainer._pages):
-                    self.SvSay(f"Index out of range! (1-{len(self._mapContainer._pages)})")
+                    self.SvTell(player.GetId(), f"Index out of range! (1-{len(self._mapContainer._pages)})")
                 else:
-                    self.SvSay(self._mapContainer._pages[page_index])
+                    self.Say(self._mapContainer._pages[page_index])
             except (ValueError, IndexError):
-                self.SvSay(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+                self.SvTell(player.GetId(), f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
