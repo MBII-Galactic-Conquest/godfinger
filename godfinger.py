@@ -570,6 +570,7 @@ class MBIIServer:
             message : str = parts[1]
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
         else:
+            pass
             # Handle the malformed message (missing quotes)
             # Log.warning(f"Malformed chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
 
@@ -586,6 +587,7 @@ class MBIIServer:
             Log.debug("Team chat meassge %s, from client %s" % (messageRaw, str(senderClient)))
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) )
         else:
+            pass
             # Log.warning(f"Malformed team chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
     
     def OnPlayer(self, logMessage : logMessage.LogMessage):
