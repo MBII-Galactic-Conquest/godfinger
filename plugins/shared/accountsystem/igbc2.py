@@ -17,18 +17,21 @@ import lib.shared.teams as teams
 import lib.shared.colors as colors
 import lib.shared.config as config
 import godfingerEvent
-
-# Configuration file paths and defaults
-DEFAULT_CFG_PATH = os.path.join(os.path.dirname(__file__),
-                                "bankingConfig.json")
-DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
+import json # Required for json.loads()
 
 # Initialize logger
 Log = logging.getLogger(__name__)
 
-# START OF ADDED CODE FOR FALLBACK CONFIGURATION
-# Fallback configuration data to prevent AttributeError if bankingConfig.json is missing
-FALLBACK_CFG_DATA = {
+# Global server data instance
+SERVER_DATA = None
+
+# Configuration file paths and defaults
+DEFAULT_CFG_PATH = os.path.join(os.path.dirname(__file__), "bankingConfig.json")
+DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
+
+# Fallback configuration if config file doesn't exist
+CONFIG_FALLBACK = \
+"""{
     "themecolor": "yellow",
     "kill_awards": {
         "kill": 10,
@@ -36,7 +39,15 @@ FALLBACK_CFG_DATA = {
         "teamkill": -20
     }
 }
-# END OF ADDED CODE FOR FALLBACK CONFIGURATION
+"""
+
+# Create default config if it doesn't exist
+if DEFAULT_CFG is None:
+    DEFAULT_CFG = config.Config()
+    DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
+    Log.error(f"Could not open config file at {DEFAULT_CFG_PATH}, ensure the file is a valid JSON file in the correct file path.")
+    with open(DEFAULT_CFG_PATH, "wt") as f:
+        f.write(CONFIG_FALLBACK)
 
 class Payment:
     def __init__(self, sender_account, target_account, amount: int):
@@ -60,6 +71,7 @@ class Bounty:
 class BankingPlugin:
 
     def __init__(self, server_data: ServerData):
+        self._register_commands()
 
         # START OF MODIFIED CODE FOR CONFIG LOADING
         # Check if config loading failed and use fallback data
@@ -110,36 +122,13 @@ class BankingPlugin:
                              self._handle_bounty),
                 ("cancel",): ("!cancel - Cancel pending transaction",
                              self._handle_cancel),
-                ("bounties",): ("!bounties - View active bounties",
-                              self._handle_bounties),
             }
         }
         self._smodCommandList = {
                 # ... existing commands ...
             ("modifycredits", "modcredits") : ("!modifycredits <playerid> <amount> - modify a player's credits by the specified amount", self._handle_mod_credits),
             ("resetbounties", "rb") : ("!resetbounties - clears the bounty list", self._handle_reset_bounties),
-        }
-        # Register commands with server
-        newVal = []
-        rCommands = self.server_data.GetServerVar("registeredCommands")
-        if rCommands != None:
-            newVal.extend(rCommands)
-        for cmd in self._command_list[teams.TEAM_GLOBAL]:
-            for i in cmd:
-                if not i.isdecimal():
-                    newVal.append((i, self._command_list[teams.TEAM_GLOBAL][cmd][0]))
-        self.server_data.SetServerVar("registeredCommands", newVal)
-
-        # Register SMOD commands
-        new_smod_commands = []
-        r_smod_commands = self.server_data.GetServerVar("registeredSmodCommands")
-        if r_smod_commands:
-            new_smod_commands.extend(r_smod_commands)
-        
-        for cmd in self._smodCommandList:
-            for alias in cmd:
-                new_smod_commands.append((alias, self._smodCommandList[cmd][0]))
-        self.server_data.SetServerVar("registeredSmodCommands", new_smod_commands)
+    }
 
     def has_pending_action(self, player_id: int) -> bool:
         """Check if player has any pending actions"""
@@ -328,20 +317,6 @@ class BankingPlugin:
             # self.SvTell(target_id, f"{player.GetName()}^7 wants to place a bounty on you for {amount} credits.")
         return True
 
-    def _handle_bounties(self, player: Player, team_id: int, args: list[str]) -> bool:
-        """Handle !bounties command - display all active bounties"""
-        if not self.active_bounties:
-            self.SvTell(player.GetId(), "No active bounties.")
-            return True
-
-        bounties = []
-        for target_id, bounty in self.active_bounties.items():
-            target_acc = bounty.target_account
-            bounties.append(f"{target_acc.player_name}^7: {colors.ColorizeText('$' + str(bounty.amount), self.themecolor)}")
-
-        self.Say("Active Bounties: " + ", ".join(bounties))
-        return True
-    
     def check_bounty(self, victim_id: int, killer_id: int) -> None:
         """Check for active bounties on killed player"""
         if victim_id in self.active_bounties:
