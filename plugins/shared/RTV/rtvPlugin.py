@@ -78,7 +78,6 @@ DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
 # Fallback configuration if config file doesn't exist
 CONFIG_FALLBACK = \
 """{
-    "MBIIPath": "your/mbii/path/here",
     "pluginThemeColor" : "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
@@ -1382,23 +1381,30 @@ def OnEvent(event) -> bool:
 # Helper function to get all map names from currently installed PK3 files located in MBII directory and base directory next to MBII
 def GetAllMaps() -> list[Map]:
     """Scan PK3 files in MBII directories to discover available maps"""
-    mbiiDir = os.path.abspath(DEFAULT_CFG.cfg["MBIIPath"])
-    if not os.path.exists(mbiiDir):
-        # try to find the MBII directory relatively
-        Log.info(f"Directory {mbiiDir} does not exist. Attempting to resolve relatively...")
-        searchDir = os.getcwd()
-        while True:
-            if os.path.exists(os.path.join(searchDir, "MBII")):
-                mbiiDir = os.path.join(searchDir, "MBII")
-                Log.info(f"SUCCESS! Found MBII directory at {mbiiDir}.")
+    # Start by assuming the MBII directory is not found
+    mbiiDir = None
+
+    # Try to find the MBII directory relatively (this is now the primary method)
+    Log.info("Attempting to find MBII directory relative to the current working directory...")
+    searchDir = os.getcwd()
+    while True:
+        if os.path.exists(os.path.join(searchDir, "MBII")):
+            mbiiDir = os.path.join(searchDir, "MBII")
+            Log.info(f"SUCCESS! Found MBII directory at {mbiiDir}.")
+            break
+        else:
+            oldDir = searchDir
+            searchDir = os.path.dirname(searchDir)
+            if oldDir == searchDir:
+                # We've hit the top without finding the directory
+                Log.error("FAILURE. No MBII directory found through relative search.")
                 break
-            else:
-                oldDir = searchDir
-                searchDir = os.path.dirname(searchDir)
-                if oldDir == searchDir:
-                    # we've hit the top
-                    Log.error(f"FAILURE. No MBII directory found. Will try and go ahead with the path in the config but will probably crash.")
-                    break
+
+    # Check if a path was successfully found
+    if mbiiDir is None:
+        Log.error("Cannot proceed as the MBII directory could not be located.")
+        return []
+
     mapList = []
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]; # base comes next so it wont override MBII dir contents if files match
     for sub_dir in dirsToProcess:
