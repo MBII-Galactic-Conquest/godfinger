@@ -568,8 +568,15 @@ class MBIIServer:
         if len(parts) > 1:
             # The chat message content is expected to be the second part (index 1)
             message : str = parts[1]
+            if message.startswith("!"):
+                cmdArgs = message[1:].split()
+                if cmdArgs and cmdArgs[0] == "help":
+                    # Handle help command directly
+                    self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
+                    return  # Don't pass to plugins
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
         else:
+            pass
             # Handle the malformed message (missing quotes)
             # Log.warning(f"Malformed chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
 
@@ -586,6 +593,7 @@ class MBIIServer:
             Log.debug("Team chat meassge %s, from client %s" % (messageRaw, str(senderClient)))
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) )
         else:
+            pass
             # Log.warning(f"Malformed team chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
     
     def OnPlayer(self, logMessage : logMessage.LogMessage):
@@ -649,6 +657,79 @@ class MBIIServer:
         if cl != None:
             self._pluginManager.Event( godfingerEvent.PlayerEvent(cl, {"text":textified}, isStartup = logMessage.isStartup))
 
+    def HandleChatHelp(self, senderClient, teamId, cmdArgs):
+        """Handle !help command for regular chat"""
+        commandAliasList = self._serverData.GetServerVar("registeredCommands")
+        if commandAliasList is None:
+            commandAliasList = []
+        
+        if len(cmdArgs) > 1:
+            # Looking for specific command help
+            commandName = cmdArgs[1].lower()
+            for commandAlias, helpText in commandAliasList:
+                if commandName == commandAlias.lower():
+                    self._svInterface.Say('^1[Godfinger]: ^7' + helpText)
+                    return True
+            # Command not found
+            self._svInterface.Say(f"^1[Godfinger]:^7 Couldn't find chat command: {commandName}")
+        else:
+            # List all available commands
+            commandStr = "Available commands (Say !help <command> for details): " + ', '.join([aliases for aliases, _ in commandAliasList])
+            maxStrLen = 950
+            if len(commandStr) > maxStrLen:
+                messages = []
+                # Break into batches for more efficient execution
+                while len(commandStr) > maxStrLen:
+                    splitIndex = commandStr.rfind(',', 0, maxStrLen)
+                    if splitIndex == -1:
+                        splitIndex = maxStrLen
+                    msg = commandStr[:splitIndex]
+                    commandStr = commandStr[splitIndex+1:].strip()
+                    messages.append(msg)
+                if len(commandStr) > 0:
+                    messages.append(commandStr)
+                self._svInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+            else:
+                self._svInterface.Say('^1[Godfinger]: ^7' + commandStr)
+        
+        return True
+
+    def HandleSmodHelp(self, playerName, smodID, adminIP, cmdArgs):
+        """Handle !help command for smod"""
+        smodCommandAliasList = self._serverData.GetServerVar("registeredSmodCommands")
+        if smodCommandAliasList is None:
+            smodCommandAliasList = []
+        
+        if len(cmdArgs) > 1:
+            # Looking for specific command help
+            commandName = cmdArgs[1].lower()
+            for commandAlias, helpText in smodCommandAliasList:
+                if commandName == commandAlias.lower():
+                    self._svInterface.SmSay(helpText)
+                    return True
+            # Command not found
+            self._svInterface.SmSay(f"Couldn't find smod command: {commandName}")
+        else:
+            # List all available smod commands
+            allCommands = ', '.join([aliases for aliases, _ in smodCommandAliasList])
+            commandStr = "Smod commands: " + allCommands
+            maxStrLen = 100
+            if len(commandStr) > maxStrLen:
+                messages = []
+                # Break into batches for more efficient execution
+                while len(commandStr) > maxStrLen:
+                    splitIndex = commandStr.rfind(',', 0, maxStrLen)
+                    if splitIndex == -1:
+                        splitIndex = maxStrLen
+                    msg = commandStr[:splitIndex]
+                    commandStr = commandStr[splitIndex+1:].strip()
+                    messages.append(msg)
+                if len(commandStr) > 0:
+                    messages.append(commandStr)
+                self._svInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+            else:
+                self._svInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
+        return True
 
     def OnKill(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
@@ -888,6 +969,13 @@ class MBIIServer:
             senderName = ' '.join(lineSplit[2:adminIDIndex])
             senderIP = lineSplit[adminIDIndex + 3].strip("):")
             message = ' '.join(lineSplit[adminIDIndex + 4:])
+            messageLower = message.lower()
+            cmdArgs = messageLower.split()
+            if cmdArgs and cmdArgs[0].startswith("!"):
+                command = cmdArgs[0][1:]  # Remove the !
+                if command == "help":
+                    self.HandleSmodHelp(senderName, smodID, senderIP, cmdArgs)
+                    return True  # Command handled, don't pass to plugins
             self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message, isStartup = logMessage.isStartup))
         else:
             # Handle the malformed message: log a warning and skip processing the event
