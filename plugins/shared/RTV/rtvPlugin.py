@@ -78,6 +78,7 @@ DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
 # Fallback configuration if config file doesn't exist
 CONFIG_FALLBACK = \
 """{
+    "MBIIPath": "your/mbii/path/here",
     "pluginThemeColor" : "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
