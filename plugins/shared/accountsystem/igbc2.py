@@ -217,8 +217,7 @@ class BankingPlugin:
             # Store pending transaction
             payment = Payment(player_account, target_account, amount)
             self.pending_payments[player.GetId()] = payment
-            self.SvTell(player.GetId(), f"Pending payment of {amount} credits to {target.GetName()}^7. Type !confirm to complete.")
-            # self.SvTell(target_id, f"{player.GetName()}^7 wants to send you {amount} credits.")
+            self.SvTell(player.GetId(), f"Pending payment of {amount} credits to {target.GetName()}^7. Type !confirm or !cancel.")
         return True
 
     def _handle_confirm(self, player: Player, team_id: int, args: list[str]) -> bool:
@@ -300,7 +299,6 @@ class BankingPlugin:
             self.SvTell(player.GetId(), "Invalid amount. Usage: !bounty <name> <amount>")
             return True
 
-        confirm = len(args) > 3 and args[3].lower() == "confirm"
 
         # Find target player(s)
         targets = self.find_players(target_name, exclude=player.GetId())
@@ -350,8 +348,7 @@ class BankingPlugin:
                     existing_bounty.add_amount(amount)
                     if not player_account in existing_bounty.contributors:
                         existing_bounty.contributors.append(player_account)
-                    self.SvTell(player.GetId(), f"Added {amount} credits to existing bounty on {target.GetName()}^7. Total: {existing_bounty.amount} credits")
-                    self.SvTell(target_id, f"Additional bounty of {amount} credits added by {player.GetName()}^7. Total: {existing_bounty.amount} credits")
+                    self.Say(f"Added {amount} credits to existing bounty on {target.GetName()}^7. Total: {existing_bounty.amount} credits")
                 else:
                     self.SvTell(player.GetId(), "Failed to add to bounty")
             else:
@@ -361,7 +358,7 @@ class BankingPlugin:
                     self.active_bounties[target_id] = bounty
                     if not player_account in bounty.contributors:
                         bounty.contributors.append(player_account)
-                    self.SvTell(player.GetId(), f"Bounty of {amount} credits placed on {target.GetName()}^7")
+                    self.Say(f"Bounty of {amount} credits placed on {target.GetName()}^7")
                     self.SvTell(target_id, f"Bounty of {amount} credits placed on you by {player.GetName()}^7")
                 else:
                     self.SvTell(player.GetId(), "Failed to place bounty")
@@ -369,7 +366,7 @@ class BankingPlugin:
             # Store pending bounty
             bounty = Bounty(player_account, target_account, amount)
             self.pending_bounties[player.GetId()] = bounty
-            self.SvTell(player.GetId(), f"Pending bounty of {amount} credits on {target.GetName()}^7. Type !confirm to complete.")
+            self.SvTell(player.GetId(), f"Pending bounty of {amount} credits on {target.GetName()}^7. Type !confirm or !cancel.")
             # self.SvTell(target_id, f"{player.GetName()}^7 wants to place a bounty on you for {amount} credits.")
         return True
 
