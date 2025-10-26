@@ -164,26 +164,38 @@ class BankingPlugin:
             return True
 
         if len(args) < 3:
-            self.SvTell(player.GetId(), "Usage: !pay <pfx> <amount>")
+            self.SvTell(player.GetId(), "Usage: !pay <name> <amount> [confirm]")
             return True
+        
+        # Check for confirm flag after amount
+        confirm = args[-1].lower() == "confirm"
 
-        target_pfx = args[1]
-        try:
-            amount = int(args[2])
-            if amount <= 0:
-                raise ValueError
-        except ValueError:
-            self.SvTell(player.GetId(), "Invalid amount")
+        # Parse amount - find where the amount argument is
+        amount_idx = -2 if confirm else -1
+        
+        if not args[amount_idx].isdecimal() or int(args[amount_idx]) <= 0:
+            self.SvTell(player.GetId(), "Invalid amount. Usage: !pay <name> <amount>")
             return True
+        amount = int(args[amount_idx])
+        
+        # Everything between index 1 and amount_idx is the target name
+        target_name = ' '.join(args[1:amount_idx])
+        
+        
 
-        confirm = len(args) > 3 and args[3].lower() == "confirm"
-
-        # Find target player
-        target = self.find_player(target_pfx, exclude=player.GetId())
-        if not target:
-            self.SvTell(player.GetId(), "Player not found")
+        # Find matching players
+        matching_players = self.find_players(target_name, exclude=player.GetId())
+        
+        if len(matching_players) == 0:
+            self.SvTell(player.GetId(), f"No players found matching '{target_name}'")
             return True
-
+        elif len(matching_players) > 1:
+            # Multiple matches - show list
+            player_list = ", ".join([f"{colors.StripColorCodes(p.GetName())}" for p in matching_players])
+            self.SvTell(player.GetId(), f"2+ matches for '{target_name}': {player_list}. Please be more specific.")
+            return True
+        
+        target = matching_players[0]
         target_id = target.GetId()
 
         # Validate sender's balance
@@ -276,23 +288,31 @@ class BankingPlugin:
             self.SvTell(player.GetId(), "Usage: !bounty <pfx> <amount>")
             return True
 
-        target_pfx = args[1]
+        confirm = len(args) > 3 and args[-1].lower() == "confirm"  # Check if last is "confirm"
+
+        # Join the remaining args to handle names with spaces
+        target_name = " ".join(args[1:-2]) if confirm else " ".join(args[1:-1])
         try:
-            amount = int(args[2])
+            amount = int(args[-2]) if confirm else int(args[-1])
             if amount <= 0:
                 raise ValueError
         except ValueError:
-            self.SvTell(player.GetId(), "Invalid amount")
+            self.SvTell(player.GetId(), "Invalid amount. Usage: !bounty <name> <amount>")
             return True
 
         confirm = len(args) > 3 and args[3].lower() == "confirm"
 
-        # Find target player
-        target = self.find_player(target_pfx, exclude=player.GetId())
-        if not target:
-            self.SvTell(player.GetId(), "Player not found")
+        # Find target player(s)
+        targets = self.find_players(target_name, exclude=player.GetId())
+        if not targets:
+            self.SvTell(player.GetId(), f"No players found matching '{target_name}'")
+            return True
+        elif len(targets) > 1:
+            # Multiple matches found, ask for clarification
+            self.SvTell(player.GetId(), f"2+ matches for '{target_name}': {', '.join([t.GetName() for t in targets])}. Please be more specific.")
             return True
 
+        target = targets[0]
         target_id = target.GetId()
 
         # Check if target is on the same team (prevent friendly bounties)
@@ -397,15 +417,20 @@ class BankingPlugin:
         self.SvTell(pid, f"Your balance: {colors.ColorizeText(str(credits), self.themecolor)} credits")
         return True
 
-    def find_player(self, name: str, exclude: int = None) -> Optional[Player]:
-        """Find player by name prefix"""
+    def find_players(self, search_term: str, exclude: int = None) -> list[Player]:
+        """Find all players whose names contain the search term as a substring (case-insensitive)"""
+        matching_players = []
+        search_lower = search_term.lower()
+        
         for client in self.server_data.API.GetAllClients():
             if client.GetId() == exclude:
                 continue
-            fixed_name = colors.StripColorCodes(client.GetName().lower())
-            if fixed_name.startswith(name.lower()):
-                return client
-        return None
+            # Strip color codes and convert to lowercase for comparison
+            fixed_name = colors.StripColorCodes(client.GetName()).lower()
+            if search_lower in fixed_name:
+                matching_players.append(client)
+        
+        return matching_players
 
     def _handle_baltop(self, player: Player, team_id: int,
                        args: list[str]) -> bool:
