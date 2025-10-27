@@ -112,7 +112,7 @@ class PluginManager():
         for targetPlug in self._plugins:
             rslt = self._plugins[targetPlug].Start();
             if not rslt:
-                Log.error("Failed to start a plugin.");
+                Log.error(f"Failed to start a plugin {targetPlug}.");
                 return rslt;
         return rslt;
 
