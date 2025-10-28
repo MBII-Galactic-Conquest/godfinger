@@ -1230,6 +1230,11 @@ class RTV(object):
         if votesInProgress != None and "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
+        # Add old map to recently played list when transitioning
+        if oldMapName and oldMapName != mapName:
+            t = Timeout()
+            t.Set(self._config.cfg["rtv"]["disableRecentlyPlayedMaps"])
+            self._rtvRecentMaps.append((oldMapName, t))
         # Update current map
         if mapName != self._mapName:
             self._mapName = mapName
