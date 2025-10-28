@@ -1248,7 +1248,7 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-            self.SvSay("Smod forced RTV vote")
+            self.SvSay(f"Smod {colors.ColorizeText(str(smodId), self._themeColor)} forced RTV vote")
             self._StartRTVVote()
         return True
 
@@ -1258,7 +1258,7 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-            self.SvSay("Smod forced RTM vote")
+            self.SvSay(f"Smod {colors.ColorizeText(str(smodId), self._themeColor)} forced RTM vote")
             self._StartRTMVote()
         return True
 
@@ -1269,7 +1269,7 @@ class RTV(object):
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._config.cfg["rtv"]["enabled"] and self._rtvCooldown.IsSet():
-                self.SvSay("SMOD reset the cooldown for RTV!")
+                self.SvSay(f"SMOD {colors.ColorizeText(str(smodId), self._themeColor)} reset the cooldown for RTV!")
                 self._rtvCooldown.Finish()
             elif not self._config.cfg["rtv"]["enabled"]:
                 self._serverData.interface.SmSay(self._messagePrefix + "RTV is not enabled.")
@@ -1284,7 +1284,7 @@ class RTV(object):
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._config.cfg["rtm"]["enabled"] and self._rtmCooldown.IsSet():
-                self.SvSay("SMOD reset the cooldown for RTM!")
+                self.SvSay(f"SMOD {colors.ColorizeText(str(smodId), self._themeColor)} reset the cooldown for RTM!")
                 self._rtmCooldown.Finish()
             elif not self._config.cfg["rtm"]["enabled"]:
                 self._serverData.interface.SmSay(self._messagePrefix + "RTM is not enabled.")
@@ -1359,7 +1359,7 @@ def OnStart():
 
 def kickClientIfProtectedName(client : client.Client):
     nameStripped = colors.StripColorCodes(client.GetName().lower())
-    nameStripped = re.sub(r":|-|\.|,|;|=|\/|\\|\||`|~|\"|\'|[|]|(|)|_", "", nameStripped)
+    nameStripped = re.sub(r":|-|\.|,|;|=|\/|\\|\||`|~|\"|'|[|]|(|)|_", "", nameStripped)
     if nameStripped in [x.lower() for x in PluginInstance._config.cfg["protectedNames"]]:
         PluginInstance._serverData.interface.ClientKick(client.GetId()) # indicate plugin start success
 
