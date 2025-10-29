@@ -622,18 +622,19 @@ class BankingPlugin:
             # Find all players on the specified team
             affected_players = []
             for client in self.server_data.API.GetAllClients():
-                if client.GetTeam() == team_id:
+                if client.GetLastNonSpecTeamId() == team_id:
                     player_id = client.GetId()
                     if player_id in self.account_manager.accounts:
                         affected_players.append((player_id, client.GetName()))
 
-            if not affected_players:
+            if len(affected_players) == 0:
                 self.server_data.interface.SmSay(self.msg_prefix + f"No players found on {team_name} team.")
                 Log.info(f"SMOD {playerName} attempted teamcredits but no players on team {team_id}")
                 return True
 
             # Add credits to each player
             success_count = 0
+            batch_commands = []
             for player_id, player_name in affected_players:
                 try:
                     old_credits = self.get_credits(player_id)
@@ -641,18 +642,24 @@ class BankingPlugin:
                         self.add_credits(player_id, credit_amount)
                         new_credits = self.get_credits(player_id)
                         
-                        # Notify the player
+                        # Prepare notification message for batch execution
                         action_word = "received" if credit_amount > 0 else "lost"
                         abs_amount = abs(credit_amount)
-                        self.SvTell(
-                            player_id,
-                            f"SMOD {action_word} {colors.ColorizeText(str(abs_amount), self.themecolor)} credits to your team. "
+                        message = (
+                            f"{self.msg_prefix}SMOD {action_word} {colors.ColorizeText(str(abs_amount), self.themecolor)} credits to your team. "
                             f"New balance: {colors.ColorizeText(str(new_credits), self.themecolor)} credits."
                         )
+                        batch_commands.append(f"svtell {player_id} {message}")
+                        batch_commands.append("wait 1")
+                        
                         success_count += 1
                         Log.debug(f"Added {credit_amount} credits to {player_name} (ID: {player_id}): {old_credits} -> {new_credits}")
                 except Exception as e:
                     Log.error(f"Failed to add credits to player {player_name} (ID: {player_id}): {e}")
+            
+            # Send all notifications at once using batch execution
+            if batch_commands:
+                self.server_data.interface.BatchExecute('b', batch_commands)
 
             # Announce to server
             action_word = "added" if credit_amount > 0 else "removed"
