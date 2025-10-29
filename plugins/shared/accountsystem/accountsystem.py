@@ -206,6 +206,7 @@ class AccountPlugin:
         self.themecolor = "yellow"
         self.msg_prefix = colors.COLOR_CODES[self.themecolor] + '[Account]^7: '
         self._is_initialized = False
+        self._register_commands()
 
     def get_account_manager(self):
         return self.account_manager
@@ -387,6 +388,30 @@ class AccountPlugin:
                 ("!uid/!id - Get your user ID", self._handle_get_uid),
             }
         }
+        self._smodCommandList = {
+                # ... TODO come up with some of these ...
+        }
+        # Register commands with server
+        newVal = []
+        rCommands = self.server_data.GetServerVar("registeredCommands")
+        if rCommands != None:
+            newVal.extend(rCommands)
+        for cmd in self._command_list[teams.TEAM_GLOBAL]:
+            for i in cmd:
+                if not i.isdecimal():
+                    newVal.append((i, self._command_list[teams.TEAM_GLOBAL][cmd][0]))
+        self.server_data.SetServerVar("registeredCommands", newVal)
+
+        # Register SMOD commands
+        new_smod_commands = []
+        r_smod_commands = self.server_data.GetServerVar("registeredSmodCommands")
+        if r_smod_commands:
+            new_smod_commands.extend(r_smod_commands)
+        
+        for cmd in self._smodCommandList:
+            for alias in cmd:
+                new_smod_commands.append((alias, self._smodCommandList[cmd][0]))
+        self.server_data.SetServerVar("registeredSmodCommands", new_smod_commands)
 
     def _handle_get_uid(self, client, team_id, args):
         pid = client.GetId()
@@ -444,7 +469,6 @@ class AccountPlugin:
 def OnStart() -> bool:
     global account_plugin
     startTime = time()
-    account_plugin._register_commands()
     batchCmds = []
     for client in account_plugin.server_data.API.GetAllClients():
         pid = client.GetId()
