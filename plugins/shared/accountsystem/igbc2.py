@@ -134,6 +134,7 @@ class BankingPlugin:
                 # ... existing commands ...
             ("modifycredits", "modcredits") : ("!modifycredits <playerid> <amount> - modify a player's credits by the specified amount", self._handle_mod_credits),
             ("resetbounties", "rb") : ("!resetbounties - clears the bounty list", self._handle_reset_bounties),
+            ("teamcredits", "tcredits") : ("!teamcredits <team> <amount> - add credits to all players on a team (1=red, 2=blue, 3=spec)", self._handle_team_credits),
         }
         # Register commands with server
         newVal = []
@@ -588,6 +589,90 @@ class BankingPlugin:
         self.server_data.interface.SmSay(self.msg_prefix + f"Admin {playerName}^7 cleared {bounty_count} active bounties.")
 
         Log.info(f"SMOD {playerName} cleared {bounty_count} active bounties")
+        return True
+
+    def _handle_team_credits(self, playerName, smodId, adminIP, cmdArgs):
+        """Handle smod !teamcredits command - add credits to all players on a team"""
+        Log.info(f"SMOD {playerName} (ID: {smodId}, IP: {adminIP}) executing teamcredits command with args: {cmdArgs}")
+
+        if len(cmdArgs) < 3:
+            self.server_data.interface.SmSay(self.msg_prefix + "Usage: !teamcredits <team> <amount> (team: 1=red, 2=blue, 3=spec)")
+            return True
+
+        try:
+            # Parse arguments
+            team_id = int(cmdArgs[1])
+            credit_amount = int(cmdArgs[2])
+
+            # Validate team ID
+            if team_id not in [teams.TEAM_EVIL, teams.TEAM_GOOD, teams.TEAM_SPEC]:
+                self.server_data.interface.SmSay(self.msg_prefix + f"Invalid team ID. Use 1=red, 2=blue, 3=spec")
+                return True
+
+            # Get team name for display
+            team_names = {
+                teams.TEAM_EVIL: "Red",
+                teams.TEAM_GOOD: "Blue",
+                teams.TEAM_SPEC: "Spectator"
+            }
+            team_name = team_names.get(team_id, "Unknown")
+
+            Log.debug(f"Parsed teamcredits args - Team: {team_id} ({team_name}), Amount: {credit_amount}")
+
+            # Find all players on the specified team
+            affected_players = []
+            for client in self.server_data.API.GetAllClients():
+                if client.GetTeam() == team_id:
+                    player_id = client.GetId()
+                    if player_id in self.account_manager.accounts:
+                        affected_players.append((player_id, client.GetName()))
+
+            if not affected_players:
+                self.server_data.interface.SmSay(self.msg_prefix + f"No players found on {team_name} team.")
+                Log.info(f"SMOD {playerName} attempted teamcredits but no players on team {team_id}")
+                return True
+
+            # Add credits to each player
+            success_count = 0
+            for player_id, player_name in affected_players:
+                try:
+                    old_credits = self.get_credits(player_id)
+                    if old_credits is not None:
+                        self.add_credits(player_id, credit_amount)
+                        new_credits = self.get_credits(player_id)
+                        
+                        # Notify the player
+                        action_word = "received" if credit_amount > 0 else "lost"
+                        abs_amount = abs(credit_amount)
+                        self.SvTell(
+                            player_id,
+                            f"SMOD {action_word} {colors.ColorizeText(str(abs_amount), self.themecolor)} credits to your team. "
+                            f"New balance: {colors.ColorizeText(str(new_credits), self.themecolor)} credits."
+                        )
+                        success_count += 1
+                        Log.debug(f"Added {credit_amount} credits to {player_name} (ID: {player_id}): {old_credits} -> {new_credits}")
+                except Exception as e:
+                    Log.error(f"Failed to add credits to player {player_name} (ID: {player_id}): {e}")
+
+            # Announce to server
+            action_word = "added" if credit_amount > 0 else "removed"
+            abs_amount = abs(credit_amount)
+            self.server_data.interface.SmSay(
+                self.msg_prefix +
+                f"Admin {playerName}^7 {action_word} {colors.ColorizeText(str(abs_amount), self.themecolor)} credits "
+                f"{'to' if action_word == 'added' else 'from'} all players on {colors.ColorizeText(team_name, self.themecolor)} team. "
+                f"({success_count} players affected)"
+            )
+
+            Log.info(f"SMOD {playerName} {action_word} {credit_amount} credits to {success_count} players on team {team_id} ({team_name})")
+
+        except ValueError as e:
+            Log.error(f"SMOD {playerName} provided invalid arguments for teamcredits: {cmdArgs} - ValueError: {e}")
+            self.server_data.interface.SmSay(self.msg_prefix + "Invalid team ID or credit amount. Both must be numbers.")
+        except Exception as e:
+            Log.error(f"Error in teamcredits command by SMOD {playerName}: {str(e)}")
+            self.server_data.interface.SmSay(self.msg_prefix + f"Error adding team credits: {str(e)}")
+
         return True
 
     def initialize_banking_table(self):
