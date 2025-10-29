@@ -684,7 +684,8 @@ class BankingPlugin:
         return self.accountsystem_xprts.Get("GetAccountByPlayerID").pointer(player_id)
 
     def get_credits_by_pid(self, player_id : int):
-        return self.get_account_data_val_by_pid(player_id, 'credits')
+        creds = self.get_credits(player_id)
+        return creds
 
     def get_credits_by_uid(self, user_id : int):
         return self.get_account_data_val_by_uid(user_id, "credits")

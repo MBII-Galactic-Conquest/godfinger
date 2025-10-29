@@ -1,6 +1,8 @@
+import logging
 import lib.shared.teams as teams;
 import threading;
 
+log = logging.getLogger(__name__)
 
 class Client(object):
     def __init__(self, id : int, name : str, address : str):
@@ -61,7 +63,7 @@ class Client(object):
                 # logMessage(f"Client {self} has changed their name to {value}")
                 self._name = value
             if key == "t" and (teams.TranslateTeam(int(self._teamId)) != teams.TranslateTeam(int(value)) or self._teamId == None):
-                if teams.TranslateTeam(int(value)) != "s":     # ignore spectator since the game switches your team to spectator at the beginning of each round, messing with voting.
-                    self._teamId = int(value)
-                    # logMessage(f"Client {self} has joined team {self._teamId}")
+                # if teams.TranslateTeam(int(value)) != "s":     # ignore spectator since the game switches your team to spectator at the beginning of each round, messing with voting.
+                self._teamId = int(value)
+                log.info(f"Client {self} has joined team {self._teamId}")
             self._userinfo[key] = value

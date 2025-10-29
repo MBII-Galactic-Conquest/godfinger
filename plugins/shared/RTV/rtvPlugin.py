@@ -427,16 +427,6 @@ class RTVVote(object):
                 countMax = len(self._playerVotes[i])
             elif len(self._playerVotes[i]) == countMax:
                 winners.append(i)
-        
-        # Handle second turn voting if enabled
-        if PluginInstance._config.cfg[voteType]["secondTurnVoting"] == True and \
-           len(winners) == 1 and \
-           len(self._playerVotes[winners[0]]) <= (self.GetVoterCount() // 2):
-            sortedByVote = list(self._playerVotes)
-            sortedByVote.sort(key = lambda a : len(self._playerVotes[a]))
-            sortedByVote.reverse()  # list is initially sorted with lowest values first
-            winners.append(sortedByVote[1])
-        
         return [self._voteOptions[x - 1] for x in winners] if countMax > 0 else []
 
     def GetVoterCount(self):
@@ -585,88 +575,177 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         voteType = "rtm" if type(self._currentVote) == RTMVote else "rtv"
         
-        # Clean up vote tracking
+        self._CleanupVoteTracking(votesInProgress)
+        
+        if not self._CheckVoteParticipationThreshold(voteType):
+            return None
+        
+        winners = self._DetermineWinners(voteType)
+        
+        if len(winners) == 1:
+            self._HandleSingleWinner(winners[0], voteType)
+        elif len(winners) > 1:
+            self._HandleTiebreaker(winners, voteType)
+        else:
+            self._HandleNoVotes(voteType)
+
+    def _CleanupVoteTracking(self, votesInProgress):
+        """Clean up vote tracking state"""
         if votesInProgress == None:
             self._serverData.SetServerVar("votesInProgress", [])
         elif "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
+
+    def _CheckVoteParticipationThreshold(self, voteType: str) -> bool:
+        """Check if minimum vote participation threshold was met"""
+        if not self._config.cfg[voteType]["minimumVoteRatio"]["enabled"]:
+            return True
         
-        # Check vote participation threshold
-        if self._config.cfg[voteType]["minimumVoteRatio"]["enabled"] and \
-           len(self._serverData.API.GetAllClients()) > 0 and \
-           (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < \
-           self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]:
-            self.SvSay(f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVoteRatio']['ratio'] * 100} percent)")
+        totalClients = len(self._serverData.API.GetAllClients())
+        if totalClients == 0:
+            return True
+        
+        participationRatio = self._currentVote.GetVoterCount() / totalClients
+        requiredRatio = self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]
+        
+        if participationRatio < requiredRatio:
+            self.SvSay(f"Vote participation threshold was not met! (Needed {requiredRatio * 100} percent)")
             self._currentVote = None
-            # Set appropriate cooldown
-            if type(self._currentVote) == RTMVote:
-                self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
-            else:
-                self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
-            return None
+            self._SetFailureCooldown(voteType)
+            return False
         
-        # Determine winner(s)
+        return True
+
+    def _DetermineWinners(self, voteType: str) -> list:
+        """Determine vote winner(s) with tie resolution"""
         winners = self._currentVote.GetWinners()
         
-        # Apply map priority system for RTV votes
-        if voteType == "rtv" and not self._config.cfg["rtv"]["automaticMaps"] and \
-           self._config.cfg["rtv"]["mapTypePriority"]["enabled"]:
-            priorityMap = {
-                MapPriorityType.MAPTYPE_NOCHANGE : self._config.cfg["rtv"]["mapTypePriority"]["nochange"],
-                MapPriorityType.MAPTYPE_PRIMARY : self._config.cfg["rtv"]["mapTypePriority"]["primary"],
-                MapPriorityType.MAPTYPE_SECONDARY : self._config.cfg["rtv"]["mapTypePriority"]["secondary"],
-            }
-            maxPrio = max(winners, key=lambda a : priorityMap[a.GetPriority()]).GetPriority()
-            winners = [winner for winner in winners if priorityMap[winner.GetPriority()] == priorityMap[maxPrio]]
+        if self._ShouldTriggerSecondTurnVoting(voteType, winners):
+            winners = self._AddSecondPlaceToWinners(winners)
         
-        # Handle vote results
-        if len(winners) == 1:
-            winner = winners[0]
-            if winner.GetMapName() != "Don't Change":
-                if type(self._currentVote) == RTMVote:
-                    # Handle RTM result
-                    if self._config.cfg["rtm"]["changeImmediately"] == True:
-                        self._SwitchRTM(winner)
-                    else:
-                        self._rtmToSwitch = winner
-                        self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
-                    self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
-                else:
-                    # Handle RTV result
-                    t = Timeout()
-                    t.Set(self._config.cfg["rtv"]["disableRecentlyPlayedMaps"])
-                    self._rtvRecentMaps.append((winner.GetMapName(), t))
-                    if self._config.cfg["rtv"]["changeImmediately"] == True:
-                        self._SwitchRTV(winner)
-                    else:
-                        self._rtvToSwitch = winner
-                        self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
-                    self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
-            else:
-                # Handle "Don't Change" result
-                if type(self._currentVote) == RTMVote:
-                    self.SvSay(f"Voted to not change mode.")
-                    self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
-                else:
-                    self.SvSay(f"Voted to not change map.")
-                    self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
-            self._currentVote = None
-        elif len(winners) > 1:
-            # Handle tie - start tiebreaker vote
-            voteOptions = [winner for winner in winners]
-            if type(self._currentVote) == RTMVote:
-                self._StartRTMVote(voteOptions)
-            else:
-                self._StartRTVVote(voteOptions)
-        elif len(winners) == 0:
-            # Handle no votes cast
-            self.SvSay("Vote ended with no voters, keeping everything the same!")
-            if type(self._currentVote) == RTMVote:
-                self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
-            else:
-                self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
-            self._currentVote = None
+        if self._ShouldApplyMapPriority(voteType, winners):
+            winners = self._ApplyMapPriorityFiltering(winners)
+        
+        return winners
+
+    def _ShouldTriggerSecondTurnVoting(self, voteType: str, winners: list) -> bool:
+        """Check if second turn voting should be triggered"""
+        if not self._config.cfg[voteType]["secondTurnVoting"]:
+            return False
+        
+        if len(winners) != 1:
+            return False
+        
+        winnerVotes = len(self._currentVote._playerVotes[self._currentVote.GetOptions().index(winners[0]) + 1])
+        totalVotes = self._currentVote.GetVoterCount()
+        
+        return winnerVotes < (totalVotes // 2)
+
+    def _AddSecondPlaceToWinners(self, winners: list) -> list:
+        """Add second place option to winners for runoff vote"""
+        sortedByVote = list(self._currentVote._playerVotes)
+        sortedByVote.sort(key=lambda a: len(self._currentVote._playerVotes[a]), reverse=True)
+        
+        if len(sortedByVote) > 1:
+            secondPlaceOption = self._currentVote.GetOptions()[sortedByVote[1] - 1]
+            secondPlaceVotes = len(self._currentVote._playerVotes[sortedByVote[1]])
+            
+            if secondPlaceOption not in winners and secondPlaceVotes > 0:
+                winners.append(secondPlaceOption)
+        
+        return winners
+
+    def _ShouldApplyMapPriority(self, voteType: str, winners: list) -> bool:
+        """Check if map priority system should be applied"""
+        return (voteType == "rtv" and 
+                not self._config.cfg["rtv"]["automaticMaps"] and
+                self._config.cfg["rtv"]["mapTypePriority"]["enabled"] and 
+                len(winners) > 1)
+
+    def _ApplyMapPriorityFiltering(self, winners: list) -> list:
+        """Filter winners based on map priority system"""
+        priorityMap = {
+            MapPriorityType.MAPTYPE_NOCHANGE: self._config.cfg["rtv"]["mapTypePriority"]["nochange"],
+            MapPriorityType.MAPTYPE_PRIMARY: self._config.cfg["rtv"]["mapTypePriority"]["primary"],
+            MapPriorityType.MAPTYPE_SECONDARY: self._config.cfg["rtv"]["mapTypePriority"]["secondary"],
+        }
+        
+        maxPriority = max(winners, key=lambda a: priorityMap[a.GetPriority()]).GetPriority()
+        maxPriorityValue = priorityMap[maxPriority]
+        
+        winnersWithMaxPriority = [w for w in winners if priorityMap[w.GetPriority()] == maxPriorityValue]
+        
+        maxVotes = max(len(self._currentVote._playerVotes[winners.index(w) + 1]) for w in winnersWithMaxPriority)
+        
+        return [w for w in winnersWithMaxPriority if len(self._currentVote._playerVotes[winners.index(w) + 1]) == maxVotes]
+
+    def _HandleSingleWinner(self, winner, voteType: str):
+        """Handle vote with single winner"""
+        if winner.GetMapName() == "Don't Change":
+            self._HandleDontChange(voteType)
+        else:
+            self._HandleWinnerChange(winner, voteType)
+        
+        self._currentVote = None
+
+    def _HandleDontChange(self, voteType: str):
+        """Handle 'Don't Change' vote result"""
+        changeType = "mode" if voteType == "rtm" else "map"
+        self.SvSay(f"Voted to not change {changeType}.")
+        self._SetSuccessCooldown(voteType)
+
+    def _HandleWinnerChange(self, winner, voteType: str):
+        """Handle vote winner that requires change"""
+        if voteType == "rtm":
+            self._HandleRTMWinner(winner)
+        else:
+            self._HandleRTVWinner(winner)
+        
+        self._SetSuccessCooldown(voteType)
+
+    def _HandleRTMWinner(self, winner):
+        """Handle RTM vote winner"""
+        if self._config.cfg["rtm"]["changeImmediately"]:
+            self._SwitchRTM(winner)
+        else:
+            self._rtmToSwitch = winner
+            self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
+
+    def _HandleRTVWinner(self, winner):
+        """Handle RTV vote winner"""
+        if self._config.cfg["rtv"]["changeImmediately"]:
+            self._SwitchRTV(winner)
+        else:
+            self._rtvToSwitch = winner
+            self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
+
+    def _HandleTiebreaker(self, winners: list, voteType: str):
+        """Handle tie - start tiebreaker vote"""
+        if voteType == "rtm":
+            self._StartRTMVote(winners)
+        else:
+            self._StartRTVVote(winners)
+
+    def _HandleNoVotes(self, voteType: str):
+        """Handle vote with no participants"""
+        self.SvSay("Vote ended with no voters, keeping everything the same!")
+        self._SetFailureCooldown(voteType)
+        self._currentVote = None
+
+    def _SetSuccessCooldown(self, voteType: str):
+        """Set cooldown after successful vote"""
+        if voteType == "rtm":
+            self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
+        else:
+            self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
+
+    def _SetFailureCooldown(self, voteType: str):
+        """Set cooldown after failed vote"""
+        if voteType == "rtm":
+            self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
+        else:
+            self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
 
     def _SwitchRTM(self, winner : Map, doSleep=True):
         """Switch game mode to winner of RTM vote"""
@@ -1152,6 +1231,11 @@ class RTV(object):
         if votesInProgress != None and "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
+        # Add old map to recently played list when transitioning
+        if oldMapName and oldMapName != mapName:
+            t = Timeout()
+            t.Set(self._config.cfg["rtv"]["disableRecentlyPlayedMaps"])
+            self._rtvRecentMaps.append((oldMapName, t))
         # Update current map
         if mapName != self._mapName:
             self._mapName = mapName
@@ -1165,7 +1249,7 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-            self.SvSay("Smod forced RTV vote")
+            self.SvSay(f"Smod {colors.ColorizeText(str(smodId), self._themeColor)} forced RTV vote")
             self._StartRTVVote()
         return True
 
@@ -1175,7 +1259,7 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-            self.SvSay("Smod forced RTM vote")
+            self.SvSay(f"Smod {colors.ColorizeText(str(smodId), self._themeColor)} forced RTM vote")
             self._StartRTMVote()
         return True
 
@@ -1186,7 +1270,7 @@ class RTV(object):
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._config.cfg["rtv"]["enabled"] and self._rtvCooldown.IsSet():
-                self.SvSay("SMOD reset the cooldown for RTV!")
+                self.SvSay(f"SMOD {colors.ColorizeText(str(smodId), self._themeColor)} reset the cooldown for RTV!")
                 self._rtvCooldown.Finish()
             elif not self._config.cfg["rtv"]["enabled"]:
                 self._serverData.interface.SmSay(self._messagePrefix + "RTV is not enabled.")
@@ -1201,7 +1285,7 @@ class RTV(object):
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._config.cfg["rtm"]["enabled"] and self._rtmCooldown.IsSet():
-                self.SvSay("SMOD reset the cooldown for RTM!")
+                self.SvSay(f"SMOD {colors.ColorizeText(str(smodId), self._themeColor)} reset the cooldown for RTM!")
                 self._rtmCooldown.Finish()
             elif not self._config.cfg["rtm"]["enabled"]:
                 self._serverData.interface.SmSay(self._messagePrefix + "RTM is not enabled.")
@@ -1276,7 +1360,7 @@ def OnStart():
 
 def kickClientIfProtectedName(client : client.Client):
     nameStripped = colors.StripColorCodes(client.GetName().lower())
-    nameStripped = re.sub(r":|-|\.|,|;|=|\/|\\|\||`|~|\"|\'|[|]|(|)|_", "", nameStripped)
+    nameStripped = re.sub(r":|-|\.|,|;|=|\/|\\|\||`|~|\"|'|[|]|(|)|_", "", nameStripped)
     if nameStripped in [x.lower() for x in PluginInstance._config.cfg["protectedNames"]]:
         PluginInstance._serverData.interface.ClientKick(client.GetId()) # indicate plugin start success
 
