@@ -42,7 +42,8 @@ CONFIG_FALLBACK = \
         "modifycredits": [],
         "resetbounties": [],
         "teamcredits": []
-    }
+    },
+    "roundStartCredits": 0
 }
 """
 
@@ -899,6 +900,59 @@ class BankingPlugin:
                 )
         return False
 
+    def _on_init_game(self, event: Event):
+        """Handle init game event - distribute round start credits"""
+        round_start_credits = self.config.cfg.get("roundStartCredits", 0)
+        
+        # If disabled or 0, do nothing
+        if round_start_credits <= 0:
+            return False
+        
+        Log.info(f"Distributing {round_start_credits} round start credits to active players")
+        
+        # Find all players who have a last non-spec team (were playing)
+        eligible_players = []
+        for client in self.server_data.API.GetAllClients():
+            last_team = client.GetLastNonSpecTeamId()
+            if last_team is not None:
+                player_id = client.GetId()
+                if player_id in self.account_manager.accounts:
+                    eligible_players.append((player_id, client.GetName()))
+        
+        if len(eligible_players) == 0:
+            Log.debug("No eligible players for round start credits")
+            return False
+        
+        # Add credits to each eligible player
+        success_count = 0
+        batch_commands = []
+        for player_id, player_name in eligible_players:
+            try:
+                old_credits = self.get_credits(player_id)
+                if old_credits is not None:
+                    self.add_credits(player_id, round_start_credits)
+                    new_credits = self.get_credits(player_id)
+                    
+                    # Prepare notification message for batch execution
+                    message = (
+                        f"{self.msg_prefix}Round start bonus: {colors.ColorizeText(str(round_start_credits), self.themecolor)} credits! "
+                        f"Balance: {colors.ColorizeText(str(new_credits), self.themecolor)} credits."
+                    )
+                    batch_commands.append(f"svtell {player_id} {message}")
+                    batch_commands.append("wait 1")
+                    
+                    success_count += 1
+                    Log.debug(f"Added {round_start_credits} round start credits to {player_name} (ID: {player_id}): {old_credits} -> {new_credits}")
+            except Exception as e:
+                Log.error(f"Failed to add round start credits to player {player_name} (ID: {player_id}): {e}")
+        
+        # Send all notifications at once using batch execution
+        if batch_commands:
+            self.server_data.interface.BatchExecute('b', batch_commands)
+        
+        Log.info(f"Distributed round start credits to {success_count} players")
+        return False
+
     def _on_smsay(self, event : Event):
         playerName = event.playerName
         smodID = event.smodID
@@ -998,6 +1052,8 @@ def OnEvent(event: Event) -> bool:
         banking_plugin._on_smsay(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
         banking_plugin._on_kill(event)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
+        banking_plugin._on_init_game(event)
     return False
 
 
