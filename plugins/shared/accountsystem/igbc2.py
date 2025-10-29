@@ -37,6 +37,11 @@ CONFIG_FALLBACK = \
         "kill": 10,
         "suicide": -5,
         "teamkill": -20
+    },
+    "smodPerms": {
+        "modifycredits": [],
+        "resetbounties": [],
+        "teamcredits": []
     }
 }
 """
@@ -156,6 +161,25 @@ class BankingPlugin:
         """Check if player has any pending actions"""
         return (player_id in self.pending_payments or
                 player_id in self.pending_bounties)
+
+    def check_smod_permission(self, command_name: str, smod_id: int) -> bool:
+        """Check if an smod has permission to execute a command"""
+        # Get smodPerms from config, default to empty dict if not present
+        smod_perms = self.config.cfg.get("smodPerms", {})
+        
+        # If command not in config, allow all smods (backward compatibility)
+        if command_name not in smod_perms:
+            return True
+        
+        # Get allowed smod IDs for this command
+        allowed_ids = smod_perms[command_name]
+        
+        # Empty list means all smods are allowed
+        if not allowed_ids:
+            return False
+        
+        # Check if this smod ID is in the allowed list
+        return smod_id in allowed_ids
 
     def _handle_pay(self, player: Player, team_id: int, args: list[str]) -> bool:
         """Handle !pay command"""
@@ -794,6 +818,18 @@ class BankingPlugin:
             command = command[len("!"):]
         for c in self._smodCommandList:
             if command in c:
+                # Get the primary command name (first in the tuple)
+                primary_command = c[0]
+                
+                # Check if smod has permission to execute this command
+                if not self.check_smod_permission(primary_command, smodID):
+                    self.server_data.interface.SmSay(
+                        self.msg_prefix + 
+                        f"Access denied. SMOD ID {smodID} does not have permission to use !{primary_command}"
+                    )
+                    Log.warning(f"SMOD {playerName} (ID: {smodID}) attempted to use !{primary_command} without permission")
+                    return True
+                
                 return self._smodCommandList[c][1](playerName, smodID, adminIP, cmdArgs)
         return False
 
