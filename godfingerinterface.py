@@ -154,8 +154,20 @@ class AServerInterface(IServerInterface):
         return True
 
     def Close(self):
-        if self._isOpened:
+        if self.IsOpened():
+            if self._ptyInstance != None:
+                self._Quit()
+                time.sleep(1)
+                self._ptyInstance.close()
+            if self._ptyThreadInput.is_alive:
+                with self._ptyThreadInputLock:
+                    self._ptyThreadInputControl.stop = True
+
+            # FIX: Add a timeout to prevent indefinite blocking during shutdown
+            self._ptyThreadInput.join(timeout=2.0)
+
             self._isOpened = False
+        super().Close()
     
     def IsOpened(self) -> bool:
         return self._isOpened
@@ -383,8 +395,9 @@ class RconInterface(AServerInterface):
                                 if len(line) > 0:
                                     line = line[7:]
                                     self._workingMessageQueue.put(logMessage.LogMessage(line))
-                    else:
-                        time.sleep(sleepTime)
+
+                    # FIX: Unconditional sleep to yield CPU, even if log data was read.
+                    time.sleep(sleepTime)
                 else:
                     break
             log.close()
@@ -928,6 +941,7 @@ class PtyInterface(AServerInterface):
 
     def _ThreadHandlePtyInput(self, control, frameTime):
         input = ""
+        MIN_SLEEP_S = 0.005 # Force a 5ms yield time to prevent 100% CPU spin
         while True:
             timeStart = time.time()
             with self._ptyThreadInputLock:
@@ -940,7 +954,7 @@ class PtyInterface(AServerInterface):
                     if self._currentCommandProc == None:
                         if not self._commandProcQueue.empty():
                             self._currentCommandProc = self._commandProcQueue.get()
-                    
+
                     inputLines = input.splitlines()
                     if len(inputLines) > 0:
                         lastLine = inputLines[-1]
@@ -969,10 +983,14 @@ class PtyInterface(AServerInterface):
                                             self._mode = PtyInterface.MODE_COMMAND
                                         continue
                                 self._workingMessageQueue.put(logMessage.LogMessage(line))
+
                     toSleep = frameTime - (time.time() - timeStart)
-                    if toSleep < 0:
-                        toSleep = 0
-                    time.sleep(toSleep)
+
+                    # FIX: Enforce minimum sleep
+                    if toSleep < MIN_SLEEP_S:
+                        time.sleep(MIN_SLEEP_S)
+                    else:
+                        time.sleep(toSleep)
                 else:
                     Log.info("MBII PTY closed.")
                     self._ptyInstance.close()
@@ -1010,17 +1028,18 @@ class PtyInterface(AServerInterface):
 
     def Close(self):
         if self.IsOpened():
-            if self._ptyInstance != None:
-                self._Quit()
-                time.sleep(1)
-                self._ptyInstance.close()
-            if self._ptyThreadInput.is_alive:
-                with self._ptyThreadInputLock:
-                    self._ptyThreadInputControl.stop = True
-            self._ptyThreadInput.join()
-            self._isOpened = False
-        super().Close()
-    
+            with self._logReaderLock:
+                self._logReaderThreadControl.stop = True
+
+            # FIX: Add a timeout (e.g., 2.0s) to prevent indefinite blocking during shutdown
+            self._logReaderThread.join(timeout=2.0)
+
+            self._rcon.Close()
+            self._messageQueueSwap.queue.clear()
+            self._workingMessageQueue.queue.clear()
+            self._watchdog.Stop()
+            super().Close()
+
     def IsOpened(self) -> bool:
         return self._isOpened and not self._ptyInstance.closed
 
