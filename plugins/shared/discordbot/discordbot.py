@@ -136,7 +136,7 @@ def start_discord_bot_thread():
         loop.close()
 
 def stop_bot_thread():
-    global bot_thread
+    global bot_thread, log_watcher_task
     if bot_thread and bot_thread.is_alive():
         Log.info("Signaling Discord bot thread to shut down...")
         shutdown_event.set()  # Signal the log watcher to stop
