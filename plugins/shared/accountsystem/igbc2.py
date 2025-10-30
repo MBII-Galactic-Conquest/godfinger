@@ -37,6 +37,17 @@ CONFIG_FALLBACK = \
         "kill": 10,
         "suicide": -5,
         "teamkill": -20
+    },
+    "smodPerms": {
+        "modifycredits": [],
+        "resetbounties": [],
+        "teamcredits": []
+    },
+    "roundStartCredits": {
+        "enabled": false,
+        "minCredits": 10,
+        "maxCredits": 50,
+        "maxRounds": 5
     }
 }
 """
@@ -102,6 +113,7 @@ class BankingPlugin:
         self.pending_payments = {}  # sender_id: Payment
         self.pending_bounties = {}  # issuer_id: Bounty
         self.active_bounties = {}  # target_id: Bounty
+        self.player_rounds = {}  # player_id: rounds_played
         self._register_commands()
         # self.initialize_banking_table()
 
@@ -129,6 +141,7 @@ class BankingPlugin:
                 # ... existing commands ...
             ("modifycredits", "modcredits") : ("!modifycredits <playerid> <amount> - modify a player's credits by the specified amount", self._handle_mod_credits),
             ("resetbounties", "rb") : ("!resetbounties - clears the bounty list", self._handle_reset_bounties),
+            ("teamcredits", "tcredits") : ("!teamcredits <team> <amount> - add credits to all players on a team (1=red, 2=blue, 3=spec)", self._handle_team_credits),
         }
         # Register commands with server
         newVal = []
@@ -156,6 +169,25 @@ class BankingPlugin:
         """Check if player has any pending actions"""
         return (player_id in self.pending_payments or
                 player_id in self.pending_bounties)
+
+    def check_smod_permission(self, command_name: str, smod_id: int) -> bool:
+        """Check if an smod has permission to execute a command"""
+        # Get smodPerms from config, default to empty dict if not present
+        smod_perms = self.config.cfg.get("smodPerms", {})
+        
+        # If command not in config, allow all smods (backward compatibility)
+        if command_name not in smod_perms:
+            return True
+        
+        # Get allowed smod IDs for this command
+        allowed_ids = smod_perms[command_name]
+        
+        # Empty list means all smods are allowed
+        if not allowed_ids:
+            return False
+        
+        # Check if this smod ID is in the allowed list
+        return smod_id in allowed_ids
 
     def _handle_pay(self, player: Player, team_id: int, args: list[str]) -> bool:
         """Handle !pay command"""
@@ -318,19 +350,19 @@ class BankingPlugin:
         target_team = target.GetTeamId()
 
         # Only allow bounties between opposing teams (TEAM_GOOD vs TEAM_EVIL)
-        if (player_team == target_team and
-            teams.IsRealTeam(player_team) and teams.IsRealTeam(target_team)):
-            self.SvTell(player.GetId(), "You cannot place bounties on teammates!")
-            return True
+        # if (player_team == target_team and
+        #     teams.IsRealTeam(player_team) and teams.IsRealTeam(target_team)):
+        #     self.SvTell(player.GetId(), "You cannot place bounties on teammates!")
+        #     return True
 
         # Also prevent bounties on spectators or from spectators
-        if player_team == teams.TEAM_SPEC:
-            self.SvTell(player.GetId(), "Spectators cannot place bounties!")
-            return True
+        # if player_team == teams.TEAM_SPEC:
+        #     self.SvTell(player.GetId(), "Spectators cannot place bounties!")
+        #     return True
 
-        if target_team == teams.TEAM_SPEC:
-            self.SvTell(player.GetId(), "You cannot place bounties on spectators!")
-            return True
+        # if target_team == teams.TEAM_SPEC:
+        #     self.SvTell(player.GetId(), "You cannot place bounties on spectators!")
+        #     return True
 
         player_account = self.get_account_by_pid(player.GetId())
         target_account = self.get_account_by_pid(target_id)
@@ -566,6 +598,97 @@ class BankingPlugin:
         Log.info(f"SMOD {playerName} cleared {bounty_count} active bounties")
         return True
 
+    def _handle_team_credits(self, playerName, smodId, adminIP, cmdArgs):
+        """Handle smod !teamcredits command - add credits to all players on a team"""
+        Log.info(f"SMOD {playerName} (ID: {smodId}, IP: {adminIP}) executing teamcredits command with args: {cmdArgs}")
+
+        if len(cmdArgs) < 3:
+            self.server_data.interface.SmSay(self.msg_prefix + "Usage: !teamcredits <team> <amount> (team: 1=red, 2=blue, 3=spec)")
+            return True
+
+        try:
+            # Parse arguments
+            team_id = int(cmdArgs[1])
+            credit_amount = int(cmdArgs[2])
+
+            # Validate team ID
+            if team_id not in [teams.TEAM_EVIL, teams.TEAM_GOOD, teams.TEAM_SPEC]:
+                self.server_data.interface.SmSay(self.msg_prefix + f"Invalid team ID. Use 1=red, 2=blue, 3=spec")
+                return True
+
+            # Get team name for display
+            team_names = {
+                teams.TEAM_EVIL: "Red",
+                teams.TEAM_GOOD: "Blue",
+                teams.TEAM_SPEC: "Spectator"
+            }
+            team_name = team_names.get(team_id, "Unknown")
+
+            Log.debug(f"Parsed teamcredits args - Team: {team_id} ({team_name}), Amount: {credit_amount}")
+
+            # Find all players on the specified team
+            affected_players = []
+            for client in self.server_data.API.GetAllClients():
+                if client.GetLastNonSpecTeamId() == team_id:
+                    player_id = client.GetId()
+                    if player_id in self.account_manager.accounts:
+                        affected_players.append((player_id, client.GetName()))
+
+            if len(affected_players) == 0:
+                self.server_data.interface.SmSay(self.msg_prefix + f"No players found on {team_name} team.")
+                Log.info(f"SMOD {playerName} attempted teamcredits but no players on team {team_id}")
+                return True
+
+            # Add credits to each player
+            success_count = 0
+            batch_commands = []
+            for player_id, player_name in affected_players:
+                try:
+                    old_credits = self.get_credits(player_id)
+                    if old_credits is not None:
+                        self.add_credits(player_id, credit_amount)
+                        new_credits = self.get_credits(player_id)
+                        
+                        # Prepare notification message for batch execution
+                        action_word = "received" if credit_amount > 0 else "lost"
+                        abs_amount = abs(credit_amount)
+                        message = (
+                            f"{self.msg_prefix}SMOD {action_word} {colors.ColorizeText(str(abs_amount), self.themecolor)} credits to your team. "
+                            f"New balance: {colors.ColorizeText(str(new_credits), self.themecolor)} credits."
+                        )
+                        batch_commands.append(f"svtell {player_id} {message}")
+                        batch_commands.append("wait 1")
+                        
+                        success_count += 1
+                        Log.debug(f"Added {credit_amount} credits to {player_name} (ID: {player_id}): {old_credits} -> {new_credits}")
+                except Exception as e:
+                    Log.error(f"Failed to add credits to player {player_name} (ID: {player_id}): {e}")
+            
+            # Send all notifications at once using batch execution
+            if batch_commands:
+                self.server_data.interface.BatchExecute('b', batch_commands)
+
+            # Announce to server
+            action_word = "added" if credit_amount > 0 else "removed"
+            abs_amount = abs(credit_amount)
+            self.server_data.interface.SmSay(
+                self.msg_prefix +
+                f"Admin {playerName}^7 {action_word} {colors.ColorizeText(str(abs_amount), self.themecolor)} credits "
+                f"{'to' if action_word == 'added' else 'from'} all players on {colors.ColorizeText(team_name, self.themecolor)} team. "
+                f"({success_count} players affected)"
+            )
+
+            Log.info(f"SMOD {playerName} {action_word} {credit_amount} credits to {success_count} players on team {team_id} ({team_name})")
+
+        except ValueError as e:
+            Log.error(f"SMOD {playerName} provided invalid arguments for teamcredits: {cmdArgs} - ValueError: {e}")
+            self.server_data.interface.SmSay(self.msg_prefix + "Invalid team ID or credit amount. Both must be numbers.")
+        except Exception as e:
+            Log.error(f"Error in teamcredits command by SMOD {playerName}: {str(e)}")
+            self.server_data.interface.SmSay(self.msg_prefix + f"Error adding team credits: {str(e)}")
+
+        return True
+
     def initialize_banking_table(self):
         """
         Creates the banking table in the SQLite database if it doesn't exist.
@@ -711,6 +834,8 @@ class BankingPlugin:
         """Load player's credits on connect using user_id"""
         pid = event.client.GetId()
         self.get_credits(pid)  # Load into cache
+        # Initialize rounds counter for this player
+        self.player_rounds[pid] = 0
         return False
 
     def _on_client_disconnect(self,
@@ -745,6 +870,10 @@ class BankingPlugin:
             if bounty.issuer_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
                 self.SvTell(bounty.issuer_account.player_id, f"Bounty on {bounty.target_account.player_name}^7 canceled - target disconnected.")
 
+        # Clean up rounds tracking
+        if pid in self.player_rounds:
+            del self.player_rounds[pid]
+
         return False
 
     def _on_kill(self, event: Event):
@@ -759,14 +888,16 @@ class BankingPlugin:
         killer_account = self.get_account_by_pid(killer_id)
         if killer_account:
             killer_user_id = killer_account.user_id
-            if not is_tk:
-                self.check_bounty(victim_id, killer_id)
-                toAdd = self.config.cfg["kill_awards"]["kill"]
-            elif killer_id == victim_id:  # Special case for suicide
+            if killer_id == victim_id:  # Special case for suicide
+                # some suicide methods don't count as tk in the log so make sure it's set
+                is_tk = True    
                 toAdd = self.config.cfg["kill_awards"]["suicide"]
                 victim_name = "yourself"
                 if event.weaponStr == "MOD_WENTSPECTATOR":  # Special case for going spectator
                     return False
+            elif not is_tk:
+                self.check_bounty(victim_id, killer_id)
+                toAdd = self.config.cfg["kill_awards"]["kill"]
             else:
                 toAdd = self.config.cfg["kill_awards"]["teamkill"]
             if toAdd != 0:
@@ -783,6 +914,87 @@ class BankingPlugin:
                 )
         return False
 
+    def _on_init_game(self, event: Event):
+        """Handle init game event - distribute scaled round start credits"""
+        round_start_config = self.config.cfg.get("roundStartCredits", {})
+        
+        # Handle legacy config (integer) or check if disabled
+        if isinstance(round_start_config, int):
+            if round_start_config <= 0:
+                return False
+            # Legacy mode: use fixed amount
+            min_credits = max_credits = round_start_config
+            max_rounds = 1
+            enabled = True
+        else:
+            enabled = round_start_config.get("enabled", False)
+            if not enabled:
+                return False
+            min_credits = round_start_config.get("minCredits", 10)
+            max_credits = round_start_config.get("maxCredits", 50)
+            max_rounds = round_start_config.get("maxRounds", 5)
+        
+        Log.info(f"Distributing scaled round start credits to active players (min: {min_credits}, max: {max_credits}, maxRounds: {max_rounds})")
+        
+        # Find all players who have a last non-spec team (were playing)
+        eligible_players = []
+        for client in self.server_data.API.GetAllClients():
+            last_team = client.GetLastNonSpecTeamId()
+            if last_team is not None:
+                player_id = client.GetId()
+                if player_id in self.account_manager.accounts:
+                    eligible_players.append((player_id, client.GetName()))
+        
+        if len(eligible_players) == 0:
+            Log.debug("No eligible players for round start credits")
+            return False
+        
+        # Add credits to each eligible player with scaling
+        success_count = 0
+        batch_commands = []
+        for player_id, player_name in eligible_players:
+            try:
+                # Increment rounds played for this player
+                if player_id not in self.player_rounds:
+                    self.player_rounds[player_id] = 0
+                self.player_rounds[player_id] += 1
+                
+                rounds_played = self.player_rounds[player_id]
+                
+                # Calculate scaled credits based on rounds played
+                if rounds_played >= max_rounds:
+                    credits_to_award = max_credits
+                else:
+                    # Linear scaling from minCredits to maxCredits
+                    credits_range = max_credits - min_credits
+                    credits_to_award = min_credits + int((credits_range * rounds_played) / max_rounds)
+                
+                old_credits = self.get_credits(player_id)
+                if old_credits is not None:
+                    self.add_credits(player_id, credits_to_award)
+                    new_credits = self.get_credits(player_id)
+                    
+                    # Prepare notification message for batch execution
+                    message = (
+                        f"{self.msg_prefix}Round start bonus: {colors.ColorizeText(str(credits_to_award), self.themecolor)} credits! "
+                        f"(Round {rounds_played}/{max_rounds}) "
+                        f"Balance: {colors.ColorizeText(str(new_credits), self.themecolor)} credits."
+                    )
+                    batch_commands.append(f"svtell {player_id} {message}")
+                    batch_commands.append("wait 1")
+                    
+                    success_count += 1
+                    Log.debug(f"Added {credits_to_award} round start credits to {player_name} (ID: {player_id}, Round {rounds_played}): {old_credits} -> {new_credits}")
+            except Exception as e:
+                Log.error(f"Failed to add round start credits to player {player_name} (ID: {player_id}): {e}")
+        
+        # Send all notifications at once using batch execution
+        if batch_commands:
+            self.server_data.interface.BatchExecute('b', batch_commands)
+        
+        Log.info(f"Distributed round start credits to {success_count} players")
+        return False
+
     def _on_smsay(self, event : Event):
         playerName = event.playerName
         smodID = event.smodID
@@ -794,6 +1006,18 @@ class BankingPlugin:
             command = command[len("!"):]
         for c in self._smodCommandList:
             if command in c:
+                # Get the primary command name (first in the tuple)
+                primary_command = c[0]
+                
+                # Check if smod has permission to execute this command
+                if not self.check_smod_permission(primary_command, smodID):
+                    self.server_data.interface.SmSay(
+                        self.msg_prefix + 
+                        f"Access denied. SMOD ID {smodID} does not have permission to use !{primary_command}"
+                    )
+                    Log.warning(f"SMOD {playerName} (ID: {smodID}) attempted to use !{primary_command} without permission")
+                    return True
+                
                 return self._smodCommandList[c][1](playerName, smodID, adminIP, cmdArgs)
         return False
 
@@ -870,6 +1094,8 @@ def OnEvent(event: Event) -> bool:
         banking_plugin._on_smsay(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_KILL:
         banking_plugin._on_kill(event)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
+        banking_plugin._on_init_game(event)
     return False
 
 

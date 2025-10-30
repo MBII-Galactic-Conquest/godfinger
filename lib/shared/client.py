@@ -14,6 +14,7 @@ class Client(object):
         self._teamId = teams.TEAM_SPEC;
         self._jaguid = "";
         self._userinfo = {};
+        self._lastNonSpecTeamId = None;
     
     def GetId(self) -> int:
         return self._id;
@@ -32,6 +33,9 @@ class Client(object):
 
     def GetInfo(self) -> dict[str, str]:
         return self._userinfo;
+
+    def GetLastNonSpecTeamId(self) -> int:
+        return self._lastNonSpecTeamId;
 
     def __repr__(self):
         s = f"{self._name} (ID : {str(self._id)}) (Name : {self._name}) (TeamId : {self._teamId})";
@@ -66,4 +70,6 @@ class Client(object):
                 # if teams.TranslateTeam(int(value)) != "s":     # ignore spectator since the game switches your team to spectator at the beginning of each round, messing with voting.
                 self._teamId = int(value)
                 log.info(f"Client {self} has joined team {self._teamId}")
+                if self._teamId != teams.TEAM_SPEC:
+                    self._lastNonSpecTeamId = self._teamId
             self._userinfo[key] = value
