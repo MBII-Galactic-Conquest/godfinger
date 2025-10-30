@@ -420,20 +420,20 @@ class MBIIServer:
             sv_fname = self._config.cfg["serverFileName"]
             if not sv_fname in (p.name() for p in psutil.process_iter()):
                 self._status = MBIIServer.STATUS_SERVER_NOT_RUNNING
-                if not Args.debug: 
+                if not Args.debug:
                     Log.error("Server is not running, start the server first, terminating...")
                     return
                 else:
                     Log.debug("Running in debug mode and server is offline, consider server data invalid.")
-            
+
             if not self._cvarManager.Initialize():
                 Log.error("Failed to initialize CvarManager, abort startup.")
                 self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR
                 return
-        
+
             allCvars = self._cvarManager.GetAllCvars()
             Log.debug("All cvars %s" % str(allCvars))
-            
+
             self._FetchStatus()
 
             if not self._pluginManager.Start():
@@ -441,14 +441,41 @@ class MBIIServer:
             self._isRunning = True
             self._status = MBIIServer.STATUS_RUNNING
             self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]))
+
+
+            MIN_SLEEP_S = 0.001
+
+            # --- TEMPORARY DIAGNOSTIC CODE ---
             while self._isRunning:
+            # We are bypassing the main loop and all timing logic to force a sleep.
+            # This must result in near 0% CPU usage if the system is stable.
+                time.sleep(1.0)
+        # --- END TEMPORARY DIAGNOSTIC CODE ---
                 startTime = time.time()
                 self.Loop()
                 elapsed = time.time() - startTime
+
+                # --- DIAGNOSTIC LOGGING ---
+                # This will print the actual time the loop took whenever it exceeds the target.
+                if elapsed > self._logicDelayS:
+                    # Log.warning() is assumed to be defined and available
+                    Log.warning(f"Loop took {elapsed:.4f}s, exceeding target of {self._logicDelayS:.4f}s. No sleep occurred.")
+                # --------------------------
+
+                # Calculate the sleep time using the class property
                 sleepTime = self._logicDelayS - elapsed
-                if sleepTime <= 0:
-                    sleepTime = 0
-                time.sleep(sleepTime)  
+
+                if sleepTime > 0:
+                    # If we have time left, ensure we sleep for at least MIN_SLEEP_S
+                    if sleepTime < MIN_SLEEP_S:
+                        time.sleep(MIN_SLEEP_S)
+                    else:
+                        time.sleep(sleepTime)
+
+                # If sleepTime <= 0, the loop took too long, and we proceed immediately.
+
+            # --- END OF CORRECTED LOGIC LOOP ---
+
         except KeyboardInterrupt:
             s = signal.signal(signal.SIGINT, signal.SIG_IGN)
             Log.info("Interrupt recieved.")
@@ -1038,13 +1065,13 @@ class MBIIServer:
     def OnSmodLogin(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
         Log.debug(f"Smod login event received: {textified}")
-        
+
         data = {
             'smod_name': None,
             'smod_id': None,
             'smod_ip': None
         }
-        
+
         # Parse the login message
         # Expected format: "Successful SMOD login by <name>(adminID: <id>) (IP: <ip>:<port>)"
         if 'adminID:' in textified and 'IP:' in textified:
@@ -1054,22 +1081,22 @@ class MBIIServer:
                 # Extract name - it's between "by " and "(adminID:"
                 name_part = parts[0].replace('Successful SMOD login by ', '').strip()
                 data['smod_name'] = name_part
-                
+
                 # Extract admin ID and IP from the second part
                 remaining = parts[1]
-                
+
                 # Extract admin ID (between start and next ')')
                 id_match = re.search(r'^(\d+)\)', remaining)
                 if id_match:
                     data['smod_id'] = id_match.group(1)
-                
+
                 # Extract IP (between 'IP: ' and ')')
                 ip_match = re.search(r'IP:\s*([^)]+)\)', remaining)
                 if ip_match:
                     # Strip port if present (everything after ':')
                     ip_with_port = ip_match.group(1)
                     data['smod_ip'] = ip_with_port.split(':')[0]
-        
+
         self._pluginManager.Event(godfingerEvent.SmodLoginEvent(data['smod_name'], data['smod_id'], data['smod_ip'], isStartup = logMessage.isStartup))
 
     # API export functions 
