@@ -350,19 +350,19 @@ class BankingPlugin:
         target_team = target.GetTeamId()
 
         # Only allow bounties between opposing teams (TEAM_GOOD vs TEAM_EVIL)
-        if (player_team == target_team and
-            teams.IsRealTeam(player_team) and teams.IsRealTeam(target_team)):
-            self.SvTell(player.GetId(), "You cannot place bounties on teammates!")
-            return True
+        # if (player_team == target_team and
+        #     teams.IsRealTeam(player_team) and teams.IsRealTeam(target_team)):
+        #     self.SvTell(player.GetId(), "You cannot place bounties on teammates!")
+        #     return True
 
         # Also prevent bounties on spectators or from spectators
-        if player_team == teams.TEAM_SPEC:
-            self.SvTell(player.GetId(), "Spectators cannot place bounties!")
-            return True
+        # if player_team == teams.TEAM_SPEC:
+        #     self.SvTell(player.GetId(), "Spectators cannot place bounties!")
+        #     return True
 
-        if target_team == teams.TEAM_SPEC:
-            self.SvTell(player.GetId(), "You cannot place bounties on spectators!")
-            return True
+        # if target_team == teams.TEAM_SPEC:
+        #     self.SvTell(player.GetId(), "You cannot place bounties on spectators!")
+        #     return True
 
         player_account = self.get_account_by_pid(player.GetId())
         target_account = self.get_account_by_pid(target_id)
