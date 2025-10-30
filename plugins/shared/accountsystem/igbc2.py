@@ -888,14 +888,16 @@ class BankingPlugin:
         killer_account = self.get_account_by_pid(killer_id)
         if killer_account:
             killer_user_id = killer_account.user_id
-            if not is_tk:
-                self.check_bounty(victim_id, killer_id)
-                toAdd = self.config.cfg["kill_awards"]["kill"]
-            elif killer_id == victim_id:  # Special case for suicide
+            if killer_id == victim_id:  # Special case for suicide
+                # some suicide methods don't count as tk in the log so make sure it's set
+                is_tk = True    
                 toAdd = self.config.cfg["kill_awards"]["suicide"]
                 victim_name = "yourself"
                 if event.weaponStr == "MOD_WENTSPECTATOR":  # Special case for going spectator
                     return False
+            elif not is_tk:
+                self.check_bounty(victim_id, killer_id)
+                toAdd = self.config.cfg["kill_awards"]["kill"]
             else:
                 toAdd = self.config.cfg["kill_awards"]["teamkill"]
             if toAdd != 0:
