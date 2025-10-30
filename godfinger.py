@@ -557,6 +557,8 @@ class MBIIServer:
                     self.OnSmsay(message)
                 elif lineParse[1] == "command":
                     self.OnSmodCommand(message)
+            elif lineParse[0] == "Successful":
+                self.OnSmodLogin(message)
             elif lineParse[1] == "say:":  # Handle say messages by players (not server)
                 self.OnChatMessage(message)
             elif lineParse[1] == "sayteam:":
@@ -1059,6 +1061,43 @@ class MBIIServer:
                 if id_match:
                     data['target_id'] = id_match.group(1)
         self._pluginManager.Event(godfingerEvent.SmodCommandEvent(data))
+
+    def OnSmodLogin(self, logMessage : logMessage.LogMessage):
+        textified = logMessage.content
+        Log.debug(f"Smod login event received: {textified}")
+
+        data = {
+            'smod_name': None,
+            'smod_id': None,
+            'smod_ip': None
+        }
+
+        # Parse the login message
+        # Expected format: "Successful SMOD login by <name>(adminID: <id>) (IP: <ip>:<port>)"
+        if 'adminID:' in textified and 'IP:' in textified:
+            # Split by '(adminID:' to separate name from the rest
+            parts = textified.split('(adminID:')
+            if len(parts) >= 2:
+                # Extract name - it's between "by " and "(adminID:"
+                name_part = parts[0].replace('Successful SMOD login by ', '').strip()
+                data['smod_name'] = name_part
+
+                # Extract admin ID and IP from the second part
+                remaining = parts[1]
+
+                # Extract admin ID (between start and next ')')
+                id_match = re.search(r'^(\d+)\)', remaining)
+                if id_match:
+                    data['smod_id'] = id_match.group(1)
+
+                # Extract IP (between 'IP: ' and ')')
+                ip_match = re.search(r'IP:\s*([^)]+)\)', remaining)
+                if ip_match:
+                    # Strip port if present (everything after ':')
+                    ip_with_port = ip_match.group(1)
+                    data['smod_ip'] = ip_with_port.split(':')[0]
+
+        self._pluginManager.Event(godfingerEvent.SmodLoginEvent(data['smod_name'], data['smod_id'], data['smod_ip'], isStartup = logMessage.isStartup))
 
     # API export functions 
     def API_GetClientById(self, id):
