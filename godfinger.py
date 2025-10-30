@@ -441,40 +441,14 @@ class MBIIServer:
             self._isRunning = True
             self._status = MBIIServer.STATUS_RUNNING
             self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]))
-
-
-            MIN_SLEEP_S = 0.001
-
-            # --- TEMPORARY DIAGNOSTIC CODE ---
             while self._isRunning:
-            # We are bypassing the main loop and all timing logic to force a sleep.
-            # This must result in near 0% CPU usage if the system is stable.
-                time.sleep(1.0)
-        # --- END TEMPORARY DIAGNOSTIC CODE ---
                 startTime = time.time()
                 self.Loop()
                 elapsed = time.time() - startTime
-
-                # --- DIAGNOSTIC LOGGING ---
-                # This will print the actual time the loop took whenever it exceeds the target.
-                if elapsed > self._logicDelayS:
-                    # Log.warning() is assumed to be defined and available
-                    Log.warning(f"Loop took {elapsed:.4f}s, exceeding target of {self._logicDelayS:.4f}s. No sleep occurred.")
-                # --------------------------
-
-                # Calculate the sleep time using the class property
                 sleepTime = self._logicDelayS - elapsed
-
-                if sleepTime > 0:
-                    # If we have time left, ensure we sleep for at least MIN_SLEEP_S
-                    if sleepTime < MIN_SLEEP_S:
-                        time.sleep(MIN_SLEEP_S)
-                    else:
-                        time.sleep(sleepTime)
-
-                # If sleepTime <= 0, the loop took too long, and we proceed immediately.
-
-            # --- END OF CORRECTED LOGIC LOOP ---
+                if sleepTime <= 0:
+                    sleepTime = 0
+                time.sleep(sleepTime)
 
         except KeyboardInterrupt:
             s = signal.signal(signal.SIGINT, signal.SIG_IGN)
