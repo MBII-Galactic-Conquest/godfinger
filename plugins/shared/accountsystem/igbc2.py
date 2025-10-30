@@ -43,7 +43,12 @@ CONFIG_FALLBACK = \
         "resetbounties": [],
         "teamcredits": []
     },
-    "roundStartCredits": 0
+    "roundStartCredits": {
+        "enabled": false,
+        "minCredits": 10,
+        "maxCredits": 50,
+        "maxRounds": 5
+    }
 }
 """
 
@@ -108,6 +113,7 @@ class BankingPlugin:
         self.pending_payments = {}  # sender_id: Payment
         self.pending_bounties = {}  # issuer_id: Bounty
         self.active_bounties = {}  # target_id: Bounty
+        self.player_rounds = {}  # player_id: rounds_played
         self._register_commands()
         # self.initialize_banking_table()
 
@@ -828,6 +834,8 @@ class BankingPlugin:
         """Load player's credits on connect using user_id"""
         pid = event.client.GetId()
         self.get_credits(pid)  # Load into cache
+        # Initialize rounds counter for this player
+        self.player_rounds[pid] = 0
         return False
 
     def _on_client_disconnect(self,
@@ -861,6 +869,10 @@ class BankingPlugin:
             # Notify the issuer if they're still online
             if bounty.issuer_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
                 self.SvTell(bounty.issuer_account.player_id, f"Bounty on {bounty.target_account.player_name}^7 canceled - target disconnected.")
+
+        # Clean up rounds tracking
+        if pid in self.player_rounds:
+            del self.player_rounds[pid]
 
         return False
 
@@ -901,14 +913,26 @@ class BankingPlugin:
         return False
 
     def _on_init_game(self, event: Event):
-        """Handle init game event - distribute round start credits"""
-        round_start_credits = self.config.cfg.get("roundStartCredits", 0)
+        """Handle init game event - distribute scaled round start credits"""
+        round_start_config = self.config.cfg.get("roundStartCredits", {})
         
-        # If disabled or 0, do nothing
-        if round_start_credits <= 0:
-            return False
+        # Handle legacy config (integer) or check if disabled
+        if isinstance(round_start_config, int):
+            if round_start_config <= 0:
+                return False
+            # Legacy mode: use fixed amount
+            min_credits = max_credits = round_start_config
+            max_rounds = 1
+            enabled = True
+        else:
+            enabled = round_start_config.get("enabled", False)
+            if not enabled:
+                return False
+            min_credits = round_start_config.get("minCredits", 10)
+            max_credits = round_start_config.get("maxCredits", 50)
+            max_rounds = round_start_config.get("maxRounds", 5)
         
-        Log.info(f"Distributing {round_start_credits} round start credits to active players")
+        Log.info(f"Distributing scaled round start credits to active players (min: {min_credits}, max: {max_credits}, maxRounds: {max_rounds})")
         
         # Find all players who have a last non-spec team (were playing)
         eligible_players = []
@@ -923,26 +947,42 @@ class BankingPlugin:
             Log.debug("No eligible players for round start credits")
             return False
         
-        # Add credits to each eligible player
+        # Add credits to each eligible player with scaling
         success_count = 0
         batch_commands = []
         for player_id, player_name in eligible_players:
             try:
+                # Increment rounds played for this player
+                if player_id not in self.player_rounds:
+                    self.player_rounds[player_id] = 0
+                self.player_rounds[player_id] += 1
+                
+                rounds_played = self.player_rounds[player_id]
+                
+                # Calculate scaled credits based on rounds played
+                if rounds_played >= max_rounds:
+                    credits_to_award = max_credits
+                else:
+                    # Linear scaling from minCredits to maxCredits
+                    credits_range = max_credits - min_credits
+                    credits_to_award = min_credits + int((credits_range * rounds_played) / max_rounds)
+                
                 old_credits = self.get_credits(player_id)
                 if old_credits is not None:
-                    self.add_credits(player_id, round_start_credits)
+                    self.add_credits(player_id, credits_to_award)
                     new_credits = self.get_credits(player_id)
                     
                     # Prepare notification message for batch execution
                     message = (
-                        f"{self.msg_prefix}Round start bonus: {colors.ColorizeText(str(round_start_credits), self.themecolor)} credits! "
+                        f"{self.msg_prefix}Round start bonus: {colors.ColorizeText(str(credits_to_award), self.themecolor)} credits! "
+                        f"(Round {rounds_played}/{max_rounds}) "
                         f"Balance: {colors.ColorizeText(str(new_credits), self.themecolor)} credits."
                     )
                     batch_commands.append(f"svtell {player_id} {message}")
                     batch_commands.append("wait 1")
                     
                     success_count += 1
-                    Log.debug(f"Added {round_start_credits} round start credits to {player_name} (ID: {player_id}): {old_credits} -> {new_credits}")
+                    Log.debug(f"Added {credits_to_award} round start credits to {player_name} (ID: {player_id}, Round {rounds_played}): {old_credits} -> {new_credits}")
             except Exception as e:
                 Log.error(f"Failed to add round start credits to player {player_name} (ID: {player_id}): {e}")
         
