@@ -99,9 +99,14 @@ class PluginManager():
             Log.info("Loading plugins...");
             totalLoaded = 0;
             for targetPlug in targetPlugins:
-                plug = self.LoadPlugin(targetPlug["path"], data);
+                pluginPath = targetPlug["path"];
+                # Check if plugin is already loaded
+                if pluginPath in self._plugins:
+                    Log.warning("Plugin %s is already loaded, skipping duplicate load.", pluginPath);
+                    continue;
+                plug = self.LoadPlugin(pluginPath, data);
                 if plug != None:
-                    self._plugins[targetPlug["path"]] = plug;
+                    self._plugins[pluginPath] = plug;
                     totalLoaded += 1;
             Log.info("Loaded total %d plugins. "% (totalLoaded));
             self._isInit = True;
