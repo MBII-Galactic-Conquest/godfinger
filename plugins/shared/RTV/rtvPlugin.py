@@ -1505,3 +1505,9 @@ def GetAllMaps() -> list[Map]:
                             newMap = Map(name, path)
                             mapList.append(newMap)
     return mapList
+
+
+if __name__ == "__main__":
+    print("This is a plugin for the Godfinger Movie Battles II plugin system. Please run one of the start scripts in the start directory to use it. Make sure that this python module's path is included in godfingerCfg!")
+    input("Press Enter to close this message.")
+    exit()
