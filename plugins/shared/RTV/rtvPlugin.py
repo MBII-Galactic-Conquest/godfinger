@@ -966,7 +966,7 @@ class RTV(object):
             # Check each validation condition separately for clearer error reporting
             if mapObj == None:
                 failReason = "map was not found"
-            elif len(self._nominations) >= 5:
+            elif len(self._nominations) >= 5 and not playerHasNomination:
                 failReason = "nomination list full"
             elif mapObj in [x.GetMap() for x in self._nominations]:
                 failReason = "map already nominated"
@@ -998,7 +998,9 @@ class RTV(object):
             # Handle validation failure
             if failReason != None:
                 self.Say(f"Map could not be nominated: {failReason}")
-        
+        elif len(cmdArgs) == 1:
+            # Show usage message
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!nominate <mapname>', self._themeColor)}")
         return capture
 
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
