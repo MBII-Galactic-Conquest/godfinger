@@ -13,6 +13,7 @@ import signal
 import sys
 import subprocess
 import tempfile
+import queue
 
 IsVenv = sys.prefix != sys.base_prefix
 if not IsVenv:
@@ -59,7 +60,7 @@ import godfingerAPI
 import lib.shared.client as client
 import lib.shared.clientmanager as clientmanager
 import lib.shared.pk3 as pk3
-import queue
+# queue imported at top
 import database
 import plugin
 import lib.shared.teams as teams
@@ -78,17 +79,6 @@ CONFIG_DEFAULT_PATH = os.path.join(os.getcwd(),"godfingerCfg.json")
 CONFIG_FALLBACK = \
 """{
     "Name":"MBII Godfinger : Consequetive Failure",
-    "Remote":
-    {
-        "address":
-        {
-            "ip":"localhost",
-            "port":29070
-        },
-        "bindAddress":"localhost",
-        "password":"rconPassword"
-    },
-
     "MBIIPath": "your/path/here/",
     "logFilename":"server.log",
     "serverPath":"your/path/here/",
@@ -105,18 +95,17 @@ CONFIG_FALLBACK = \
         },
         "rcon":
         {
-            "Remote":
-            {
-                "address":
-                {
-                    "ip":"localhost",
-                    "port":29070
-                },
-                "bindAddress":"localhost",
-                "password":"fuckmylife"
-            },
-            "logFilename":"server.log",
+            "ip":"localhost",
+            "bindAddress":"localhost",
             "logReadDelay":0.1,
+
+            "Remotes": [
+                {
+                    "port":29070,
+                    "logFilename":"server.log",
+                    "password":"fuckmylife"
+                }
+            ],
 
             "Debug":
             {
@@ -125,7 +114,7 @@ CONFIG_FALLBACK = \
         }
     },
     "interface":"rcon",
-    
+
 
     "paths":
     [
@@ -133,6 +122,7 @@ CONFIG_FALLBACK = \
     ],
 
     "prologueMessage":"Initialized Godfinger System",
+
     "epilogueMessage":"Finishing Godfinger System",
 
     "Plugins":
@@ -169,25 +159,47 @@ class MBIIServer:
             return "Status : Error at configuration load."
         else:
             return "Unknown status id." # implement later
-    
+
     def ValidateConfig(self, cfg : config.Config) -> bool:
         if cfg == None:
             return False
-        curVar = cfg.GetValue("MBIIPath", None)
-        if curVar == None or curVar == "your/path/here/":
+        # Server/Game path and name are global properties, check them
+        if cfg.GetValue("MBIIPath", None) in [None, "your/path/here/"]:
             return False
-        curVar = cfg.GetValue("serverFileName", None)
-        if curVar == None or curVar == "":
+        if cfg.GetValue("serverFileName", None) in [None, ""]:
             return False
-        curVar = cfg.GetValue("serverPath", None)
-        if curVar == None or curVar == "your/path/here/":
+        if cfg.GetValue("serverPath", None) in [None, "your/path/here/"]:
             return False
+
         curVar = cfg.GetValue("interface", None)
         if curVar == None or ( curVar != "pty" and curVar != "rcon" ):
             return False
         elif curVar == "pty":
             Log.error("pty Interface is not fully implemented, use rcon instead.")
             return False
+        elif curVar == "rcon":
+            rcon_cfg = cfg.cfg["interfaces"]["rcon"]
+            # REFACTORED: "Debug" is now included in the list of top-level required keys again
+            required_rcon_keys = ["ip", "bindAddress", "logReadDelay", "Remotes", "Debug"]
+            for key in required_rcon_keys:
+                if key not in rcon_cfg:
+                    Log.error(f"Rcon interface config is missing the required key '{key}'.")
+                    return False
+
+            # NEW: Validate the structure of the top-level Debug block
+            if not isinstance(rcon_cfg["Debug"], dict) or "TestRetrospect" not in rcon_cfg["Debug"]:
+                 Log.error("Rcon interface config 'Debug' is missing the required 'TestRetrospect' setting.")
+                 return False
+
+            if not isinstance(rcon_cfg["Remotes"], list) or len(rcon_cfg["Remotes"]) == 0:
+                Log.error("Rcon interface config 'Remotes' is not a list or is empty.")
+                return False
+
+            # NEW: Validate that each remote has a password (Debug check is removed from here)
+            for idx, remote_cfg in enumerate(rcon_cfg["Remotes"]):
+                if "password" not in remote_cfg:
+                    Log.error(f"Rcon remote #{idx+1} is missing a required 'password' setting.")
+                    return False
         return True
 
 
@@ -199,7 +211,8 @@ class MBIIServer:
         self._isRunning = False
         self._isRestarting = False
         self._pluginManager = None
-        self._svInterface = None
+        self._svInterfaces = [] # NEW: List of interfaces
+        self._primarySvInterface = None # NEW: Primary interface for status/commands
         self._gatheringExitData = False
         self._exitLogMessages = []
 
@@ -211,40 +224,68 @@ class MBIIServer:
         if self._config == None:
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
-    
+
         if not self.ValidateConfig(self._config):
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
-    
+
         if "paths" in self._config.cfg:
             for path in self._config.cfg["paths"]:
                 sys.path.append(os.path.normpath(path))
-        
+
         Log.debug("System path total %s", str(sys.path))
 
-        self._svInterface = None
         cfgIface = self._config.GetValue("interface", "pty")
+
         if cfgIface == "pty":
-            self._svInterface = godfingerinterface.PtyInterface(cwd=self._config.cfg["serverPath"],\
+            # NOTE: PtyInterface is only supported as a single interface connection
+            self._svInterfaces.append(godfingerinterface.PtyInterface(cwd=self._config.cfg["serverPath"],\
                                                                 args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["interfaces"]["pty"]["target"])]\
                                                                 + (Args.mbiicmd.split() if Args.mbiicmd else []),\
                                                                 inputDelay=self._config.cfg["interfaces"]["pty"]["inputDelay"],\
-                                                                )
+                                                                ))
         elif cfgIface == "rcon":
-            self._svInterface = godfingerinterface.RconInterface(   self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["ip"],\
-                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["address"]["port"],\
-                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["bindAddress"],\
-                                                                    self._config.cfg["interfaces"]["rcon"]["Remote"]["password"],\
-                                                                    os.path.join(self._config.cfg["MBIIPath"], self._config.cfg["interfaces"]["rcon"]["logFilename"]),\
-                                                                    self._config.cfg["interfaces"]["rcon"]["logReadDelay"],
-                                                                    self._config.cfg["interfaces"]["rcon"]["Debug"]["TestRetrospect"],
+            rcon_cfg = self._config.cfg["interfaces"]["rcon"]
+            global_logFilename = self._config.cfg["logFilename"]
+
+            # REFACTORED: Read shared/top-level properties
+            shared_ip = rcon_cfg["ip"]
+            shared_bindAddress = rcon_cfg["bindAddress"]
+            shared_logReadDelay = rcon_cfg["logReadDelay"]
+            shared_testRetrospect = rcon_cfg["Debug"]["TestRetrospect"] # Re-read from top level Debug block
+
+            # NEW: Loop over Remotes list, getting password and connection details from each remote
+            for idx, remote_cfg in enumerate(rcon_cfg["Remotes"]):
+                remote_ip = remote_cfg.get("ip", shared_ip)
+                remote_logFilename = remote_cfg.get("logFilename", global_logFilename)
+                remote_port = remote_cfg.get("port", 0) # Port is mandatory for Rcon, but use 0 as a safe sentinel
+
+                # NEW: Get password from remote config
+                remote_password = remote_cfg["password"]
+
+                if remote_port == 0:
+                    Log.error(f"Rcon remote #{idx+1} is missing a required 'port' setting. Skipping.")
+                    continue
+
+                interface = godfingerinterface.RconInterface(
+                                                                    remote_ip,\
+                                                                    remote_port,\
+                                                                    shared_bindAddress,\
+                                                                    remote_password,\
+                                                                    os.path.join(self._config.cfg["MBIIPath"], remote_logFilename),\
+                                                                    shared_logReadDelay,
+                                                                    shared_testRetrospect, # Uses shared/top-level value
                                                                     procName=self._config.cfg["serverFileName"])
-        
-        if self._svInterface == None:
-            Log.error("Server interface was not initialized properly.")
+                self._svInterfaces.append(interface)
+                Log.info(f"Initialized RconInterface #{idx+1} on {remote_ip}:{remote_port} (Bind: {shared_bindAddress}) using log file {remote_logFilename}")
+
+        if len(self._svInterfaces) == 0:
+            Log.error("Server interface(s) were not initialized properly or 'Remotes' list was empty.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
-    
+
+        self._primarySvInterface = self._svInterfaces[0] # Use the first interface for sending commands and status checks
+
         if IsWindows:
             try:
                 os.system("title " + self._config.cfg["Name"])
@@ -261,16 +302,17 @@ class MBIIServer:
         self._pk3Manager = pk3.Pk3Manager()
         self._pk3Manager.Initialize([self._config.cfg["MBIIPath"]])
 
-        if not self._svInterface.Open():
-            Log.error("Unable to Open server interface.")
-            self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR
-            return
-        self._svInterface.WaitUntilReady()
-        
+        # NEW: Open all interfaces
+        for interface in self._svInterfaces:
+            if not interface.Open():
+                Log.error(f"Unable to Open server interface: {interface}")
+                self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR
+                return
+            interface.WaitUntilReady()
+
         # Cvars
-        # Init at Start
-        self._cvarManager = cvar.CvarManager(self._svInterface)
-        
+        self._cvarManager = cvar.CvarManager(self._primarySvInterface) # Use primary interface for Cvars
+
         # Client management
         self._clientManager = clientmanager.ClientManager()
 
@@ -288,7 +330,7 @@ class MBIIServer:
         exportAPI.GetDatabase       = self.API_GetDatabase
         exportAPI.GetPlugin         = self.API_GetPlugin
         exportAPI.Restart           = self.Restart
-        self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._svInterface, Args)
+        self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._primarySvInterface, Args) # Use primary interface
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)))
 
 
@@ -300,18 +342,18 @@ class MBIIServer:
             self._status = MBIIServer.STATUS_PLUGIN_ERROR
             return
         self._logicDelayS = self._config.cfg["logicDelay"]
-    
+
         self._isFinished = False
         self._isRunning = False
         self._isRestarting = False
         self._lastRestartTick = 0.0
         self._restartTimeout = timeout.Timeout()
         self.restartOnCrash = self._config.cfg["restartOnCrash"]
-            
+
 
         Log.info("The Godfinger initialized in %.2f seconds!\n" %(time.time() - startTime))
-    
-    def Finish(self):
+
+    def Finish(self,):
         # Ensure that finish is called only once; if _isFinished is already set, skip cleanup.
         if not hasattr(self, "_isFinished") or not self._isFinished:
             Log.info("Finishing Godfinger...")
@@ -323,32 +365,25 @@ class MBIIServer:
             self._status = MBIIServer.STATUS_FINISHED
             self._isFinished = True
             Log.info("Finished Godfinger.")
-    
+
     def __del__(self):
         self.Finish()
         # Safely delete attributes if they exist.
         if hasattr(self, "_pluginManager"):
             del self._pluginManager
             self._pluginManager = None
-        if hasattr(self, "_svInterface"):
-            del self._svInterface
-            self._svInterface = None
-
+        # NEW: Delete all interfaces
+        if hasattr(self, "_svInterfaces"):
+            for interface in self._svInterfaces:
+                del interface
+            self._svInterfaces = []
+            self._primarySvInterface = None
 
 
     # status notrunc
-    # hostname: MBII Test Server
-    # version : 1.0.1.0 26
-    # game    : MBII
-    # udp/ip  : localhost:29070 os(Windows) type(public dedicated)
-    # map    : mb2_smuggler gametype(7)
-    # players : 0 humans, 0 bots (32 max)
-    # uptime  : 0h0m16s
-    # cl score ping name            address                                 rate
-    # -- ----- ---- --------------- --------------------------------------- -----
-    #  0     0   50 ^0^1C^0 ^72cwldys ^7                     127.0.0.1:20071 50000
     def _FetchStatus(self):
-        statusStr = self._svInterface.Status()
+        # NEW: Use primary interface for status
+        statusStr = self._primarySvInterface.Status()
         if statusStr != None:
             Log.debug(statusStr)
             splitted = statusStr.splitlines()
@@ -404,15 +439,16 @@ class MBIIServer:
             Log.warning("Server status is unreachable, setting default values to status data.")
         pass
 
-    
+
     def Restart(self, timeout = 60):
         if not self._isRestarting:
             self._isRestarting = True
             self._restartTimeout.Set(timeout)
-            self._lastRestartTick = timeout
-            self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger Restarting procedure started, ETA %s"%self._restartTimeout.LeftDHMS()))
+            self._lastRestartTick = 0.0
+            # Use primary interface to send command
+            self._primarySvInterface.SvSay("^1 {text}.".format(text = "Godfinger Restarting procedure started, ETA %s"%self._restartTimeout.LeftDHMS()))
             Log.info("Restart issued, proceeding.")
-    
+
     def Start(self):
         # a = 0/0
         try:
@@ -426,6 +462,7 @@ class MBIIServer:
                 else:
                     Log.debug("Running in debug mode and server is offline, consider server data invalid.")
 
+            # Use primary interface for CvarManager
             if not self._cvarManager.Initialize():
                 Log.error("Failed to initialize CvarManager, abort startup.")
                 self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR
@@ -440,7 +477,8 @@ class MBIIServer:
                 return
             self._isRunning = True
             self._status = MBIIServer.STATUS_RUNNING
-            self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]))
+            # Use primary interface for SvSay
+            self._primarySvInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]))
             while self._isRunning:
                 startTime = time.time()
                 self.Loop()
@@ -449,51 +487,59 @@ class MBIIServer:
                 if sleepTime <= 0:
                     sleepTime = 0
                 time.sleep(sleepTime)
-
         except KeyboardInterrupt:
             s = signal.signal(signal.SIGINT, signal.SIG_IGN)
             Log.info("Interrupt recieved.")
             Sighandler(signal.SIGINT, -1)
-            
+
     def Stop(self):
         if self._isRunning:
             Log.info("Stopping Godfinger...")
-            self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["epilogueMessage"]))
+            # Use primary interface for SvSay
+            if self._primarySvInterface:
+                self._primarySvInterface.SvSay("^1 {text}.".format(text = self._config.cfg["epilogueMessage"]))
             self._status = MBIIServer.STATUS_STOPPING
-            self._svInterface.Close()
+            # NEW: Close all interfaces
+            for interface in self._svInterfaces:
+                interface.Close()
             self._isRunning = False
             self._status = MBIIServer.STATUS_STOPPED
-            Log.info("Stopped.") 
+            Log.info("Stopped.")
 
     def Loop(self):
         if self._isRestarting:
             if self._restartTimeout.IsSet():
                 tick = self._restartTimeout.Left()
                 if tick - self._lastRestartTick <= -5:
-                    self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger is about to restart in %s"%self._restartTimeout.LeftDHMS()))
+                    # Use primary interface for SvSay
+                    self._primarySvInterface.SvSay("^1 {text}.".format(text = "Godfinger is about to restart in %s"%self._restartTimeout.LeftDHMS()))
                     self._lastRestartTick = tick
             else:
                 Sighandler(signal.SIGINT, -1)
                 self.restartOnCrash = False
                 self.Stop()
                 return
-        messages = self._svInterface.GetMessages()
-        while not messages.empty():
-            message = messages.get()
-            self._ParseMessage(message)
+
+        # NEW: Process messages from all interfaces
+        for interface in self._svInterfaces:
+            messages = interface.GetMessages()
+            while not messages.empty():
+                message = messages.get()
+                self._ParseMessage(message)
+
         self._pluginManager.Loop()
 
     def _ParseMessage(self, message : logMessage.LogMessage):
-        
+
         line = message.content
         if line.startswith("ShutdownGame"):
             self.OnShutdownGame(message)
             return
-    
+
         elif line.startswith("gsess"):
             self.OnRealInit(message)
             return
-    
+
         # maybe its better to move it outside of string parsing
         if line.startswith("wd_"):
             if line == "wd_unavailable":
@@ -509,7 +555,7 @@ class MBIIServer:
             return
 
         lineParse = line.split()
-        
+
         l = len(lineParse)
         # we shouldn't ever see blank lines in the server log if it isn't tampered with but just in case
         if l > 1:
@@ -580,8 +626,6 @@ class MBIIServer:
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
         else:
             pass
-            # Handle the malformed message (missing quotes)
-            # Log.warning(f"Malformed chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
 
     def OnChatMessageTeam(self, logMessage : logMessage.LogMessage):
         messageRaw = logMessage.content
@@ -597,11 +641,10 @@ class MBIIServer:
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, senderClient.GetTeamId(), isStartup = logMessage.isStartup ) )
         else:
             pass
-            # Log.warning(f"Malformed team chat message: missing quote characters. Skipping event. Raw: {messageRaw}")
-    
+
     def OnPlayer(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
-        Log.debug("On Player log entry %s ", textified)
+        Log.debug("On Player log entry %s", textified)
 
         # Initialize cl to None to prevent UnboundLocalError
         cl = None
@@ -619,10 +662,7 @@ class MBIIServer:
                 vars = {}
                 changedOld = {}
 
-                # FIX: Set the upper bound of the loop to be len(splitui) - 1
-                # This ensures the loop always stops when the last valid key is reached
-                # which leaves a safe index+1 for the corresponding value.
-                # len(splitui) - 1 works for both odd and even lengths.
+                # Set the upper bound of the loop to be len(splitui) - 1
                 for index in range (0, len(splitui) - 1, 2):
                     vars[splitui[index]] = splitui[index+1]
                 with cl._lock:
@@ -665,16 +705,16 @@ class MBIIServer:
         commandAliasList = self._serverData.GetServerVar("registeredCommands")
         if commandAliasList is None:
             commandAliasList = []
-        
+
         if len(cmdArgs) > 1:
             # Looking for specific command help
             commandName = cmdArgs[1].lower()
             for commandAlias, helpText in commandAliasList:
                 if commandName == commandAlias.lower():
-                    self._svInterface.Say('^1[Godfinger]: ^7' + helpText)
+                    self._primarySvInterface.Say('^1[Godfinger]: ^7' + helpText)
                     return True
             # Command not found
-            self._svInterface.Say(f"^1[Godfinger]:^7 Couldn't find chat command: {commandName}")
+            self._primarySvInterface.Say(f"^1[Godfinger]:^7 Couldn't find chat command: {commandName}")
         else:
             # List all available commands
             commandStr = "Available commands (Say !help <command> for details): " + ', '.join([aliases for aliases, _ in commandAliasList])
@@ -691,10 +731,10 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._svInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._primarySvInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
             else:
-                self._svInterface.Say('^1[Godfinger]: ^7' + commandStr)
-        
+                self._primarySvInterface.Say('^1[Godfinger]: ^7' + commandStr)
+
         return True
 
     def HandleSmodHelp(self, playerName, smodID, adminIP, cmdArgs):
@@ -702,16 +742,16 @@ class MBIIServer:
         smodCommandAliasList = self._serverData.GetServerVar("registeredSmodCommands")
         if smodCommandAliasList is None:
             smodCommandAliasList = []
-        
+
         if len(cmdArgs) > 1:
             # Looking for specific command help
             commandName = cmdArgs[1].lower()
             for commandAlias, helpText in smodCommandAliasList:
                 if commandName == commandAlias.lower():
-                    self._svInterface.SmSay(helpText)
+                    self._primarySvInterface.SmSay(helpText)
                     return True
             # Command not found
-            self._svInterface.SmSay(f"Couldn't find smod command: {commandName}")
+            self._primarySvInterface.SmSay(f"Couldn't find smod command: {commandName}")
         else:
             # List all available smod commands
             allCommands = ', '.join([aliases for aliases, _ in smodCommandAliasList])
@@ -729,9 +769,9 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._svInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._primarySvInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
             else:
-                self._svInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
+                self._primarySvInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
         return True
 
     def OnKill(self, logMessage : logMessage.LogMessage):
@@ -739,41 +779,29 @@ class MBIIServer:
         Log.debug("Kill log entry %s", textified)
 
         # Split the log message into parts using ': ' as the delimiter, limiting to 2 splits.
-        # This results in a list of up to 3 parts (before ':', numeric part, message part).
         parts = textified.split(": ", 2)
 
-        # Initialize variables to a safe state
         kill_part = ""
         numeric_part = ""
         message_part = ""
 
-        # --- FIX: Safe Unpacking Logic ---
+        # --- Safe Unpacking Logic ---
         if len(parts) >= 3:
-            # Standard case: 3 or more parts found
             kill_part = parts[0]
             numeric_part = parts[1]
-            # Rejoin the remaining parts in case there were extra ': ' delimiters in the message
-            # Note: We rejoin with ': ' because that was the original split delimiter
             message_part = ": ".join(parts[2:])
 
         elif len(parts) == 2:
-            # Fix: Handle the 'expected 3, got 2' case.
-            # This means the numeric part (pids) is likely missing.
-            # Log.warning(f"Malformed Kill message (expected 3 parts, got 2). Log: {textified}")
             kill_part = parts[0]
             numeric_part = ""
             message_part = parts[1]
 
         else:
-            # Handle cases with 1 or 0 delimiters (severely malformed)
-            # Log.error(f"Severely malformed Kill message (only {len(parts)} parts). Log: {textified}")
-            return # Abort processing for invalid format
-        # --- END FIX ---
+            return
 
-        # Check if the numeric part (containing PIDs) was found/extracted
         if not numeric_part:
             Log.error(f"Kill message missing Player IDs. Log: {textified}")
-            return # Cannot proceed without PIDs
+            return
 
         # Extract killer and victim player IDs
         pids = numeric_part.split()
@@ -811,7 +839,7 @@ class MBIIServer:
                     cl._teamId = teams.TEAM_SPEC
                     self._pluginManager.Event(godfingerEvent.ClientChangedEvent(cl, {"team": old_team}, logMessage.isStartup))
             self._pluginManager.Event(godfingerEvent.KillEvent(cl, clVictim, weapon_str, {"tk": isTK}, logMessage.isStartup))
-        
+
     def OnExit(self, logMessages : list[logMessage.LogMessage]):
         textified = self._exitLogMessages[0].content
         textsplit = textified.split()
@@ -846,8 +874,7 @@ class MBIIServer:
         token_to_check = lineParse[3 + extraName]
 
         try:
-            # 1. Strip color codes (e.g., '^6'), which might be mistaken for part of a number.
-            #    The 'colors' utility is imported in godfingerinterface and assumed available here.
+            # 1. Strip color codes
             stripped_token = colors.StripColorCodes(token_to_check)
 
             # 2. Strip surrounding punctuation (like '(', ')') and whitespace.
@@ -857,9 +884,6 @@ class MBIIServer:
             id = int(cleaned_token)
 
         except ValueError:
-            # If the token is still not a valid integerhandle gracefully.
-            # Log.warning(f"OnClientConnect: Malformed ID token '{token_to_check}' encountered. Falling back to lineParse[1] for client ID.")
-
             # Fallback: Attempt to use the client ID from the known primary position (index 1).
             try:
                 id = int(lineParse[1])
@@ -878,7 +902,6 @@ class MBIIServer:
             self._clientManager.AddClient(newClient) # make sure its added BEFORE events are processed
             self._pluginManager.Event( godfingerEvent.ClientConnectEvent( newClient, None, isStartup = logMessage.isStartup ) )
         else:
-            #Log.warning(f"Duplicate client with ID {id} connected, ignoring")
             pass
 
     def OnClientBegin(self, logMessage : logMessage.LogMessage ):
@@ -889,10 +912,10 @@ class MBIIServer:
         if client != None:
             pass
             self._pluginManager.Event( godfingerEvent.ClientBeginEvent( client, {}, isStartup = logMessage.isStartup ) )
-    
+
     def OnClientDisconnect(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
-        Log.debug("Client disconnect log entry %s", textified) 
+        Log.debug("Client disconnect log entry %s", textified)
         lineParse = textified.split()
         dcId = int(lineParse[1])
         cl = self._clientManager.GetClientById(dcId)
@@ -904,7 +927,7 @@ class MBIIServer:
                 Log.debug("All players have left the server")
                 self._pluginManager.Event( godfingerEvent.ServerEmptyEvent(isStartup = logMessage.isStartup))
         else:
-            pass # player reconnected ( thats how server shits in logs for some reason)
+            pass
 
     def OnClientUserInfoChanged(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content
@@ -927,7 +950,7 @@ class MBIIServer:
         splitted = configStr.split("\\")
         for index in range (0, len(splitted) - 1, 2):
             vars[splitted[index]] = splitted[index+1]
-            
+
         if "mapname" in vars:
             if vars["mapname"] != self._serverData.mapName:
                 Log.debug("mapname cvar parsed, applying " + vars["mapname"] + " : OLD " + self._serverData.mapName)
@@ -935,10 +958,10 @@ class MBIIServer:
                     self.OnMapChange(vars["mapname"], self._serverData.mapName)
                 self._serverData.mapName = vars["mapname"]
         else:
-            self._serverData.mapName = self._svInterface.GetCurrentMap()
-        
+            self._serverData.mapName = self._primarySvInterface.GetCurrentMap()
+
         Log.info("Current map name on init : %s", self._serverData.mapName)
-        
+
         self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_INIT, { "vars" : vars }, isStartup = logMessage.isStartup ) )
         self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_POST_INIT, {}, isStartup = logMessage.isStartup ) )
 
@@ -948,9 +971,9 @@ class MBIIServer:
         allClients = self._clientManager.GetAllClients()
         for client in allClients:
             Log.debug("Shutdown pseudo-disconnecting client %s" %str(client))
-        
+
         self._pluginManager.Event( godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN, None, isStartup = logMessage.isStartup ) )
-    
+
     def OnRealInit(self, logMessage : logMessage.LogMessage):
         Log.debug("Server starting up for real.")
         self._pluginManager.Event(godfingerEvent.Event( godfingerEvent.GODFINGER_EVENT_TYPE_REAL_INIT, None, isStartup = logMessage.isStartup ))
@@ -965,7 +988,6 @@ class MBIIServer:
         lineSplit = textified.split()
 
         # Check if the token '(adminID:' is present in the list before trying to get its index.
-        # This prevents the ValueError.
         if '(adminID:' in lineSplit:
             adminIDIndex = lineSplit.index('(adminID:')
             smodID = lineSplit[adminIDIndex + 1].strip(")")
@@ -981,7 +1003,6 @@ class MBIIServer:
                     return True  # Command handled, don't pass to plugins
             self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message, isStartup = logMessage.isStartup))
         else:
-            # Handle the malformed message: log a warning and skip processing the event
             pass
 
     def OnSmodCommand(self, logMessage : logMessage.LogMessage):
@@ -1000,7 +1021,7 @@ class MBIIServer:
 
         # Split the message into parts based on the command structure
         parts = log_message.split(' executed by ')
-        
+
         # Parse SMOD executor information
         if len(parts) >= 2:
             # Extract SMOD details from first part
@@ -1013,14 +1034,14 @@ class MBIIServer:
                     data['smod_name'] = match.group(1).strip()
                     data['smod_id'] = match.group(3)
                     data['smod_ip'] = smod_info[1].split(')')[0]
-            
+
             # Extract command information
             command_part = parts[0].split(' (')
             if len(command_part) >= 1:
                 command_match = re.search(r'SMOD command \((.*)\) executed', log_message)
                 if command_match:
                     data['command'] = command_match.group(1).lower()
-        
+
         # Check for target information
         if ' against ' in log_message:
             target_part = log_message.split(' against ')[1]
@@ -1029,7 +1050,7 @@ class MBIIServer:
             if target_match:
                 data['target_name'] = target_match.group(1).strip()
                 data['target_ip'] = target_match.group(2).split(':')[0]
-                
+
                 # Try to extract target ID if present
                 id_match = re.search(r'\((\d+)\)', target_info)
                 if id_match:
@@ -1047,7 +1068,6 @@ class MBIIServer:
         }
 
         # Parse the login message
-        # Expected format: "Successful SMOD login by <name>(adminID: <id>) (IP: <ip>:<port>)"
         if 'adminID:' in textified and 'IP:' in textified:
             # Split by '(adminID:' to separate name from the rest
             parts = textified.split('(adminID:')
@@ -1073,7 +1093,8 @@ class MBIIServer:
 
         self._pluginManager.Event(godfingerEvent.SmodLoginEvent(data['smod_name'], data['smod_id'], data['smod_ip'], isStartup = logMessage.isStartup))
 
-    # API export functions 
+
+    # API export functions
     def API_GetClientById(self, id):
         return self._clientManager.GetClientById(id)
 
@@ -1100,7 +1121,7 @@ class MBIIServer:
 
     def API_AddDatabase(self, db : database.ADatabase) -> int:
         return self._dbManager.AddDatabase(db)
-    
+
     def API_GetDatabase(self, name) -> database.ADatabase:
         return self._dbManager.GetDatabase(name)
 
@@ -1129,7 +1150,7 @@ def InitLogger():
             newLogfile = Args.logfile
         print(f"Logging into file {newLogfile}")
         loggingFile = newLogfile
-    
+
     if loggingFile != "":
         logging.basicConfig(
         filename = loggingFile,
@@ -1169,6 +1190,7 @@ def main():
                 Server.Finish()
                 if Server.restartOnCrash:
                     runAgain = True
+                    del Server
                     Server = MBIIServer()
                     int_status = Server.GetStatus()
                     if int_status == MBIIServer.STATUS_INIT:
@@ -1186,20 +1208,20 @@ def main():
             dir = os.path.dirname(__file__)
             cmd = os.path.normpath(os.path.join(dir, cmd))
             cmd = (sys.executable + " " + cmd )
-            
+
             # Cross-platform subprocess handling
             if IsWindows:
                 subprocess.Popen(cmd, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
             else:
                 # Unix/Linux compatible detached process
-                subprocess.Popen(cmd, shell=True, stdin=None, stdout=None, stderr=None, close_fds=True, 
+                subprocess.Popen(cmd, shell=True, stdin=None, stdout=None, stderr=None, close_fds=True,
                                start_new_session=True)
             sys.exit()
         del Server
         Server = None
     else:
         Log.info("Godfinger initialize error %s" % (MBIIServer.StatusString(int_status)))
-    
+
     Log.info("The final gunshot was an exclamation mark on everything that had led to this point. I released my finger from the trigger, and it was over.")
 
 
