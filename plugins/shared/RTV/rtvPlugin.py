@@ -966,7 +966,7 @@ class RTV(object):
             # Check each validation condition separately for clearer error reporting
             if mapObj == None:
                 failReason = "map was not found"
-            elif len(self._nominations) >= 5:
+            elif len(self._nominations) >= 5 and not playerHasNomination:
                 failReason = "nomination list full"
             elif mapObj in [x.GetMap() for x in self._nominations]:
                 failReason = "map already nominated"
@@ -998,7 +998,9 @@ class RTV(object):
             # Handle validation failure
             if failReason != None:
                 self.Say(f"Map could not be nominated: {failReason}")
-        
+        elif len(cmdArgs) == 1:
+            # Show usage message
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!nominate <mapname>', self._themeColor)}")
         return capture
 
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -1505,3 +1507,9 @@ def GetAllMaps() -> list[Map]:
                             newMap = Map(name, path)
                             mapList.append(newMap)
     return mapList
+
+
+if __name__ == "__main__":
+    print("This is a plugin for the Godfinger Movie Battles II plugin system. Please run one of the start scripts in the start directory to use it. Make sure that this python module's path is included in godfingerCfg!")
+    input("Press Enter to close this message.")
+    exit()
