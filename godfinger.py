@@ -953,7 +953,7 @@ class MBIIServer:
 
         if "mapname" in vars:
             if vars["mapname"] != self._serverData.mapName:
-                print("mapname cvar parsed, applying " + vars["mapname"] + " : " + self._serverData.mapName)
+                Log.debug("mapname cvar parsed, applying " + vars["mapname"] + " : OLD " + self._serverData.mapName)
                 if self._serverData.mapName != '':          # ignore first map ;
                     self.OnMapChange(vars["mapname"], self._serverData.mapName)
                 self._serverData.mapName = vars["mapname"]
