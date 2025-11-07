@@ -114,6 +114,9 @@ class BankingPlugin:
         self.pending_bounties = {}  # issuer_id: Bounty
         self.active_bounties = {}  # target_id: Bounty
         self.player_rounds = {}  # player_id: rounds_played
+        self.player_class_by_pid = {}  # player_id: current character/class name
+        self.extralives_map = {}  # character/class name -> extralives (int >= 0)
+        self._load_extralives_map()
         self._register_commands()
         # self.initialize_banking_table()
 
@@ -142,6 +145,7 @@ class BankingPlugin:
             ("modifycredits", "modcredits") : ("!modifycredits <playerid> <amount> - modify a player's credits by the specified amount", self._handle_mod_credits),
             ("resetbounties", "rb") : ("!resetbounties - clears the bounty list", self._handle_reset_bounties),
             ("teamcredits", "tcredits") : ("!teamcredits <team> <amount> - add credits to all players on a team (1=red, 2=blue, 3=spec)", self._handle_team_credits),
+            ("reloadextralives", "relives") : ("!reloadextralives - reload extralives.json table", self._handle_reload_extralives),
         }
         # Register commands with server
         newVal = []
@@ -898,6 +902,14 @@ class BankingPlugin:
             elif not is_tk:
                 self.check_bounty(victim_id, killer_id)
                 toAdd = self.config.cfg["kill_awards"]["kill"]
+                # Scale positive kill awards by victim's extra lives: floor(base * (1/(n+1)))
+                try:
+                    n_extras = self.get_extralives_for_pid(victim_id)
+                    if isinstance(n_extras, int) and n_extras >= 0 and toAdd > 0:
+                        mult = 1.0 / (n_extras + 1)
+                        toAdd = int(toAdd * mult)
+                except Exception:
+                    pass
             else:
                 toAdd = self.config.cfg["kill_awards"]["teamkill"]
             if toAdd != 0:
@@ -913,6 +925,78 @@ class BankingPlugin:
                     f"Fined {abs(toAdd)} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
                 )
         return False
+
+    # ==== Extra lives integration ====
+    def _extralives_path(self) -> str:
+        # repo_root/plugins/shared/accountsystem/igbc2.py -> repo_root/data/extralives.json
+        here = os.path.dirname(__file__)
+        repo_root = os.path.abspath(os.path.join(here, "..", "..", ".."))
+        return os.path.join(repo_root, "data", "extralives.json")
+
+    def _load_extralives_map(self) -> None:
+        """Load extralives table from JSON into memory. Keys are plaintext character names."""
+        try:
+            path = self._extralives_path()
+            if not os.path.exists(path):
+                Log.warning(f"extralives.json not found at {path}; kill rewards will not be scaled")
+                self.extralives_map = {}
+                return
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            # Expect structure: { total_characters: N, characters: { name: { extralives: int, ... }, ... } }
+            chars = data.get("characters", {}) if isinstance(data, dict) else {}
+            table = {}
+            for name, info in chars.items():
+                try:
+                    n = info.get("extralives", 0)
+                    if n is None:
+                        n = 0
+                    n = int(n)
+                    if n < 0:
+                        n = 0
+                    table[str(name)] = n
+                except Exception:
+                    continue
+            self.extralives_map = table
+            Log.info(f"Loaded extralives map with {len(self.extralives_map)} entries")
+        except Exception as e:
+            Log.error(f"Failed to load extralives.json: {e}")
+            self.extralives_map = {}
+
+    def _handle_reload_extralives(self, playerName, smodId, adminIP, cmdArgs):
+        """SMOD command to reload extralives.json at runtime."""
+        try:
+            self._load_extralives_map()
+            self.server_data.interface.SmSay(self.msg_prefix + f"Reloaded extralives table ({len(self.extralives_map)} entries)")
+        except Exception as e:
+            self.server_data.interface.SmSay(self.msg_prefix + f"Failed to reload extralives: {e}")
+        return True
+
+    def get_extralives_for_pid(self, player_id: int) -> int:
+        """Get extra lives count for the player's current character/class name; returns 0 if unknown."""
+        name = self.player_class_by_pid.get(player_id)
+        if not name:
+            return 0
+        return int(self.extralives_map.get(name, 0))
+
+    def _on_client_changed(self, event: Event):
+        """Track player's current class/character name when they change class."""
+        try:
+            pid = event.client.GetId()
+            # Attempt to read potential keys from event data
+            char_name = None
+            data = getattr(event, "data", {}) or {}
+            key = 'sc'
+            if key in data and isinstance(data[key], str) and data[key]:
+                char_name = data[key]
+            else:
+                Log.error(f"Could not find class name for player {pid}")
+                return False
+            self.player_class_by_pid[pid] = char_name
+            return True
+        except Exception as e:
+            Log.error(f"Error in _on_client_changed: {e}")
+            return False
 
     def _on_init_game(self, event: Event):
         """Handle init game event - distribute scaled round start credits"""
@@ -1096,6 +1180,8 @@ def OnEvent(event: Event) -> bool:
         banking_plugin._on_kill(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         banking_plugin._on_init_game(event)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
+        banking_plugin._on_client_changed(event)
     return False
 
 
