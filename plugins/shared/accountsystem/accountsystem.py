@@ -489,7 +489,7 @@ def OnStart() -> bool:
             batchCmds.append(f'svtell {pid} "{account_plugin.msg_prefix}{welcome_message}"')
     
     if batchCmds:
-        account_plugin.server_data.interface.BatchExecute(batchCmds)
+        account_plugin.server_data.interface.BatchExecute('b', batchCmds)
         
     # Report startup time
     loadTime = time() - startTime
