@@ -266,44 +266,50 @@ class AccountPlugin:
                     break
         return None
 
-    def load_or_create_account(self, player_name: str, ip_address: str, client: Player, display_welcome=True) -> tuple[Account, bool]:
+    def load_or_create_account(self, player_name: str, ip_address: str, client: Player, display_welcome=True) -> tuple[Account, bool, Optional[str]]:
         """
         Load an existing account or create a new one if it doesn't exist.
-        
+
         Args:
             player_name: The player's name
             ip_address: The player's IP address
             client: The client object to associate with the account
             display_welcome: Whether to display welcome messages
-            
+
         Returns:
-            tuple: (Account object, created_flag) where created_flag is True if a new account was created
+            tuple: (Account object, created_flag, welcome_message) where created_flag is True if a new account was created
         """
         created = False
         client_id = client.GetId()
-        
+        welcome_message = None
+
         account = self.account_manager.load_account(player_name, ip_address, client)
         if not account:
             Log.debug(f"Couldn't find existing account with credentials {player_name, ip_address}, attempting to create new account.")
             account = self.account_manager.create_account(player_name, ip_address, client)
             created = True
-        
+
         if account:
             account.set_client(client)  # Ensure client is properly set
             self.account_manager.accounts[client_id] = account
             Log.info(f"Player {player_name} (ID: {client_id}) successfully logged in as user id {account.user_id}.")
-            if created and display_welcome:
-                self._tell_player(client_id, f"Welcome, {player_name}^7! Your account was automatically created! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})")
-            elif display_welcome:
-                self._tell_player(client_id, f"Welcome back, {player_name}^7! Your stats were successfully loaded! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})")
+            if display_welcome:
+                if created:
+                    welcome_message = f"Welcome, {player_name}^7! Your account was automatically created! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})"
+                else:
+                    welcome_message = f"Welcome back, {player_name}^7! Your stats were successfully loaded! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})"
         else:
             Log.error(f"UNABLE TO CREATE ACCOUNT FOR {player_name, ip_address}! USING DEFAULT TEMPORARY ACCOUNT, DATA WILL NOT BE SAVED!")
-            self._tell_player(client_id, f"Your stats could not be loaded. Using temporary account.")
+            if display_welcome:
+                welcome_message = f"Your stats could not be loaded. Using temporary account."
             # Create dummy account with client
             account = Account(None, client_id, player_name, ip_address, None, client=client)
             self.account_manager.accounts[client_id] = account
-        
-        return account, created
+
+        if welcome_message:
+            self._tell_player(client_id, welcome_message)
+
+        return account, created, welcome_message
 
     def get_database_connection(self):
         return self.account_manager.accounts_db
@@ -324,7 +330,9 @@ class AccountPlugin:
                 f"Player ID {pid} already exists and name doesn't match. Overwriting with new connection."
             )
     
-        account, created = self.load_or_create_account(player_name, ip_address, client)
+        account, created, message = self.load_or_create_account(player_name, ip_address, client)
+        if message:
+            self._tell_player(pid, message)
         return False
 
     def _on_client_disconnect(self, event: Event):
@@ -371,11 +379,12 @@ class AccountPlugin:
                 
                 # Get client IP and attempt to load/create account with new name
                 ip_address = event.client.GetIp()
-                account, created = self.load_or_create_account(new_name, ip_address, event.client, display_welcome=False)
-                if created:
-                    self._tell_player(client_id, f"Name changed to {new_name}^7! New account created automatically! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})")
-                else:
-                    self._tell_player(client_id, f"Name changed to {new_name}^7! Existing account loaded! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})")
+                account, created, welcome_message = self.load_or_create_account(new_name, ip_address, event.client, display_welcome=False)
+                if welcome_message:
+                    if created:
+                        self._tell_player(client_id, f"Name changed to {new_name}^7! New account created automatically! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})")
+                    else:
+                        self._tell_player(client_id, f"Name changed to {new_name}^7! Existing account loaded! (ID: {colors.ColorizeText(account.user_id, self.themecolor)})")
 
     def _register_commands(self):
         self._command_list = {
@@ -475,9 +484,13 @@ def OnStart() -> bool:
         player_name = client.GetName()
         ip_address = client.GetIp()
         
-        account, created = account_plugin.load_or_create_account(player_name, ip_address, client, display_welcome=True)
+        account, created, welcome_message = account_plugin.load_or_create_account(player_name, ip_address, client, display_welcome=True)
+        if welcome_message:
+            batchCmds.append(f'svtell {pid} "{account_plugin.msg_prefix}{welcome_message}"')
     
-    account_plugin.server_data.interface.BatchExecute("b", batchCmds)
+    if batchCmds:
+        account_plugin.server_data.interface.BatchExecute(batchCmds)
+        
     # Report startup time
     loadTime = time() - startTime
     account_plugin.console_say(
