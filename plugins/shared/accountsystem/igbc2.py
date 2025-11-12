@@ -48,6 +48,10 @@ CONFIG_FALLBACK = \
         "minCredits": 10,
         "maxCredits": 50,
         "maxRounds": 5
+    },
+    "objectiveCredits": {
+        "enabled": false,
+        "credits": 10
     }
 }
 """
@@ -1105,6 +1109,12 @@ class BankingPlugin:
                 return self._smodCommandList[c][1](playerName, smodID, adminIP, cmdArgs)
         return False
 
+    def _on_objective(self, event : Event):
+        if self.config.GetValue("objectiveCredits", None) != None and self.config.cfg["objectiveCredits"]["enabled"]:
+            self.add_credits(event.client.GetId(), self.config.cfg["objectiveCredits"]["credits"])
+            self.SvTell(event.client.GetId(), f"You have been awarded {self.config.cfg['objectiveCredits']['credits']} credits ({colors.ColorizeText(str(self.get_credits(event.client.GetId())), self.themecolor)}) for completing the objective!")
+        return True
+
 
     def SvTell(self, pid: int, message: str):
         """Send message to player"""
@@ -1182,6 +1192,8 @@ def OnEvent(event: Event) -> bool:
         banking_plugin._on_init_game(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
         banking_plugin._on_client_changed(event)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_OBJECTIVE:
+        banking_plugin._on_objective(event)
     return False
 
 
