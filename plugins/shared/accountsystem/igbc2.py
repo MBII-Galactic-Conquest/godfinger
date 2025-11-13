@@ -141,7 +141,9 @@ class BankingPlugin:
                 ("cancel",): ("!cancel - Cancel pending transaction",
                              self._handle_cancel),
                 ("bounties",): ("!bounties - View active bounties",
-                              self._handle_bounties)
+                              self._handle_bounties),
+                ("credrank", "balrank"): ("!credrank - Check your rank on the balance leaderboard",
+                               self._handle_credrank)
             }
         }
         self._smodCommandList = {
@@ -493,6 +495,44 @@ class BankingPlugin:
             top_players.append(f"{name}^7 (ID: {uid}): {colors.ColorizeText('$' + str(credits_val), self.themecolor)}")
 
         self.Say("Top 10 Credits Balances: " + ", ".join(top_players))
+        return True
+
+    def _handle_credrank(self, player: Player, team_id: int, args: list[str]) -> bool:
+        """Handle !credrank command"""
+        player_id = player.GetId()
+        account = self.get_account_by_pid(player_id)
+
+        if not account or account.is_dummy_account():
+            self.SvTell(player_id, "Account not found or is temporary.")
+            return True
+
+        credits = self.get_credits(player_id)
+
+        if credits is None:
+            self.SvTell(player_id, "Could not retrieve your balance.")
+            return True
+
+        # Get player's rank
+        rank_query = f"""
+            SELECT COUNT(*) + 1 as rank
+            FROM banking
+            WHERE credits > {credits}
+        """
+        rank_result = self.db_connection.ExecuteQuery(rank_query, withResponse=True)
+
+        # Get total players
+        total_query = "SELECT COUNT(*) FROM banking"
+        total_result = self.db_connection.ExecuteQuery(total_query, withResponse=True)
+
+        if rank_result and total_result:
+            rank = rank_result[0][0]
+            total = total_result[0][0]
+            credits_text = colors.ColorizeText(str(credits), self.themecolor)
+
+            self.SvTell(player_id, f"Your balance rank: #{rank} of {total} (Credits: {credits_text})")
+        else:
+            self.SvTell(player_id, "Rank data unavailable.")
+
         return True
 
     def _handle_mod_credits(self, playerName, smodId, adminIP, cmdArgs):
