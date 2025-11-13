@@ -289,13 +289,13 @@ class BankingPlugin:
                     if not sender_account in bounty.contributors:
                         self.active_bounties[target_id].contributors.append(sender_account)
                     self.active_bounties[target_id].add_amount(amount)
-                    self.SvTell(sender_account.player_id, f"Added {amount} credits to {target_account.player_name}^7's bounty.")
+                    self.Say(f"Added {amount} credits to {target_account.player_name}^7's bounty.")
                     self.SvTell(target_account.player_id, f"Your bounty has increased by {amount} credits ({self.active_bounties[target_id].amount}) by {sender_account.player_name}^7")
                 else:
                     if not sender_account in bounty.contributors:
                         bounty.contributors.append(sender_account)
                     self.active_bounties[target_account.player_id] = bounty
-                    self.SvTell(sender_account.player_id, f"Bounty of {amount} credits placed on {target_account.player_name}^7")
+                    self.Say(f"Bounty of {amount} credits placed on {target_account.player_name}^7")
                     self.SvTell(target_account.player_id, f"Bounty of {amount} credits placed on you by {sender_account.player_name}^7")
             else:
                 self.SvTell(player.GetId(), "Failed to place bounty")
