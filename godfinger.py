@@ -600,6 +600,8 @@ class MBIIServer:
                 self.OnClientDisconnect(message)
             elif lineParse[0] == "ClientUserinfoChanged:":
                 self.OnClientUserInfoChanged(message)
+            elif line.endswith(") completed the objective!"):
+                self.OnObjective(message)
             else:
                 return
 
@@ -735,6 +737,21 @@ class MBIIServer:
             else:
                 self._primarySvInterface.Say('^1[Godfinger]: ^7' + commandStr)
 
+        return True
+
+    def OnObjective(self, logMessage : logMessage.LogMessage):
+        messageRaw = logMessage.content
+        # using regex to extract player ID
+        match = re.search(r'\(ID: (\d+)\)', messageRaw)
+        if match:
+            player_id = int(match.group(1))
+            cl = self._clientManager.GetClientById(player_id)
+            if cl:
+                self._pluginManager.Event(godfingerEvent.ObjectiveEvent(cl, {"messageRaw": messageRaw}, isStartup=logMessage.isStartup))
+        else:
+            Log.error("Unable to retrieve player ID from objective message")
+            return False
+            
         return True
 
     def HandleSmodHelp(self, playerName, smodID, adminIP, cmdArgs):

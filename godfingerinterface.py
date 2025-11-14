@@ -384,7 +384,7 @@ class RconInterface(AServerInterface):
                                 if len(line) > 0:
                                     line = line[7:]
                                     self._workingMessageQueue.put(logMessage.LogMessage(line))
-                    if IsUnix or (len(linesSplit) == 1 and linesSplit[0] == ""):
+                    if (len(linesSplit) == 1 and linesSplit[0] == ""):
                         time.sleep(sleepTime)
                 else:
                     break
