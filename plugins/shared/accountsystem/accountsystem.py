@@ -306,8 +306,6 @@ class AccountPlugin:
             account = Account(None, client_id, player_name, ip_address, None, client=client)
             self.account_manager.accounts[client_id] = account
 
-        if welcome_message:
-            self._tell_player(client_id, welcome_message)
 
         return account, created, welcome_message
 
