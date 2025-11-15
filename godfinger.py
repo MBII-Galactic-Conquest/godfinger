@@ -951,13 +951,32 @@ class MBIIServer:
         Log.debug("Client user info changed log entry %s", textified)
         lineParse = textified.split()
         clientId = int(lineParse[1])
-        userInfo = textified[23 + len(lineParse[1]):].strip()  # easier if we just ignore everything up until the variables
+        userInfoString = textified[23 + len(lineParse[1]):].strip()
+
         cl = self._clientManager.GetClientById(clientId)
-        if cl != None:
-            cl.Update(userInfo)
-            self._pluginManager.Event( godfingerEvent.ClientChangedEvent( cl, cl.GetInfo(), isStartup = logMessage.isStartup ) )
-        else:
+        if cl is None:
             Log.warning(f"Attempted to update userinfo of client {clientId} which does not exist, ignoring")
+            return
+
+        if not userInfoString or userInfoString == "0":
+            Log.warning(f"Received invalid or empty userinfo '{userInfoString}' for client {clientId}, ignoring update.")
+            return
+
+        # Parse userinfo string into a dictionary
+        userInfoDict = {}
+        parts = userInfoString.split("\\")
+        # Handle potential empty strings from splitting
+        if len(parts) > 1:
+            for i in range(0, len(parts) - 1, 2):
+                if parts[i] and parts[i+1]: # Ensure key and value are not empty
+                    userInfoDict[parts[i]] = parts[i+1]
+
+        if len(userInfoDict) == 0:
+            Log.warning(f"Could not parse userinfo string '{userInfoString}' for client {clientId}, ignoring update.")
+            return
+
+        cl.Update(userInfoDict)
+        self._pluginManager.Event(godfingerEvent.ClientChangedEvent(cl, cl.GetInfo(), isStartup=logMessage.isStartup))
 
     def OnInitGame(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content

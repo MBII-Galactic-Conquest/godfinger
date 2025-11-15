@@ -58,11 +58,8 @@ class Client(object):
     mbc - current class
     """
     
-    def Update(self, data : str):
-        data = data.split("\\")
-        for i in range(0, len(data), 2):
-            key = data[i]
-            value = data[i+1]
+    def Update(self, data : dict[str, str]):
+        for key, value in data.items():
             if key == "n" and self._name != value:
                 # logMessage(f"Client {self} has changed their name to {value}")
                 self._name = value
