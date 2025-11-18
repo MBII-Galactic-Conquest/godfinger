@@ -706,19 +706,33 @@ class RTV(object):
 
     def _HandleRTMWinner(self, winner):
         """Handle RTM vote winner"""
+        winner_index = self._currentVote.GetOptions().index(winner)
+        winner_votes = len(self._currentVote._playerVotes[winner_index + 1])
+        total_votes = self._currentVote.GetVoterCount()
+        percentage = 0
+        if total_votes > 0:
+            percentage = round((winner_votes / total_votes) * 100)
+
         if self._config.cfg["rtm"]["changeImmediately"]:
             self._SwitchRTM(winner)
         else:
             self._rtmToSwitch = winner
-            self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
+            self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} with {percentage} percent of the votes next round!")
 
     def _HandleRTVWinner(self, winner):
         """Handle RTV vote winner"""
+        winner_index = self._currentVote.GetOptions().index(winner)
+        winner_votes = len(self._currentVote._playerVotes[winner_index + 1])
+        total_votes = self._currentVote.GetVoterCount()
+        percentage = 0
+        if total_votes > 0:
+            percentage = round((winner_votes / total_votes) * 100)
+
         if self._config.cfg["rtv"]["changeImmediately"]:
             self._SwitchRTV(winner)
         else:
             self._rtvToSwitch = winner
-            self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
+            self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} with {percentage} percent of the votes next round!")
 
     def _HandleTiebreaker(self, winners: list, voteType: str):
         """Handle tie - start tiebreaker vote"""
