@@ -281,28 +281,46 @@ class BankingPlugin:
         # Check for pending bounties
         elif pid in self.pending_bounties:
             bounty = self.pending_bounties[pid]
-            sender_account = bounty.issuer_account
-            target_account = bounty.target_account
-            target_id = target_account.player_id
-            amount = bounty.amount
-            if self.deduct_credits(player.GetId(), amount):
+            issuer_player = self.server_data.GetClientByID(pid)
+            target_player = self.server_data.GetClientByID(bounty.target_account.player_id)
+
+            if self._place_bounty(issuer_player, target_player, bounty.amount):
                 del self.pending_bounties[pid]
-                if target_id in self.active_bounties:
-                    if not sender_account in bounty.contributors:
-                        self.active_bounties[target_id].contributors.append(sender_account)
-                    self.active_bounties[target_id].add_amount(amount)
-                    self.Say(f"Added {amount} credits to {target_account.player_name}^7's bounty.")
-                    self.SvTell(target_account.player_id, f"Your bounty has increased by {amount} credits ({self.active_bounties[target_id].amount}) by {sender_account.player_name}^7")
-                else:
-                    if not sender_account in bounty.contributors:
-                        bounty.contributors.append(sender_account)
-                    self.active_bounties[target_account.player_id] = bounty
-                    self.Say(f"Bounty of {amount} credits placed on {target_account.player_name}^7")
-                    self.SvTell(target_account.player_id, f"Bounty of {amount} credits placed on you by {sender_account.player_name}^7")
             else:
-                self.SvTell(player.GetId(), "Failed to place bounty")
+                # _place_bounty already sent a message
+                pass
         else:
             self.SvTell(pid, "No pending transactions")
+        return True
+
+    def _place_bounty(self, issuer_player: Player, target_player: Player, amount: int) -> bool:
+        """Handles the logic of placing or adding to a bounty."""
+        issuer_id = issuer_player.GetId()
+        target_id = target_player.GetId()
+        issuer_account = self.get_account_by_pid(issuer_id)
+        target_account = self.get_account_by_pid(target_id)
+
+        if not self.deduct_credits(issuer_id, amount):
+            self.SvTell(issuer_id, "Failed to place bounty (insufficient funds)")
+            return False
+
+        if target_id in self.active_bounties:
+            # Add to existing bounty
+            existing_bounty = self.active_bounties[target_id]
+            existing_bounty.add_amount(amount)
+            if issuer_account not in existing_bounty.contributors:
+                existing_bounty.contributors.append(issuer_account)
+            self.Say(f"Added {amount} credits to existing bounty on {target_player.GetName()}^7. Total: {existing_bounty.amount} credits")
+            self.SvTell(target_id, f"Your bounty has increased by {amount} credits ({existing_bounty.amount}) by {issuer_player.GetName()}^7")
+        else:
+            # Create a new bounty
+            bounty = Bounty(issuer_account, target_account, amount)
+            if issuer_account not in bounty.contributors:
+                bounty.contributors.append(issuer_account)
+            self.active_bounties[target_id] = bounty
+            self.Say(f"Bounty of {amount} credits placed on {target_player.GetName()}^7")
+            self.SvTell(target_id, f"Bounty of {amount} credits placed on you by {issuer_player.GetName()}^7")
+        
         return True
 
     def _handle_bounties(self, player: Player, team_id: int, args: list[str]) -> bool:
@@ -345,7 +363,7 @@ class BankingPlugin:
         # Find target player(s)
         targets = self.find_players(target_name, exclude=player.GetId())
         if not targets:
-            self.SvTell(player.GetId(), f"No players found matching '{target_name}'")
+            self.SvTell(player.GetId(), f"No players found matching '{target_name}'. Usage: !bounty <name> <amount>")
             return True
         elif len(targets) > 1:
             # Multiple matches found, ask for clarification
@@ -383,27 +401,7 @@ class BankingPlugin:
             return True
 
         if confirm:
-            # Place bounty immediately
-            if target_id in self.active_bounties:
-                existing_bounty = self.active_bounties[target_id]
-                if self.deduct_credits(player.GetId(), amount):
-                    existing_bounty.add_amount(amount)
-                    if not player_account in existing_bounty.contributors:
-                        existing_bounty.contributors.append(player_account)
-                    self.Say(f"Added {amount} credits to existing bounty on {target.GetName()}^7. Total: {existing_bounty.amount} credits")
-                else:
-                    self.SvTell(player.GetId(), "Failed to add to bounty")
-            else:
-                # Deduct credits immediately
-                if self.deduct_credits(player.GetId(), amount):
-                    bounty = Bounty(player_account, target_account, amount)
-                    self.active_bounties[target_id] = bounty
-                    if not player_account in bounty.contributors:
-                        bounty.contributors.append(player_account)
-                    self.Say(f"Bounty of {amount} credits placed on {target.GetName()}^7")
-                    self.SvTell(target_id, f"Bounty of {amount} credits placed on you by {player.GetName()}^7")
-                else:
-                    self.SvTell(player.GetId(), "Failed to place bounty")
+            self._place_bounty(player, target, amount)
         else:
             # Store pending bounty
             bounty = Bounty(player_account, target_account, amount)
@@ -961,12 +959,12 @@ class BankingPlugin:
             if toAdd > 0:
                 self.SvTell(
                     killer_id,
-                    f"Earned {toAdd} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
+                    f"Earned {colors.ColorizeText(str(toAdd), self.themecolor)} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
                 )
             elif toAdd < 0:
                 self.SvTell(
                     killer_id,
-                    f"Fined {abs(toAdd)} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
+                    f"Fined {colors.ColorizeText(str(abs(toAdd)), self.themecolor)} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
                 )
         return False
 
