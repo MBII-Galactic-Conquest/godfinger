@@ -119,8 +119,6 @@ class BankingPlugin:
         self.active_bounties = {}  # target_id: Bounty
         self.player_rounds = {}  # player_id: rounds_played
         self.player_class_by_pid = {}  # player_id: current character/class name
-        self.extralives_map = {}  # character/class name -> extralives (int >= 0)
-        self._load_extralives_map()
         self._register_commands()
         # self.initialize_banking_table()
 
@@ -968,50 +966,9 @@ class BankingPlugin:
                 )
         return False
 
-    # ==== Extra lives integration ====
-    def _extralives_path(self) -> str:
-        # repo_root/plugins/shared/accountsystem/igbc2.py -> repo_root/data/extralives.json
-        here = os.path.dirname(__file__)
-        repo_root = os.path.abspath(os.path.join(here, "..", "..", ".."))
-        return os.path.join(repo_root, "data", "extralives.json")
-
-    def _load_extralives_map(self) -> None:
-        """Load extralives table from JSON into memory. Keys are plaintext character names."""
-        try:
-            path = self._extralives_path()
-            if not os.path.exists(path):
-                Log.warning(f"extralives.json not found at {path}; kill rewards will not be scaled")
-                self.extralives_map = {}
-                return
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            # Expect structure: { total_characters: N, characters: { name: { extralives: int, ... }, ... } }
-            chars = data.get("characters", {}) if isinstance(data, dict) else {}
-            table = {}
-            for name, info in chars.items():
-                try:
-                    n = info.get("extralives", 0)
-                    if n is None:
-                        n = 0
-                    n = int(n)
-                    if n < 0:
-                        n = 0
-                    table[str(name)] = n
-                except Exception:
-                    continue
-            self.extralives_map = table
-            Log.info(f"Loaded extralives map with {len(self.extralives_map)} entries")
-        except Exception as e:
-            Log.error(f"Failed to load extralives.json: {e}")
-            self.extralives_map = {}
-
     def _handle_reload_extralives(self, playerName, smodId, adminIP, cmdArgs):
         """SMOD command to reload extralives.json at runtime."""
-        try:
-            self._load_extralives_map()
-            self.server_data.interface.SmSay(self.msg_prefix + f"Reloaded extralives table ({len(self.extralives_map)} entries)")
-        except Exception as e:
-            self.server_data.interface.SmSay(self.msg_prefix + f"Failed to reload extralives: {e}")
+        self.server_data.interface.SmSay(self.msg_prefix + "This command is deprecated. Extra lives data is loaded at server startup.")
         return True
 
     def get_extralives_for_pid(self, player_id: int) -> int:
@@ -1019,7 +976,7 @@ class BankingPlugin:
         name = self.player_class_by_pid.get(player_id)
         if not name:
             return 0
-        return int(self.extralives_map.get(name, 0))
+        return int(self.server_data.extralives_map.get(name, 0))
 
     def _on_client_changed(self, event: Event):
         """Track player's current class/character name when they change class."""

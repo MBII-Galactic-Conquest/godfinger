@@ -331,6 +331,22 @@ class MBIIServer:
         exportAPI.GetPlugin         = self.API_GetPlugin
         exportAPI.Restart           = self.Restart
         self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._primarySvInterface, Args) # Use primary interface
+        extralives_path = os.path.join(os.path.dirname(__file__), "data", "extralives.json")
+        try:
+            with open(extralives_path, "r") as f:
+                extralives_data = json.load(f)
+                if extralives_data and "characters" in extralives_data:
+                    self._serverData.extralives_map = {
+                        char: details["extralives"]
+                        for char, details in extralives_data["characters"].items()
+                        if "extralives" in details
+                    }
+                else:
+                    self._serverData.extralives_map = {}
+        except FileNotFoundError:
+            Log.error(f"extralives.json not found at {extralives_path}")
+        except json.JSONDecodeError:
+            Log.error(f"Error decoding extralives.json at {extralives_path}")
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)))
 
 
