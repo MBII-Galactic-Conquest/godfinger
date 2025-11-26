@@ -979,11 +979,11 @@ class RTV(object):
             
             # Check each validation condition separately for clearer error reporting
             if mapObj == None:
-                failReason = "map was not found"
+                failReason = f"map {colors.ColorizeText(mapToNom, self._themeColor)} was not found"
             elif len(self._nominations) >= 5 and not playerHasNomination:
                 failReason = "nomination list full"
             elif mapObj in [x.GetMap() for x in self._nominations]:
-                failReason = "map already nominated"
+                failReason = f"map {colors.ColorizeText(mapToNom, self._themeColor)} already nominated"
             elif self._config.cfg["rtv"]["allowNominateCurrentMap"] == False and mapToNom.lower() == self._mapName.lower():
                 failReason = "server does not allow nomination of current map"
             elif mapToNom.lower() in [x[0].lower() for x in self._rtvRecentMaps] and self._config.cfg["rtv"]["disableRecentMapNomination"] == True:
