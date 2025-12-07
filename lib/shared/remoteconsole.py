@@ -378,3 +378,10 @@ class RCON(object):
         else:
             cmd = b'exec'
         return self.Request(b"\xff\xff\xff\xffrcon %b %b %b" % (self._password, cmd, filename))
+
+    def MarkTK(self, player_id : int, time : int):
+        if not type(player_id) == bytes:
+            player_id = bytes(str(player_id), "UTF-8")
+        if not type(time) == bytes:
+            time = bytes(str(time), "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b marktk %b %b" % (self._password, player_id, time))
