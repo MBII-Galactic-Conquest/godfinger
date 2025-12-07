@@ -308,13 +308,13 @@ class RCON(object):
         res = res.decode("UTF-8", "ignore");
         return res
     
-    def DumpUser(self, id) -> str:
-        if not type(id) == bytes:
-            id = bytes(str(id), "UTF-8") 
-            res = self.Request(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self._password, id));
-            if res != None and len(res) > 0:
-                res = res.decode("UTF-8", "ignore");
-            return res;
+    def DumpUser(self, user_id) -> str:
+        if not type(user_id) == bytes:
+            user_id = bytes(str(user_id), "UTF-8") 
+        res = self.Request(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self._password, user_id));
+        if res != None and len(res) > 0:
+            res = res.decode("UTF-8", "ignore");
+        return res;
   
     def _CvarListParser(self, bb : bytes) -> bool:
         return True if bb.decode("UTF-8", "ignore").rfind("total cvars") != -1 else False;
@@ -364,7 +364,7 @@ class RCON(object):
             msg = bytes(msg, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self._password, msg));
 
-    def Exec(self, filename : str, quiet : bool = False):
+    def ExecFile(self, filename : str, quiet : bool = False):
         """
         Executes a script file with the given filename.
         If the filename does not have a file extension, .cfg will be added to the end of the filename.
