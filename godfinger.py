@@ -85,6 +85,11 @@ CONFIG_FALLBACK = \
     "serverFileName":"mbiided.x86.exe",
     "logicDelay":0.016,
     "restartOnCrash": false,
+    "floodProtection": {
+        "enabled": false,
+        "soft": false,
+        "seconds": 1.5
+    },
 
     "interfaces":
     {
@@ -637,6 +642,22 @@ class MBIIServer:
             message : str = parts[1]
             if message.startswith("!"):
                 cmdArgs = message[1:].split()
+                
+                # Flood Protection
+                floodProtectionConfig = self._config.GetValue("floodProtection", {
+                    "enabled": False,
+                    "soft": False,
+                    "seconds": 1.5
+                })
+
+                if floodProtectionConfig["enabled"] and senderClient:
+                    command = cmdArgs[0].lower()
+                    if senderClient._floodProtectionCooldown.IsSet():
+                        if (floodProtectionConfig["soft"] and command == senderClient._lastCommand) or not floodProtectionConfig["soft"]:
+                            return
+                    senderClient._floodProtectionCooldown.Set(floodProtectionConfig["seconds"])
+                    senderClient._lastCommand = command
+
                 if cmdArgs and cmdArgs[0] == "help":
                     # Handle help command directly
                     self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)

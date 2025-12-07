@@ -82,72 +82,31 @@ CONFIG_FALLBACK = \
     "pluginThemeColor" : "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
-    "caseSensitiveCommands" : false,
-    "requirePrefix" : false,
-    "protectedNames" : ["admin", "server"],
-    "kickProtectedNames" : true,
-    "useSayOnly" : false,
-    "floodProtection" :
-    {
-        "enabled" : false,
-        "soft" : false,
-        "seconds" : 1.5
-    },
-    "showVoteCooldownTime" : 5,
-    "maxMapPageSize" : 950,
-    "maxSearchPageSize" : 950,
-    "rtv" : 
-    {
-        "enabled" : true,
-        "voteTime" : 180,
-        "voteAnnounceTimer" : 30,
-        "voteRequiredRatio" : 0.5,
-        "automaticMaps" : true,
-        "primaryMaps" : 
-        [
-            
-        ],
-        "secondaryMaps" : 
-        [
-            
-        ],
-        "useSecondaryMaps" : 1,
-        "mapBanList" : 
-        [
-            "yavin1",
-            "yavin1b",
-            "yavin2",
-            "vjun1",
-            "vjun2",
-            "vjun3",
-            "taspir1",
-            "taspir2",
-            "t1_danger",
-            "t1_fatal",
-            "t1_inter",
-            "t1_rail",
-            "t1_sour",
-            "t1_surprise",
-            "t2_wedge",
-            "t2_trip",
-            "t2_rogue",
-            "t2_rancor",
-            "t2_dpred",
-            "t3_bounty",
-            "t3_byss",
-            "t3_hevil",
-            "t3_rift",
-            "t3_stamp",
-            "kor1",
-            "kor2",
-            "hoth3",
-            "hoth2",
-            "academy1",
-            "academy2",
-            "academy3",
-            "academy4",
-            "academy5",
-            "academy6"
+    "caseSensitiveCommands": false,
+    "requirePrefix": false,
+    "protectedNames": ["admin", "server"],
+    "kickProtectedNames": true,
+    "useSayOnly": false,
+    "showVoteCooldownTime": 5,
+    "maxMapPageSize": 950,
+    "maxSearchPageSize": 950,
+    "rtv": {
+        "enabled": true,
+        "voteTime": 180,
+        "voteAnnounceTimer": 30,
+        "voteRequiredRatio": 0.5,
+        "automaticMaps": true,
+        "primaryMaps": [],
+        "secondaryMaps": [],
+        "useSecondaryMaps": 1,
+        "mapBanList": [
+            "yavin1", "yavin1b", "yavin2", "vjun1", "vjun2", "vjun3",
+            "taspir1", "taspir2", "t1_danger", "t1_fatal", "t1_inter",
+            "t1_rail", "t1_sour", "t1_surprise", "t2_wedge", "t2_trip",
+            "t2_rogue", "t2_rancor", "t2_dpred", "t3_bounty", "t3_byss",
+            "t3_hevil", "t3_rift", "t3_stamp", "kor1", "kor2", "hoth3",
+            "hoth2", "academy1", "academy2", "academy3", "academy4",
+            "academy5", "academy6"
         ],
         "mapTypePriority" : {
             "enabled" : true,
@@ -443,8 +402,6 @@ class RTVPlayer(player.Player):
     """ Specialized player class for RTV/RTM, implements RTV/RTM specific player variables  """
     def __init__(self, cl: client.Client):
         super().__init__(cl)
-        self._floodProtectionCooldown = Timeout()
-        self._lastCommand = None
 
 class RTV(object):
     """Main class implementing Rock the Vote (RTV) and Rock the Mode (RTM) functionality"""
@@ -786,12 +743,6 @@ class RTV(object):
             command = command.lower()
         for c in self._commandList[teamId]:
             if command in c:
-                if self._config.cfg["floodProtection"]["enabled"] == True:
-                    if player._floodProtectionCooldown.IsSet() == True and \
-                    ((self._config.cfg["floodProtection"]["soft"] == True and c == player._lastCommand) or self._config.cfg["floodProtection"]["soft"] == False):
-                        return False
-                    player._floodProtectionCooldown.Set(self._config.cfg["floodProtection"]["seconds"])
-                    player._lastCommand = c
                 return self._commandList[teamId][c][1](player, teamId, cmdArgs)
         return False
 
