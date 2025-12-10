@@ -21,6 +21,7 @@ class ServerData():
         self.gameType = "";
         self.mapName = "";
         self.mode = -1;
+        self.extralives_map = {}
     
     def GetInterfaceType(self):
         return self.interface.GetType();

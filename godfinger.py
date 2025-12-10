@@ -85,6 +85,11 @@ CONFIG_FALLBACK = \
     "serverFileName":"mbiided.x86.exe",
     "logicDelay":0.016,
     "restartOnCrash": false,
+    "floodProtection": {
+        "enabled": false,
+        "soft": false,
+        "seconds": 1.5
+    },
 
     "interfaces":
     {
@@ -220,12 +225,14 @@ class MBIIServer:
         self._status = MBIIServer.STATUS_INIT
         Log.info("Initializing Godfinger...")
         # Config load first
-        self._config = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
+        self._config = config.Config.from_file(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
         if self._config == None:
+            Log.error("Failed to load Godfinger config.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
 
         if not self.ValidateConfig(self._config):
+            Log.error("Godfinger config validation failed.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
 
@@ -331,6 +338,22 @@ class MBIIServer:
         exportAPI.GetPlugin         = self.API_GetPlugin
         exportAPI.Restart           = self.Restart
         self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._primarySvInterface, Args) # Use primary interface
+        extralives_path = os.path.join(os.path.dirname(__file__), "data", "extralives.json")
+        try:
+            with open(extralives_path, "r") as f:
+                extralives_data = json.load(f)
+                if extralives_data and "characters" in extralives_data:
+                    self._serverData.extralives_map = {
+                        char: details["extralives"]
+                        for char, details in extralives_data["characters"].items()
+                        if "extralives" in details
+                    }
+                else:
+                    self._serverData.extralives_map = {}
+        except FileNotFoundError:
+            Log.error(f"extralives.json not found at {extralives_path}")
+        except json.JSONDecodeError:
+            Log.error(f"Error decoding extralives.json at {extralives_path}")
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)))
 
 
@@ -621,6 +644,22 @@ class MBIIServer:
             message : str = parts[1]
             if message.startswith("!"):
                 cmdArgs = message[1:].split()
+                
+                # Flood Protection
+                floodProtectionConfig = self._config.GetValue("floodProtection", {
+                    "enabled": False,
+                    "soft": False,
+                    "seconds": 1.5
+                })
+
+                if floodProtectionConfig["enabled"] and senderClient:
+                    command = cmdArgs[0].lower()
+                    if senderClient._floodProtectionCooldown.IsSet():
+                        if (floodProtectionConfig["soft"] and command == senderClient._lastCommand) or not floodProtectionConfig["soft"]:
+                            return
+                    senderClient._floodProtectionCooldown.Set(floodProtectionConfig["seconds"])
+                    senderClient._lastCommand = command
+
                 if cmdArgs and cmdArgs[0] == "help":
                     # Handle help command directly
                     self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
