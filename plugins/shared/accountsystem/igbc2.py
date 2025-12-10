@@ -113,7 +113,7 @@ class PendingBounty(PendingTransaction):
 
     def on_confirm(self, plugin):
         issuer_player = self.player
-        target_player = plugin.server_data.GetClientByID(self.target_account.player_id)
+        target_player = plugin.server_data.API.GetClientById(self.target_account.player_id)
         plugin._place_bounty(issuer_player, target_player, self.amount)
 
     def on_cancel(self, plugin):
