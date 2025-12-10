@@ -72,14 +72,14 @@ Log = logging.getLogger(__name__)
 SERVER_DATA = None
 
 # Configuration file paths and defaults
-DEFAULT_CFG_PATH = os.path.join(os.path.dirname(__file__), "rtvConfig.json")
-DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
+DEFAULT_CFG_JSON = os.path.join(os.path.dirname(__file__), "rtvConfig.json")
+DEFAULT_CFG_YAML = os.path.join(os.path.dirname(__file__), "rtvConfig.yaml")
+DEFAULT_CFG = None
 
 # Fallback configuration if config file doesn't exist
-CONFIG_FALLBACK = \
-"""{
+CONFIG_FALLBACK = '''{
     "MBIIPath": "your/mbii/path/here",
-    "pluginThemeColor" : "green",
+    "pluginThemeColor": "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
     "caseSensitiveCommands": false,
@@ -108,78 +108,89 @@ CONFIG_FALLBACK = \
             "hoth2", "academy1", "academy2", "academy3", "academy4",
             "academy5", "academy6"
         ],
-        "mapTypePriority" : {
-            "enabled" : true,
-            "primary" : 2,
-            "secondary" : 0,
-            "nochange" : 1
+        "mapTypePriority": {
+            "enabled": true,
+            "primary": 2,
+            "secondary": 0,
+            "nochange": 1
         },
-        "allowNominateCurrentMap" : false,
-        "emptyServerMap" : 
-        {
-            "enabled" : true,
-            "map" : "mb2_dotf_classicb"
+        "allowNominateCurrentMap": false,
+        "emptyServerMap": {
+            "enabled": true,
+            "map": "mb2_dotf_classicb"
         },
-        "timeLimit" : 
-        {
-            "enabled" : false,
-            "seconds" : 0
+        "timeLimit": {
+            "enabled": false,
+            "seconds": 0
         },
-        "roundLimit" : 
-        {
-            "enabled" : false,
-            "rounds" : 0
+        "roundLimit": {
+            "enabled": false,
+            "rounds": 0
         },
-        "minimumVoteRatio" :
-        {
-            "enabled" : true,
-            "ratio" : 0.1
+        "minimumVoteRatio": {
+            "enabled": true,
+            "ratio": 0.1
         },
-        "successTimeout" : 30,
-        "failureTimeout" : 60,
-        "disableRecentlyPlayedMaps" : 1800,
-        "disableRecentMapNomination" : true,
-        "skipVoting" : true,
-        "secondTurnVoting" : true,
-        "changeImmediately" : true
+        "successTimeout": 30,
+        "failureTimeout": 60,
+        "disableRecentlyPlayedMaps": 1800,
+        "disableRecentMapNomination": true,
+        "skipVoting": true,
+        "secondTurnVoting": true,
+        "changeImmediately": true
     },
-    "rtm" : 
-    {
-        "enabled" : true,
-        "voteTime" : 20,
-        "voteAnnounceTimer" : 30,
-        "voteRequiredRatio" : 0.5,
-        "modes_enabled" : ["Open", "Legends", "Duel", "Full Authentic"],
-        "emptyServerMode" : 
-        {
-            "enabled" : false,
-            "mode" : "open"
+    "rtm": {
+        "enabled": true,
+        "voteTime": 20,
+        "voteAnnounceTimer": 30,
+        "voteRequiredRatio": 0.5,
+        "modes_enabled": ["Open", "Legends", "Duel", "Full Authentic"],
+        "emptyServerMode": {
+            "enabled": false,
+            "mode": "open"
         },
-        "timeLimit" : 
-        {
-            "enabled" : false,
-            "seconds" : 0
+        "timeLimit": {
+            "enabled": false,
+            "seconds": 0
         },
-        "roundLimit" : 
-        {
-            "enabled" : false,
-            "rounds" : 0
+        "roundLimit": {
+            "enabled": false,
+            "rounds": 0
         },
-        "minimumVoteRatio" :
-        {
-            "enabled" : false,
-            "ratio" : 0
+        "minimumVoteRatio": {
+            "enabled": false,
+            "ratio": 0
         },
-        "successTimeout" : 60,
-        "failureTimeout" : 60,
-        "skipVoting" : true,
-        "secondTurnVoting" : true,
-        "changeImmediately" : true
+        "successTimeout": 60,
+        "failureTimeout": 60,
+        "skipVoting": true,
+        "secondTurnVoting": true,
+        "changeImmediately": true
     }
-}
+}'''
 
-"""
+# Try to load YAML config first, fall back to JSON if not found
+try:
+    if os.path.exists(DEFAULT_CFG_YAML):
+        DEFAULT_CFG = config.Config.from_file(DEFAULT_CFG_YAML, CONFIG_FALLBACK)
+        Log.info(f"Loaded configuration from YAML file: {DEFAULT_CFG_YAML}")
+    elif os.path.exists(DEFAULT_CFG_JSON):
+        DEFAULT_CFG = config.Config.from_file(DEFAULT_CFG_JSON, CONFIG_FALLBACK)
+        Log.info(f"Loaded configuration from JSON file: {DEFAULT_CFG_JSON}")
+    else:
+        # If neither file exists, create a default YAML config
+        DEFAULT_CFG = config.Config.FromString(CONFIG_FALLBACK)
+        with open(DEFAULT_CFG_YAML, 'w', encoding='utf-8') as f:
+            import yaml
+            yaml.dump(json.loads(CONFIG_FALLBACK), f, default_flow_style=False, sort_keys=False)
+        Log.warning(f"No config file found. Created default YAML config at: {DEFAULT_CFG_YAML}")
+except Exception as e:
+    Log.error(f"Error loading configuration: {str(e)}")
+    DEFAULT_CFG = config.Config()
+    DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
+    Log.warning("Using default configuration due to error")
 
+# Map game modes to their internal IDs
 # Map game modes to their internal IDs
 MBMODE_ID_MAP = {
     'open' : 0,
@@ -189,9 +200,9 @@ MBMODE_ID_MAP = {
     'legends' : 4
 }
 
-# Create default config if it doesn't exist
-if DEFAULT_CFG == None:
-    DEFAULT_CFG = config.Config()
+# Final check if we have a valid config
+if not hasattr(DEFAULT_CFG, 'cfg'):
+    Log.error("Failed to initialize configuration. Using default settings.")
     DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
     Log.error(f"Could not open config file at {os.path.dirname(__file__) + 'rtvConfig.json, ensure the file is a valid JSON file in the correct file path.'}")
     with open(DEFAULT_CFG_PATH, "wt") as f:
@@ -734,6 +745,36 @@ class RTV(object):
         self.SvSay(f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!")
         if doSleep:
             sleep(1)
+        
+        # Get purchased teams from banking plugin
+        teamsToChange1 = self._serverData.GetServerVar("team1_purchased_teams")
+        teamsToChange2 = self._serverData.GetServerVar("team2_purchased_teams")
+        if teamsToChange1 != None and len(teamsToChange1) > 0:
+            # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
+            team_names = []
+            for t in teamsToChange1:
+                if hasattr(t, "name"):
+                    team_names.append(t.name)
+                else:
+                    team_names.append(str(t))
+            teamsToChange1 = ' '.join(team_names)
+            self._serverData.interface.SetTeam1("LEG_Good " + teamsToChange1)
+            self._serverData.SetServerVar("team1_purchased_teams", None)
+        else:
+            self._serverData.interface.SetTeam1("LEG_Good")
+        if teamsToChange2 != None and len(teamsToChange2) > 0:
+            # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
+            team_names = []
+            for t in teamsToChange2:
+                if hasattr(t, "name"):
+                    team_names.append(t.name)
+                else:
+                    team_names.append(str(t))
+            teamsToChange2 = ' '.join(team_names)
+            self._serverData.interface.SetTeam2("LEG_Evil " + teamsToChange2)
+            self._serverData.SetServerVar("team2_purchased_teams", None)
+        else:
+            self._serverData.interface.SetTeam2("LEG_Evil")
         self._serverData.interface.MapReload(mapToChange)
     
     def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
@@ -1139,6 +1180,12 @@ class RTV(object):
         if self._currentVote != None:
             print("last player dc'ed, killing current vote")
             self._currentVote = None
+        
+        # Reset siege teams
+        self._serverData.SetServerVar("team1_purchased_teams", None)
+        self._serverData.SetServerVar("team2_purchased_teams", None)
+        self._serverData.interface.SetTeam1("LEG_Good")
+        self._serverData.interface.SetTeam2("LEG_Evil")
         if doMap and doMode:
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]], self._config.cfg["rtv"]["emptyServerMap"]["map"])
         elif doMap:
@@ -1478,3 +1525,24 @@ if __name__ == "__main__":
     print("This is a plugin for the Godfinger Movie Battles II plugin system. Please run one of the start scripts in the start directory to use it. Make sure that this python module's path is included in godfingerCfg!")
     input("Press Enter to close this message.")
     exit()
+
+TEST_OBJ = [
+    RTVNomination(None, Map("mb2_deathstar", 'fake/path')),
+    RTVNomination(None, Map("mb2_commtower", 'fake/path')),
+    RTVNomination(None, Map("mb2_dotf", 'fake/path')),
+    RTVNomination(None, Map("mb2_cmp_dust2", 'fake/path'))
+]
+
+TEST_OBJ_2 = {
+    1 : [],
+    2 : [0],
+    3 : [1,2],
+    4 : [3,4,5,6],
+    5 : [7,8],
+    6 : []
+}
+
+TEST_OBJ[0]._map.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)
+TEST_OBJ[1]._map.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)
+TEST_OBJ[2]._map.SetPriority(MapPriorityType.MAPTYPE_SECONDARY)
+TEST_OBJ[3]._map.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)

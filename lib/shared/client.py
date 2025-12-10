@@ -1,6 +1,7 @@
 import logging
 import lib.shared.teams as teams;
 import threading;
+from lib.shared.timeout import Timeout
 
 log = logging.getLogger(__name__)
 
@@ -15,6 +16,8 @@ class Client(object):
         self._jaguid = "";
         self._userinfo = {};
         self._lastNonSpecTeamId = None;
+        self._floodProtectionCooldown = Timeout()
+        self._lastCommand = None
     
     def GetId(self) -> int:
         return self._id;

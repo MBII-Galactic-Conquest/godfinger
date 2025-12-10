@@ -225,12 +225,14 @@ class MBIIServer:
         self._status = MBIIServer.STATUS_INIT
         Log.info("Initializing Godfinger...")
         # Config load first
-        self._config = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
+        self._config = config.Config.from_file(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
         if self._config == None:
+            Log.error("Failed to load Godfinger config.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
 
         if not self.ValidateConfig(self._config):
+            Log.error("Godfinger config validation failed.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
 
