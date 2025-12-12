@@ -369,7 +369,7 @@ class BankingPlugin:
                                           self._handle_teamsearch)
             }
             teams.TEAM_GOOD: {},
-            teams.TEAM_BAD: {},
+            teams.TEAM_EVIL: {},
             teams.TEAM_SPEC: {},
         }
         self._smodCommandList = {
