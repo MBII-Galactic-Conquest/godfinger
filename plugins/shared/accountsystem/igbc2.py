@@ -368,6 +368,9 @@ class BankingPlugin:
                 ("teamsearch", "ts"): ("!teamsearch <term> - Search for teams by name",
                                           self._handle_teamsearch)
             }
+            teams.TEAM_GOOD: {},
+            teams.TEAM_BAD: {},
+            teams.TEAM_SPEC: {},
         }
         self._smodCommandList = {
                 # ... existing commands ...
