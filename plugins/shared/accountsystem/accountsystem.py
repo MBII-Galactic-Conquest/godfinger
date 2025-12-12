@@ -393,7 +393,10 @@ class AccountPlugin:
                 ("!register - Register a new account", self._handle_register),
                 ("uid", "id", "getuid", "getid"):
                 ("!uid/!id - Get your user ID", self._handle_get_uid),
-            }
+            },
+            teams.TEAM_GOOD: {},
+            teams.TEAM_EVIL: {},
+            teams.TEAM_SPEC: {},
         }
         self._smodCommandList = {
                 # ... TODO come up with some of these ...
