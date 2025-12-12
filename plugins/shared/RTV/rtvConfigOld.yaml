@@ -1,0 +1,411 @@
+# ============================================
+# Godfinger RTV/RTM Plugin Configuration
+# ============================================
+# This is a commented version of the configuration file with detailed explanations
+# for each setting. For the actual configuration, use rtvConfig.yaml
+# ============================================
+
+# Path to your Movie Battles II installation directory
+# Example (Windows): "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Jedi Academy\\GameData\\MBII\\"
+# Example (Linux): "/home/container/.local/share/openjk/MBII/"
+MBIIPath: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Jedi Academy\\GameData\\MBII\\"
+
+# Color used for plugin messages and highlights
+# Possible values: Any valid color code from lib/shared/colors.py (e.g., "red", "green", "blue", "lblue")
+pluginThemeColor: "red"
+
+# Prefix used for plugin messages
+# Note: The plugin theme color's corresponding color code is automatically added to the beginning
+MessagePrefix: "[RTV]^7: "
+
+# Command prefix for RTV/RTM commands (set to "" to disable prefix requirements)
+RTVPrefix: "!"
+
+# Whether command matching should be case-sensitive
+caseSensitiveCommands: false
+
+# Whether commands must include the prefix to be recognized
+requirePrefix: false
+
+# List of protected names (case insensitive)
+protectedNames:
+  - "admin"
+  - "server"
+
+# Whether to kick players with protected names
+kickProtectedNames: true
+
+# Whether to use 'say' instead of 'svsay' for messages
+useSayOnly: false
+
+# Cooldown time in seconds for the !showvote/!showrtv command (0 to disable)
+showVoteCooldownTime: 5
+
+# Maximum size (in characters) of each page for map list commands
+maxMapPageSize: 950
+
+# Maximum size (in characters) of each page for search results
+maxSearchPageSize: 950
+
+# Enable/disable player count sanity checks
+playerCountSanityCheck: false
+
+# ============================================
+# RTV (Rock The Vote) Configuration
+# ============================================
+rtv:
+  # Enable/disable RTV functionality
+  enabled: true
+  
+  # Duration of the vote in seconds
+  voteTime: 180
+  
+  # How often to announce vote progress in seconds
+  voteAnnounceTimer: 30
+  
+  # Minimum ratio of players needed to start a vote (0.0 to 1.0)
+  voteRequiredRatio: 0.5
+  
+  # Whether to automatically include all maps or use primary/secondary lists
+  automaticMaps: true
+  
+  # Primary maps - always available for nomination and voting
+  primaryMaps:
+    - "mb2_alderaan"
+    - "mb2_hrakertstation"
+    - "mb2_snowfacility"
+    - "mb2_manaan"
+    - "mb2_boc"
+    - "mb2_citadel"
+    - "mb2_cloudcity"
+    - "mb2_commtower"
+    - "mb2_commtower_classic"
+    - "mb2_corellia"
+    - "mb2_coruscant_chase"
+    - "mb2_deathstar"
+    - "mb2_dotf_classicb"
+    - "mb2_dxun"
+    - "mb2_echobase"
+    - "mb2_enclave"
+    - "mb2_eravana"
+    - "mb2_jabba"
+    - "mb2_jakku"
+    - "mb2_jeditemple"
+    - "mb2_kamino"
+    - "mb2_korriban"
+    - "mb2_lunarbase"
+    - "mb2_mygeeto"
+    - "mb2_ps_desert"
+    - "mb2_ps_korriban"
+    - "mb2_rc_hangarc"
+    - "mb2_republiccruiser"
+    - "mb2_republiccruiser_fastload"
+    - "um_sarlaccbarge"
+    - "mb2_scarif"
+    - "mb2_sdestroyer"
+    - "mb2_smuggler"
+    - "mb2_starkiller_base"
+    - "mb2_tantiveiv"
+    - "mb2_tatooine"
+    - "mb2_theed"
+    - "mb2_tradefed"
+    - "mb2_yavinassault"
+    - "mb2_yavinassault_veh"
+    - "mb2_cmp_dust2"
+    - "mb2_cmp_endor"
+    - "mb2_cmp_fdepot"
+    - "mb2_cmp_geocanyons"
+    - "mb2_cmp_telos"
+    - "mb2_cmp_onderon"
+    - "shogun"
+    - "mb2_cmp_hetzalprime"
+    - "mb2_yavinruins"
+    - "mb2_cmp_jedha"
+    - "mb2_cmp_transport"
+
+  # Secondary maps - availability depends on useSecondaryMaps setting
+  secondaryMaps:
+    - "mb2_cmp_arctic"
+    - "mb2_cmp_arena"
+    - "mb2_cmp_assault"
+    - "mb2_cmp_cislabs"
+    - "mb2_cmp_coruscantuc"
+    - "mb2_cmp_deltaprime"
+    - "mb2_cmp_doomgiver"
+    - "mb2_duel_dunesea"
+    - "mb2_duel_office"
+    - "mb2_cmp_hotel"
+    - "mb2_cmp_hotfo"
+    - "mb2_cmp_lab"
+    - "mb2_cmp_massassi"
+    - "mb2_cmp_mountainkeep"
+    - "mb2_cmp_narshaddaa"
+    - "mb2_cmp_poolday"
+    - "mb2_cmp_poolparty"
+    - "mb2_cmp_prison"
+    - "mb2_cmp_raxus"
+    - "mb2_cmp_reactor"
+    - "mb2_cmp_rescue"
+    - "mb2_cmp_theedstreets"
+    - "de_dust2"
+    - "lotr_helmsdeep"
+    - "mgs2_agear"
+    - "ultimate_showdown"
+    - "ww2_omaha"
+    - "um_bouncy"
+    - "um_bouncybash"
+    - "um_colosseum"
+    - "um_crazyrace"
+    - "um_crazyrace2"
+    - "um_hammertime"
+    - "um_jawarace"
+    - "um_lavaduel"
+    - "um_lavaparty"
+    - "um_lavarising"
+    - "um_medievil"
+    - "um_poolparty"
+    - "um_prisonraid_v4"
+    - "um_ragnosbattle"
+    - "um_sniperlabs"
+    - "um_spacerace"
+    - "um_swoopbattle"
+    - "um_swooprace"
+    - "um_throwthemin"
+    - "pb2_cloudcity"
+    - "pb2_ctf_bespin"
+    - "pb2_ctf_imperial"
+    - "pb2_ctf_rift"
+    - "pb2_ctf_theed"
+    - "pb2_dotf"
+    - "pb2_reactor"
+    - "pb2_sdestroyer"
+    - "pb_dotf"
+    - "pb_sdestroyer"
+    - "som_dotf"
+    - "som_snowfacility"
+    - "pb3_cloudcity"
+    - "pb3_manaan"
+    - "pb3_dotf"
+    - "mb2_jeditemple_classic"
+    - "mb2_dotf"
+    - "um_ctf_bespin"
+    - "um_ctf_coruscant"
+    - "um_ctf_narshadda"
+    - "um_ctf_rift"
+    - "um_ctf_medievil"
+    - "um_ctf_oceantemple"
+    - "um_ctf_yavinvalley"
+    - "mb2_ctf_dotf"
+    - "mb2_ctf_theed"
+    - "mb2_ctf_tusken"
+    - "mb2_cmp_ctf_poolparty"
+    - "mb2_ctf_deathstar"
+    - "mb2_ptf_deathstar"
+    - "mb2_cmp_ctf_ascension"
+    - "mb2_ctf_eravana"
+    - "mb2_ptf_sdestroyer"
+    - "mb2_ctf_scarif"
+    - "mb2_ptf_scarif"
+    - "mb2_ctf_backstreets"
+    - "mb2_ctf_starkiller_base"
+    - "um_spice"
+    - "um_spice_skirmish"
+    - "mb2_mustafar"
+    - "um_ctf_darkandlight"
+    - "um_ctf_dfarena"
+
+  # Secondary maps handling:
+  # 0 = none, 1 = can be nominated but not randomly selected, 2 = can be nominated and randomly selected
+  useSecondaryMaps: 1
+  
+  # List of maps that cannot be nominated or voted for
+  mapBanList:
+    - "fifa"
+    - "tmnt"
+    - "SOM_ptf_Sdestroyer"
+    - "SOM_Sdestroyer"
+    - "SOM_theed"
+    - "pb2_citadel"
+    - "pb2_cloudcity"
+    - "pb2_ctf_bespin"
+    - "pb2_ctf_imperial"
+    - "pb2_ctf_rift"
+    - "pb2_ctf_theed"
+    - "pb2_dotf"
+    - "pb2_kashyyyk"
+    - "pb2_ptf_jeditemple"
+    - "pb2_ptf_sdestroyer"
+    - "pb2_reactor"
+    - "pb2_sdestroyer"
+    - "pb_dotf"
+    - "pb_sdestroyer"
+    - "som_dotf"
+    - "som_snowfacility"
+    - "pb3_reactor"
+    - "uM_Canyon_guns"
+    - "uM_Taspir_rockets"
+    - "uM_birdmino"
+    - "uM_crazyrace2"
+    - "um_bouncy"
+    - "um_crazyrace"
+    - "um_ctf_gib_bespin"
+    - "um_ctf_gib_coruscant"
+    - "um_ctf_gib_narshaddaa"
+    - "um_ctf_gib_narshaddaa"
+    - "um_football"
+    - "um_jawarace"
+    - "um_nightmare"
+    - "um_prisonraid_v4"
+    - "um_rockettennis"
+    - "um_spacerace"
+    - "um_swooprace"
+    - "um_xwing"
+    - "mb2_sailbarge"
+    - "mb2_veh_destroyer"
+    - "yavin1"
+    - "yavin1b"
+    - "yavin2"
+    - "vjun1"
+    - "vjun2"
+    - "vjun3"
+    - "taspir1"
+    - "taspir2"
+    - "t1_danger"
+    - "t1_fatal"
+    - "t1_inter"
+    - "t1_rail"
+    - "t1_sour"
+    - "t1_surprise"
+    - "t2_wedge"
+    - "t2_trip"
+    - "t2_rogue"
+    - "t2_rancor"
+    - "t2_dpred"
+    - "t3_bounty"
+    - "t3_byss"
+    - "t3_hevil"
+    - "t3_rift"
+    - "t3_stamp"
+    - "kor1"
+    - "kor2"
+    - "hoth3"
+    - "hoth2"
+    - "academy1"
+    - "academy2"
+    - "academy3"
+    - "academy4"
+    - "academy5"
+    - "academy6"
+
+  # Map type priority configuration
+  mapTypePriority:
+    # Enable/disable priority system
+    enabled: true
+    
+    # Priority values (higher = more likely to appear in votes)
+    primary: 2    # Priority for primary maps
+    secondary: 0  # Priority for secondary maps
+    nochange: 1   # Priority for "Don't Change" option
+
+  # Allow nominating the current map
+  allowNominateCurrentMap: false
+
+  # Nomination type settings
+  nominationType:
+    top5: false    # Show top 5 nominated maps
+    first5: false  # Show first 5 nominated maps
+
+  # Map to switch to when the server is empty
+  emptyServerMap:
+    enabled: true
+    map: "um_olympus"
+
+  # Time-based automatic RTV (0 to disable)
+  timeLimit:
+    enabled: false
+    seconds: 0
+
+  # Round-based automatic RTV (0 to disable)
+  roundLimit:
+    enabled: false
+    rounds: 0
+
+  # Minimum participation ratio for a valid vote (0.0 to 1.0)
+  minimumVoteRatio:
+    enabled: true
+    ratio: 0.1
+
+  # Cooldown periods in seconds
+  successTimeout: 30   # After successful vote
+  failureTimeout: 60   # After failed vote
+  
+  # Time in seconds to avoid repeating recently played maps (0 to disable)
+  disableRecentlyPlayedMaps: 1800
+  
+  # Whether to allow nominating recently played maps
+  disableRecentMapNomination: true
+  
+  # Skip voting once majority is reached
+  skipVoting: true
+  
+  # Allow second-round voting in case of ties
+  secondTurnVoting: true
+  
+  # Change maps immediately when vote passes
+  changeImmediately: true
+
+# ============================================
+# RTM (Rock The Mode) Configuration
+# ============================================
+rtm:
+  # Enable/disable RTM functionality
+  enabled: true
+  
+  # Duration of the vote in seconds
+  voteTime: 20
+  
+  # How often to announce vote progress in seconds
+  voteAnnounceTimer: 30
+  
+  # Minimum ratio of players needed to start a vote (0.0 to 1.0)
+  voteRequiredRatio: 0.5
+  
+  # Available game modes for voting
+  modes_enabled:
+    - "Open"
+    - "Legends"
+    - "Duel"
+    - "Full Authentic"
+
+  # Mode to switch to when the server is empty
+  emptyServerMode:
+    enabled: false
+    mode: "open"
+
+  # Time-based automatic RTM (0 to disable)
+  timeLimit:
+    enabled: false
+    seconds: 0
+
+  # Round-based automatic RTM (0 to disable)
+  roundLimit:
+    enabled: false
+    rounds: 0
+
+  # Minimum participation ratio for a valid vote (0.0 to 1.0)
+  minimumVoteRatio:
+    enabled: false
+    ratio: 0
+
+  # Cooldown periods in seconds
+  successTimeout: 60   # After successful vote
+  failureTimeout: 60   # After failed vote
+  
+  # Skip voting once majority is reached
+  skipVoting: true
+  
+  # Allow second-round voting in case of ties
+  secondTurnVoting: true
+  
+  # Change modes immediately when vote passes
+  changeImmediately: true

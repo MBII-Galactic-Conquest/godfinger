@@ -652,7 +652,7 @@ class MBIIServer:
                     "seconds": 1.5
                 })
 
-                if floodProtectionConfig["enabled"] and senderClient:
+                if floodProtectionConfig["enabled"] and senderClient and len(cmdArgs) > 0:
                     command = cmdArgs[0].lower()
                     if senderClient._floodProtectionCooldown.IsSet():
                         if (floodProtectionConfig["soft"] and command == senderClient._lastCommand) or not floodProtectionConfig["soft"]:
@@ -660,7 +660,7 @@ class MBIIServer:
                     senderClient._floodProtectionCooldown.Set(floodProtectionConfig["seconds"])
                     senderClient._lastCommand = command
 
-                if cmdArgs and cmdArgs[0] == "help":
+                if len(cmdArgs) > 0 and cmdArgs[0] == "help":
                     # Handle help command directly
                     self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
                     return  # Don't pass to plugins
