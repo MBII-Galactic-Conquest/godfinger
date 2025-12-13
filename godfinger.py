@@ -85,6 +85,11 @@ CONFIG_FALLBACK = \
     "serverFileName":"mbiided.x86.exe",
     "logicDelay":0.016,
     "restartOnCrash": false,
+    "floodProtection": {
+        "enabled": false,
+        "soft": false,
+        "seconds": 1.5
+    },
 
     "interfaces":
     {
@@ -220,12 +225,14 @@ class MBIIServer:
         self._status = MBIIServer.STATUS_INIT
         Log.info("Initializing Godfinger...")
         # Config load first
-        self._config = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
+        self._config = config.Config.from_file(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
         if self._config == None:
+            Log.error("Failed to load Godfinger config.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
 
         if not self.ValidateConfig(self._config):
+            Log.error("Godfinger config validation failed.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
 
@@ -331,6 +338,22 @@ class MBIIServer:
         exportAPI.GetPlugin         = self.API_GetPlugin
         exportAPI.Restart           = self.Restart
         self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._primarySvInterface, Args) # Use primary interface
+        extralives_path = os.path.join(os.path.dirname(__file__), "data", "extralives.json")
+        try:
+            with open(extralives_path, "r") as f:
+                extralives_data = json.load(f)
+                if extralives_data and "characters" in extralives_data:
+                    self._serverData.extralives_map = {
+                        char: details["extralives"]
+                        for char, details in extralives_data["characters"].items()
+                        if "extralives" in details
+                    }
+                else:
+                    self._serverData.extralives_map = {}
+        except FileNotFoundError:
+            Log.error(f"extralives.json not found at {extralives_path}")
+        except json.JSONDecodeError:
+            Log.error(f"Error decoding extralives.json at {extralives_path}")
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)))
 
 
@@ -621,7 +644,23 @@ class MBIIServer:
             message : str = parts[1]
             if message.startswith("!"):
                 cmdArgs = message[1:].split()
-                if cmdArgs and cmdArgs[0] == "help":
+                
+                # Flood Protection
+                floodProtectionConfig = self._config.GetValue("floodProtection", {
+                    "enabled": False,
+                    "soft": False,
+                    "seconds": 1.5
+                })
+
+                if floodProtectionConfig["enabled"] and senderClient and len(cmdArgs) > 0:
+                    command = cmdArgs[0].lower()
+                    if senderClient._floodProtectionCooldown.IsSet():
+                        if (floodProtectionConfig["soft"] and command == senderClient._lastCommand) or not floodProtectionConfig["soft"]:
+                            return
+                    senderClient._floodProtectionCooldown.Set(floodProtectionConfig["seconds"])
+                    senderClient._lastCommand = command
+
+                if len(cmdArgs) > 0 and cmdArgs[0] == "help":
                     # Handle help command directly
                     self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
                     return  # Don't pass to plugins
@@ -951,13 +990,32 @@ class MBIIServer:
         Log.debug("Client user info changed log entry %s", textified)
         lineParse = textified.split()
         clientId = int(lineParse[1])
-        userInfo = textified[23 + len(lineParse[1]):].strip()  # easier if we just ignore everything up until the variables
+        userInfoString = textified[23 + len(lineParse[1]):].strip()
+
         cl = self._clientManager.GetClientById(clientId)
-        if cl != None:
-            cl.Update(userInfo)
-            self._pluginManager.Event( godfingerEvent.ClientChangedEvent( cl, cl.GetInfo(), isStartup = logMessage.isStartup ) )
-        else:
+        if cl is None:
             Log.warning(f"Attempted to update userinfo of client {clientId} which does not exist, ignoring")
+            return
+
+        if not userInfoString or userInfoString == "0":
+            Log.warning(f"Received invalid or empty userinfo '{userInfoString}' for client {clientId}, ignoring update.")
+            return
+
+        # Parse userinfo string into a dictionary
+        userInfoDict = {}
+        parts = userInfoString.split("\\")
+        # Handle potential empty strings from splitting
+        if len(parts) > 1:
+            for i in range(0, len(parts) - 1, 2):
+                if parts[i] and parts[i+1]: # Ensure key and value are not empty
+                    userInfoDict[parts[i]] = parts[i+1]
+
+        if len(userInfoDict) == 0:
+            Log.warning(f"Could not parse userinfo string '{userInfoString}' for client {clientId}, ignoring update.")
+            return
+
+        cl.Update(userInfoDict)
+        self._pluginManager.Event(godfingerEvent.ClientChangedEvent(cl, cl.GetInfo(), isStartup=logMessage.isStartup))
 
     def OnInitGame(self, logMessage : logMessage.LogMessage):
         textified = logMessage.content

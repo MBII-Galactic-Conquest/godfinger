@@ -306,8 +306,6 @@ class AccountPlugin:
             account = Account(None, client_id, player_name, ip_address, None, client=client)
             self.account_manager.accounts[client_id] = account
 
-        if welcome_message:
-            self._tell_player(client_id, welcome_message)
 
         return account, created, welcome_message
 
@@ -395,7 +393,10 @@ class AccountPlugin:
                 ("!register - Register a new account", self._handle_register),
                 ("uid", "id", "getuid", "getid"):
                 ("!uid/!id - Get your user ID", self._handle_get_uid),
-            }
+            },
+            teams.TEAM_GOOD: {},
+            teams.TEAM_EVIL: {},
+            teams.TEAM_SPEC: {},
         }
         self._smodCommandList = {
                 # ... TODO come up with some of these ...

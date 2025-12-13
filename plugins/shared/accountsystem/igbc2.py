@@ -9,6 +9,8 @@ import logging
 import os
 import time
 from typing import Dict, Optional
+from zipfile import ZipFile
+from random import sample
 from godfingerEvent import Event
 from lib.shared.serverdata import ServerData
 from database import DatabaseManager, ADatabase
@@ -52,7 +54,12 @@ CONFIG_FALLBACK = \
     "objectiveCredits": {
         "enabled": false,
         "credits": 10
-    }
+    },
+    "MBIIPath": "your/mbii/path/here",
+    "siegeteamBanList": [],
+    "siegeteamBanListIsWhitelist": false,
+    "priceOverride": {},
+    "defaultTeamPrice": 1000
 }
 """
 
@@ -64,12 +71,96 @@ if DEFAULT_CFG is None:
     with open(DEFAULT_CFG_PATH, "wt") as f:
         f.write(CONFIG_FALLBACK)
 
-class Payment:
-    def __init__(self, sender_account, target_account, amount: int):
+class PendingTransaction:
+    def __init__(self, player):
+        self.player = player
+        self.player_id = player.GetId()
+        self.timestamp = time.time()
+
+    def on_confirm(self, plugin):
+        pass
+
+    def on_cancel(self, plugin):
+        pass
+
+class PendingPayment(PendingTransaction):
+    def __init__(self, player, sender_account, target_account, amount):
+        super().__init__(player)
         self.sender_account = sender_account
         self.target_account = target_account
         self.amount = amount
-        self.timestamp = time.time()
+
+    def on_confirm(self, plugin):
+        sender_account = self.sender_account
+        target_account = self.target_account
+        if plugin.transfer_credits(sender_account.user_id, target_account.user_id, self.amount):
+            plugin.SvTell(sender_account.player_id, f"Sent {self.amount} credits to {target_account.player_name}^7")
+            plugin.SvTell(target_account.player_id, f"Received {self.amount} credits from {sender_account.player_name}^7")
+        else:
+            plugin.SvTell(sender_account.player_id, "Transaction failed")
+            plugin.SvTell(target_account.player_id, "Transaction failed")
+
+    def on_cancel(self, plugin):
+        plugin.SvTell(self.player_id, "Payment canceled.")
+        plugin.SvTell(self.target_account.player_id, "Payment canceled by sender.")
+
+class PendingBounty(PendingTransaction):
+    def __init__(self, player, issuer_account, target_account, amount):
+        super().__init__(player)
+        self.issuer_account = issuer_account
+        self.target_account = target_account
+        self.amount = amount
+
+    def on_confirm(self, plugin):
+        issuer_player = self.player
+        target_player = plugin.server_data.API.GetClientById(self.target_account.player_id)
+        plugin._place_bounty(issuer_player, target_player, self.amount)
+
+    def on_cancel(self, plugin):
+        plugin.SvTell(self.player_id, "Bounty canceled.")
+        plugin.SvTell(self.target_account.player_id, "Bounty canceled by issuer.")
+
+class PendingTeamPurchase(PendingTransaction):
+    def __init__(self, player, team):
+        super().__init__(player)
+        self.team = team
+
+    def on_confirm(self, plugin):
+        player = self.player
+        team = self.team
+        price = team._price
+
+        player_team = player.GetLastNonSpecTeamId()
+        server_var_key = ""
+        if player_team == teams.TEAM_GOOD:
+            server_var_key = "team1_purchased_teams"
+        elif player_team == teams.TEAM_EVIL:
+            server_var_key = "team2_purchased_teams"
+
+        if server_var_key:
+            purchased_teams = plugin.server_data.GetServerVar(server_var_key) or []
+            purchased_team_names = [t.name for t in purchased_teams]
+            if team.GetName() not in purchased_team_names:
+                if plugin.deduct_credits(player.GetId(), price):
+                    purchased_teams.append(PurchasedTeam(team.GetName(), player.GetId(), price))
+                    plugin.server_data.SetServerVar(server_var_key, purchased_teams)
+                    team_color = "Red" if player_team == teams.TEAM_GOOD else "Blue"
+                    plugin.SvTell(player.GetId(), f"Successfully purchased team: {team.GetName()} for {price} credits for the {team_color} team. ({colors.ColorizeText(str(plugin.get_credits(player.GetId())), plugin.themecolor)})")
+                else:
+                    plugin.SvTell(player.GetId(), "Transaction failed. Could not deduct credits.")
+            else:
+                plugin.SvTell(player.GetId(), f"Team '{team.GetName()}' has already been purchased.")
+        else:
+            plugin.SvTell(player.GetId(), "Transaction failed. Invalid team selection.")
+
+    def on_cancel(self, plugin):
+        plugin.SvTell(self.player_id, "Team purchase canceled.")
+
+class PurchasedTeam:
+    def __init__(self, name, buyer_id, price):
+        self.name = name
+        self.buyer_id = buyer_id
+        self.price = price
 
 class Bounty:
     def __init__(self, issuer_account, target_account, amount: int):
@@ -83,12 +174,140 @@ class Bounty:
         """Add to the existing bounty amount"""
         self.amount += additional_amount
 
+class SiegeTeamContainer:
+    def __init__(self, team_array, plugin_instance):
+        self.plugin = plugin_instance
+        self._teams = {}
+        self._pages = []
+        ban_list = [x.lower() for x in plugin_instance.config.cfg.get("siegeteamBanList", [])]
+        is_whitelist = plugin_instance.config.cfg.get("siegeteamBanListIsWhitelist", False)
+        price_override = plugin_instance.config.cfg.get("priceOverride", {})
+        default_price = plugin_instance.config.cfg.get("defaultTeamPrice", 1000)
+        
+        for team in team_array:
+            team_lower = team.GetName().lower()
+            is_banned = team_lower in ban_list
+
+            if (is_whitelist and not is_banned) or (not is_whitelist and is_banned):
+                continue
+            
+            # Set default price
+            team._price = default_price
+
+            # Apply price override if exists
+            if team.GetName() in price_override:
+                team._price = price_override[team.GetName()]
+                
+            self._teams[team.GetName()] = team
+        
+        self._CreatePages()
+    
+    def GetAllTeams(self):
+        return list(self._teams.values())
+    
+    def GetRandomTeams(self, num):
+        return sample(list(self._teams.values()), min(num, len(self._teams)))
+    
+    def FindTeamWithName(self, name):
+        return self._teams.get(name)
+
+    def _CreatePages(self):
+        self._pages = []
+        all_teams = sorted(self.GetAllTeams(), key=lambda t: t.GetName().lower())
+        if not all_teams:
+            return
+
+        page_str = ""
+        max_len = 900 
+
+        for team in all_teams:
+            team_name = team.GetName()
+            team_price = team.GetPrice()
+            entry = f"{team_name} ({colors.ColorizeText(str(team_price), self.plugin.themecolor)})"
+            
+            if len(page_str) + len(entry) + 2 < max_len:
+                if page_str:
+                    page_str += ", " + entry
+                else:
+                    page_str = entry
+            else:
+                self._pages.append(page_str)
+                page_str = entry
+        
+        if page_str:
+            self._pages.append(page_str)
+
+    def GetPage(self, page_num):
+        if 0 <= page_num < len(self._pages):
+            return self._pages[page_num]
+        return None
+
+    def GetPageCount(self):
+        return len(self._pages)
+
+class SiegeTeam:
+    def __init__(self, name, path):
+        self._name = name
+        self._path = path
+        self._price = 1000
+
+    def GetName(self):
+        return self._name
+    
+    def GetFilePath(self):
+        return self._path
+    
+    def GetPrice(self):
+        return self._price
+    
+    def __str__(self):
+        return f"{self._name}"
+
+def GetAllTeams() -> list[SiegeTeam]:
+    """Scan PK3 files in MBII directories to discover available teams"""
+    mbiiDir = os.path.abspath(DEFAULT_CFG.cfg["MBIIPath"])
+    if not os.path.exists(mbiiDir):
+        Log.info("Attempting to find MBII directory relative to the current working directory...")
+        searchDir = os.getcwd()
+        while True:
+            if os.path.exists(os.path.join(searchDir, "MBII")):
+                mbiiDir = os.path.join(searchDir, "MBII")
+                Log.info(f"SUCCESS! Found MBII directory at {mbiiDir}.")
+                break
+            else:
+                oldDir = searchDir
+                searchDir = os.path.dirname(searchDir)
+                if oldDir == searchDir:
+                    Log.error("FAILURE. No MBII directory found through relative search.")
+                    break
+
+    if mbiiDir is None:
+        Log.error("Cannot proceed as the MBII directory could not be located.")
+        return []
+
+    team_list = []
+    dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))];
+    for sub_dir in dirsToProcess:
+        for filename in os.listdir(sub_dir):
+            if filename.endswith(".pk3"):
+                try:
+                    with ZipFile(os.path.join(sub_dir, filename)) as pk3:
+                        for name in pk3.namelist():
+                            if name.endswith(".mbtc") and not name.startswith("Sup_"):
+                                team_name = os.path.basename(name).replace(".mbtc", "")
+                                team_list.append(SiegeTeam(team_name, name))
+                except Exception as e:
+                    logging.error(f"Error reading PK3 {filename}: {str(e)}")
+    return team_list
+
 class BankingPlugin:
 
     def __init__(self, server_data: ServerData):
 
         # START OF MODIFIED CODE FOR CONFIG LOADING
         # Check if config loading failed and use fallback data
+        if DEFAULT_CFG is None or DEFAULT_CFG.cfg.get("MBIIPath") in [None, "your/mbii/path/here"]:
+            Log.error("MBIIPath is not configured in bankingConfig.json. The GetAllTeams function will not work.")
         if DEFAULT_CFG is None:
             Log.warning("Default config failed to load from file. Using fallback configuration.")
             # Create a minimal mock config object to prevent AttributeError: 'NoneType' object has no attribute 'cfg'
@@ -114,13 +333,11 @@ class BankingPlugin:
         self.msg_prefix = f'{colors.COLOR_CODES[self.themecolor]}[Bank]^7: '
         self._is_initialized = False
 
-        self.pending_payments = {}  # sender_id: Payment
-        self.pending_bounties = {}  # issuer_id: Bounty
-        self.active_bounties = {}  # target_id: Bounty
-        self.player_rounds = {}  # player_id: rounds_played
-        self.player_class_by_pid = {}  # player_id: current character/class name
-        self.extralives_map = {}  # character/class name -> extralives (int >= 0)
-        self._load_extralives_map()
+        self.pending_transactions : dict[int, PendingTransaction] = {}  # player_id: PendingTransaction
+        self.active_bounties : dict[int, Bounty] = {}  # target_id: Bounty
+        self.player_rounds : dict[int, int] = {}  # player_id: rounds_played
+        self.player_class_by_pid : dict[int, str] = {}  # player_id: current character/class name
+        self.team_container = SiegeTeamContainer(GetAllTeams(), self)
         self._register_commands()
         # self.initialize_banking_table()
 
@@ -132,7 +349,7 @@ class BankingPlugin:
                  self._handle_balance),
                 ("baltop", "credtop"):
                 ("!baltop - View top 10 richest players", self._handle_baltop),
-                ("pay",): ("!pay <pfx> <amount> - Send credits to player",
+                ("pay", "send"): ("!pay <pfx> <amount> - Send credits to player",
                           self._handle_pay),
                 ("confirm",): ("!confirm - Confirm pending transaction",
                               self._handle_confirm),
@@ -143,8 +360,17 @@ class BankingPlugin:
                 ("bounties",): ("!bounties - View active bounties",
                               self._handle_bounties),
                 ("credrank", "balrank"): ("!credrank - Check your rank on the balance leaderboard",
-                               self._handle_credrank)
+                               self._handle_credrank),
+                ("buyteam", "bt", "teambuy", "tb"): ("!buyteam <teamname> - Purchase a team for your side",
+                                self._handle_buyteam),
+                ("teamlist", "tl"): ("!teamlist <page> - List available teams with prices",
+                                      self._handle_teamlist),
+                ("teamsearch", "ts"): ("!teamsearch <term> - Search for teams by name",
+                                          self._handle_teamsearch)
             }
+            teams.TEAM_GOOD: {},
+            teams.TEAM_EVIL: {},
+            teams.TEAM_SPEC: {},
         }
         self._smodCommandList = {
                 # ... existing commands ...
@@ -177,8 +403,7 @@ class BankingPlugin:
 
     def has_pending_action(self, player_id: int) -> bool:
         """Check if player has any pending actions"""
-        return (player_id in self.pending_payments or
-                player_id in self.pending_bounties)
+        return player_id in self.pending_transactions
 
     def check_smod_permission(self, command_name: str, smod_id: int) -> bool:
         """Check if an smod has permission to execute a command"""
@@ -257,52 +482,56 @@ class BankingPlugin:
                 self.SvTell(player.GetId(), "Transaction failed")
         else:
             # Store pending transaction
-            payment = Payment(player_account, target_account, amount)
-            self.pending_payments[player.GetId()] = payment
+            payment = PendingPayment(player, player_account, target_account, amount)
+            self.pending_transactions[player.GetId()] = payment
             self.SvTell(player.GetId(), f"Pending payment of {amount} credits to {target.GetName()}^7. Type !confirm or !cancel.")
         return True
 
     def _handle_confirm(self, player: Player, team_id: int, args: list[str]) -> bool:
         """Handle !confirm command for pending transactions"""
         pid = player.GetId()
-        # Check for pending payments
-        if pid in self.pending_payments:
-            payment = self.pending_payments[pid]
-            del self.pending_payments[pid]
-            sender_account = payment.sender_account
-            target_account = payment.target_account
-            if self.transfer_credits(sender_account.user_id, target_account.user_id, payment.amount):
-                self.SvTell(sender_account.player_id, f"Sent {payment.amount} credits to {target_account.player_name}^7")
-                self.SvTell(target_account.player_id, f"Received {payment.amount} credits from {sender_account.player_name}^7")
-            else:
-                self.SvTell(sender_account.player_id, "Transaction failed")
-                self.SvTell(target_account.player_id, "Transaction failed")
-            return True
-        # Check for pending bounties
-        elif pid in self.pending_bounties:
-            bounty = self.pending_bounties[pid]
-            sender_account = bounty.issuer_account
-            target_account = bounty.target_account
-            target_id = target_account.player_id
-            amount = bounty.amount
-            if self.deduct_credits(player.GetId(), amount):
-                del self.pending_bounties[pid]
-                if target_id in self.active_bounties:
-                    if not sender_account in bounty.contributors:
-                        self.active_bounties[target_id].contributors.append(sender_account)
-                    self.active_bounties[target_id].add_amount(amount)
-                    self.Say(f"Added {amount} credits to {target_account.player_name}^7's bounty.")
-                    self.SvTell(target_account.player_id, f"Your bounty has increased by {amount} credits ({self.active_bounties[target_id].amount}) by {sender_account.player_name}^7")
-                else:
-                    if not sender_account in bounty.contributors:
-                        bounty.contributors.append(sender_account)
-                    self.active_bounties[target_account.player_id] = bounty
-                    self.Say(f"Bounty of {amount} credits placed on {target_account.player_name}^7")
-                    self.SvTell(target_account.player_id, f"Bounty of {amount} credits placed on you by {sender_account.player_name}^7")
-            else:
-                self.SvTell(player.GetId(), "Failed to place bounty")
-        else:
+        
+        if pid not in self.pending_transactions:
             self.SvTell(pid, "No pending transactions")
+            return True
+
+        transaction = self.pending_transactions[pid]
+        transaction.on_confirm(self)
+            
+        # Remove transaction after processing
+        if pid in self.pending_transactions:
+            del self.pending_transactions[pid]
+            
+        return True
+
+    def _place_bounty(self, issuer_player: Player, target_player: Player, amount: int) -> bool:
+        """Handles the logic of placing or adding to a bounty."""
+        issuer_id = issuer_player.GetId()
+        target_id = target_player.GetId()
+        issuer_account = self.get_account_by_pid(issuer_id)
+        target_account = self.get_account_by_pid(target_id)
+
+        if not self.deduct_credits(issuer_id, amount):
+            self.SvTell(issuer_id, "Failed to place bounty (insufficient funds)")
+            return False
+
+        if target_id in self.active_bounties:
+            # Add to existing bounty
+            existing_bounty = self.active_bounties[target_id]
+            existing_bounty.add_amount(amount)
+            if issuer_account not in existing_bounty.contributors:
+                existing_bounty.contributors.append(issuer_account)
+            self.Say(f"Added {amount} credits to existing bounty on {target_player.GetName()}^7. Total: {existing_bounty.amount} credits")
+            self.SvTell(target_id, f"Your bounty has increased by {amount} credits ({existing_bounty.amount}) by {issuer_player.GetName()}^7")
+        else:
+            # Create a new bounty
+            bounty = Bounty(issuer_account, target_account, amount)
+            if issuer_account not in bounty.contributors:
+                bounty.contributors.append(issuer_account)
+            self.active_bounties[target_id] = bounty
+            self.Say(f"Bounty of {amount} credits placed on {target_player.GetName()}^7")
+            self.SvTell(target_id, f"Bounty of {amount} credits placed on you by {issuer_player.GetName()}^7")
+        
         return True
 
     def _handle_bounties(self, player: Player, team_id: int, args: list[str]) -> bool:
@@ -345,7 +574,7 @@ class BankingPlugin:
         # Find target player(s)
         targets = self.find_players(target_name, exclude=player.GetId())
         if not targets:
-            self.SvTell(player.GetId(), f"No players found matching '{target_name}'")
+            self.SvTell(player.GetId(), f"No players found matching '{target_name}'. Usage: !bounty <name> <amount>")
             return True
         elif len(targets) > 1:
             # Multiple matches found, ask for clarification
@@ -383,31 +612,11 @@ class BankingPlugin:
             return True
 
         if confirm:
-            # Place bounty immediately
-            if target_id in self.active_bounties:
-                existing_bounty = self.active_bounties[target_id]
-                if self.deduct_credits(player.GetId(), amount):
-                    existing_bounty.add_amount(amount)
-                    if not player_account in existing_bounty.contributors:
-                        existing_bounty.contributors.append(player_account)
-                    self.Say(f"Added {amount} credits to existing bounty on {target.GetName()}^7. Total: {existing_bounty.amount} credits")
-                else:
-                    self.SvTell(player.GetId(), "Failed to add to bounty")
-            else:
-                # Deduct credits immediately
-                if self.deduct_credits(player.GetId(), amount):
-                    bounty = Bounty(player_account, target_account, amount)
-                    self.active_bounties[target_id] = bounty
-                    if not player_account in bounty.contributors:
-                        bounty.contributors.append(player_account)
-                    self.Say(f"Bounty of {amount} credits placed on {target.GetName()}^7")
-                    self.SvTell(target_id, f"Bounty of {amount} credits placed on you by {player.GetName()}^7")
-                else:
-                    self.SvTell(player.GetId(), "Failed to place bounty")
+            self._place_bounty(player, target, amount)
         else:
             # Store pending bounty
-            bounty = Bounty(player_account, target_account, amount)
-            self.pending_bounties[player.GetId()] = bounty
+            bounty = PendingBounty(player, player_account, target_account, amount)
+            self.pending_transactions[player.GetId()] = bounty
             self.SvTell(player.GetId(), f"Pending bounty of {amount} credits on {target.GetName()}^7. Type !confirm or !cancel.")
             # self.SvTell(target_id, f"{player.GetName()}^7 wants to place a bounty on you for {amount} credits.")
         return True
@@ -435,18 +644,15 @@ class BankingPlugin:
     def _handle_cancel(self, player: Player, team_id: int, args: list[str]) -> bool:
         """Handle !cancel command"""
         pid = player.GetId()
-        if pid in self.pending_payments:
-            payment = self.pending_payments[pid]
-            del self.pending_payments[pid]
-            self.SvTell(pid, "Payment canceled.")
-            self.SvTell(payment.target_account.player_id, "Payment canceled by sender.")
-        elif pid in self.pending_bounties:
-            bounty = self.pending_bounties[pid]
-            del self.pending_bounties[pid]
-            self.SvTell(pid, "Bounty canceled.")
-            self.SvTell(bounty.target_account.player_id, "Bounty canceled by issuer.")
-        else:
+        
+        if pid not in self.pending_transactions:
             self.SvTell(pid, "No pending transactions to cancel.")
+            return True
+            
+        transaction = self.pending_transactions[pid]
+        transaction.on_cancel(self)
+        del self.pending_transactions[pid]
+            
         return True
 
     def _handle_balance(self, player: Player, team_id: int,
@@ -896,19 +1102,18 @@ class BankingPlugin:
                 self.set_credits(pid, to_set)
 
         # Clean up pending transactions
-        if pid in self.pending_payments:
-            payment = self.pending_payments[pid]
-            del self.pending_payments[pid]
-            # Notify the target player if they're still online
-            if payment.target_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
-                self.SvTell(payment.target_account.player_id, "Payment canceled - sender disconnected.")
-
-        if pid in self.pending_bounties:
-            bounty = self.pending_bounties[pid]
-            del self.pending_bounties[pid]
-            # Notify the target player if they're still online
-            if bounty.target_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
-                self.SvTell(bounty.target_account.player_id, "Bounty canceled - issuer disconnected.")
+        if pid in self.pending_transactions:
+            transaction = self.pending_transactions[pid]
+            del self.pending_transactions[pid]
+            
+            if isinstance(transaction, PendingPayment):
+                # Notify the target player if they're still online
+                if transaction.target_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
+                    self.SvTell(transaction.target_account.player_id, "Payment canceled - sender disconnected.")
+            elif isinstance(transaction, PendingBounty):
+                # Notify the target player if they're still online
+                if transaction.target_account.player_id in [client.GetId() for client in self.server_data.API.GetAllClients()]:
+                    self.SvTell(transaction.target_account.player_id, "Bounty canceled - issuer disconnected.")
 
         # Clean up active bounties on this player
         if pid in self.active_bounties:
@@ -961,67 +1166,246 @@ class BankingPlugin:
             if toAdd > 0:
                 self.SvTell(
                     killer_id,
-                    f"Earned {toAdd} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
+                    f"Earned {colors.ColorizeText(str(toAdd), self.themecolor)} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
                 )
             elif toAdd < 0:
                 self.SvTell(
                     killer_id,
-                    f"Fined {abs(toAdd)} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
+                    f"Fined {colors.ColorizeText(str(abs(toAdd)), self.themecolor)} credits ({colors.ColorizeText(str(self.get_credits(killer_id)), self.themecolor)}) for killing {victim_name}^7! {colors.ColorizeText('(TK)', 'red') if is_tk else ''}"
                 )
         return False
 
-    # ==== Extra lives integration ====
-    def _extralives_path(self) -> str:
-        # repo_root/plugins/shared/accountsystem/igbc2.py -> repo_root/data/extralives.json
-        here = os.path.dirname(__file__)
-        repo_root = os.path.abspath(os.path.join(here, "..", "..", ".."))
-        return os.path.join(repo_root, "data", "extralives.json")
-
-    def _load_extralives_map(self) -> None:
-        """Load extralives table from JSON into memory. Keys are plaintext character names."""
-        try:
-            path = self._extralives_path()
-            if not os.path.exists(path):
-                Log.warning(f"extralives.json not found at {path}; kill rewards will not be scaled")
-                self.extralives_map = {}
-                return
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            # Expect structure: { total_characters: N, characters: { name: { extralives: int, ... }, ... } }
-            chars = data.get("characters", {}) if isinstance(data, dict) else {}
-            table = {}
-            for name, info in chars.items():
-                try:
-                    n = info.get("extralives", 0)
-                    if n is None:
-                        n = 0
-                    n = int(n)
-                    if n < 0:
-                        n = 0
-                    table[str(name)] = n
-                except Exception:
-                    continue
-            self.extralives_map = table
-            Log.info(f"Loaded extralives map with {len(self.extralives_map)} entries")
-        except Exception as e:
-            Log.error(f"Failed to load extralives.json: {e}")
-            self.extralives_map = {}
-
     def _handle_reload_extralives(self, playerName, smodId, adminIP, cmdArgs):
         """SMOD command to reload extralives.json at runtime."""
-        try:
-            self._load_extralives_map()
-            self.server_data.interface.SmSay(self.msg_prefix + f"Reloaded extralives table ({len(self.extralives_map)} entries)")
-        except Exception as e:
-            self.server_data.interface.SmSay(self.msg_prefix + f"Failed to reload extralives: {e}")
+        self.server_data.interface.SmSay(self.msg_prefix + "This command is deprecated. Extra lives data is loaded at server startup.")
         return True
 
-    def get_extralives_for_pid(self, player_id: int) -> int:
+    def _process_team_purchase(self, player: Player, team: 'SiegeTeam', price: int) -> bool:
+        """Process a team purchase for the given player.
+        
+        Args:
+            player: The player making the purchase
+            team: The team being purchased
+            price: The price of the team
+            
+        Returns:
+            bool: True if purchase was successful, False otherwise
+        """
+        player_team = player.GetLastNonSpecTeamId()
+        if player_team not in (teams.TEAM_GOOD, teams.TEAM_EVIL):
+            self.SvTell(player.GetId(), "You must be on a team to purchase teams.")
+            return False
+            
+        server_var_key = "team1_purchased_teams" if player_team == teams.TEAM_GOOD else "team2_purchased_teams"
+        purchased_teams = self.server_data.GetServerVar(server_var_key) or []
+        
+        if team.GetName() in purchased_teams:
+            self.SvTell(player.GetId(), f"Team '{team.GetName()}' has already been purchased.")
+            return False
+            
+        if not self.deduct_credits(player.GetId(), price):
+            self.SvTell(player.GetId(), "Transaction failed. Could not deduct credits.")
+            return False
+            
+        purchased_teams.append(PurchasedTeam(team.GetName(), player.GetId(), price))
+        # Just update the server variable, RTV will handle the team assignments
+        self.server_data.SetServerVar(server_var_key, purchased_teams)
+        
+        team_color = "Red" if player_team == teams.TEAM_GOOD else "Blue"
+        self.Say(f"Purchased team: {team.GetName()} for {price} credits for the {team_color} team. ({colors.ColorizeText(str(self.get_credits(player.GetId())), self.themecolor)})")
+        return True
+
+    def _handle_buyteam(self, player: Player, team_id: int, args: list[str]) -> bool:
+        """Handle !buyteam command"""
+        if self.has_pending_action(player.GetId()):
+            self.SvTell(player.GetId(), "You already have a pending transaction!")
+            return True
+
+        if len(args) < 2:
+            self.SvTell(player.GetId(), "Usage: !buyteam <teamname> [confirm]")
+            return True
+
+        # Check for confirm flag
+        confirm = args[-1].lower() == "confirm"
+        
+        # If confirmed, exclude 'confirm' from team name parsing
+        team_name_parts = args[1:-1] if confirm else args[1:]
+        team_name = ' '.join(team_name_parts)
+        
+        # Case insensitive team search
+        team = None
+        for available_team in self.team_container.GetAllTeams():
+            if available_team.GetName().lower() == team_name.lower():
+                team = available_team
+                break
+
+        if not team:
+            self.SvTell(player.GetId(), f"Team '{team_name}' not found.")
+            return True
+
+        # Check player balance
+        price = team._price
+        player_credits = self.get_credits(player.GetId())
+        if player_credits < price:
+            self.SvTell(player.GetId(), f"Insufficient funds. You need {price} credits to buy this team (you have {player_credits}).")
+            return True
+
+        # Check if team has already been purchased
+        player_team = player.GetLastNonSpecTeamId()
+        if player_team not in [teams.TEAM_GOOD, teams.TEAM_EVIL]:
+            self.SvTell(player.GetId(), "You must be on a team (red or blue) to purchase teams.")
+            return True
+            
+        server_var_key = "team1_purchased_teams" if player_team == teams.TEAM_GOOD else "team2_purchased_teams"
+        opposing_team_key = "team2_purchased_teams" if player_team == teams.TEAM_GOOD else "team1_purchased_teams"
+        
+        purchased_teams = self.server_data.GetServerVar(server_var_key) or []
+        opposing_teams = self.server_data.GetServerVar(opposing_team_key) or []
+        
+        # Check if team is already purchased (handle new dict structure)
+        purchased_team_names = [t.name for t in purchased_teams]
+        opposing_team_names = [t.name for t in opposing_teams]
+
+        if team.GetName() in purchased_team_names:
+            self.SvTell(player.GetId(), f"Team '{team.GetName()}' has already been purchased by your team.")
+            return True
+            
+        if team.GetName() in opposing_team_names:
+            self.SvTell(player.GetId(), f"Team '{team.GetName()}' has already been purchased by the opposing team.")
+            return True
+
+        if confirm:
+            # Process immediately if confirmed
+            if not self._process_team_purchase(player, team, price):
+                return True
+        else:
+            # Create pending purchase
+            purchase = PendingTeamPurchase(player, team)
+            self.pending_transactions[player.GetId()] = purchase
+            team_color = "Red" if player_team == teams.TEAM_GOOD else "Blue"
+            self.SvTell(player.GetId(), f"Pending purchase of team {team.GetName()} for {price} credits for {team_color}. Type !confirm or !cancel.")
+            
+        return True
+
+    def _handle_teamlist(self, player: Player, team_id: int, args: list[str]) -> bool:
+        """Handle !teamlist command - show available teams"""
+        page_count = self.team_container.GetPageCount()
+        if page_count == 0:
+            self.SvTell(player.GetId(), "No teams available.")
+            return True
+
+        page_num = 1
+        if len(args) >= 2:
+            if args[1].isdigit():
+                page_num = int(args[1])
+        
+        if page_num < 1 or page_num > page_count:
+            self.SvTell(player.GetId(), 
+                      f"Usage: {colors.ColorizeText('!teamlist <page>', self.themecolor)}, " +
+                      f"valid pages {colors.ColorizeText(f'1-{page_count}', self.themecolor)}")
+            return True
+            
+        page_content = self.team_container.GetPage(page_num - 1)
+        self.Say(f"Available Teams (Page {page_num}/{page_count}): {page_content}")
+        return True
+
+    def _handle_teamsearch(self, player: Player, team_id: int, args: list[str]) -> bool:
+        """Handle !teamsearch command - search for teams by name"""
+        try:
+            if len(args) < 2:
+                self.SvTell(player.GetId(), 
+                          f"Usage: {colors.ColorizeText('!teamsearch <search term>', self.themecolor)}")
+                return True
+
+            search_terms = [term.lower() for term in args[1:]]
+            results = []
+
+            # Search through all teams
+            for team in self.team_container.GetAllTeams():
+                team_name = team.GetName().lower()
+                # Check if all search terms are in the team name
+                if all(term in team_name for term in search_terms):
+                    results.append(team)
+
+            if not results:
+                self.SvTell(player.GetId(), 
+                          f"No teams found matching: {colors.ColorizeText(' '.join(search_terms), self.themecolor)}")
+                return True
+
+            # Sort results alphabetically
+            results.sort(key=lambda t: t.GetName().lower())
+
+            # Format results with highlighting
+            formatted_results = []
+            for team in results:
+                team_name = team.GetName()
+                team_price = team.GetPrice()
+                # Highlight search terms in results
+                highlighted_name = team_name
+                for term in search_terms:
+                    idx = highlighted_name.lower().find(term)
+                    if idx != -1:
+                        highlighted_name = (
+                            highlighted_name[:idx] +
+                            colors.ColorizeText(highlighted_name[idx:idx+len(term)], self.themecolor) +
+                            highlighted_name[idx+len(term):]
+                        )
+                formatted_results.append(f"{highlighted_name} ({colors.ColorizeText(str(team_price), self.themecolor)})")
+
+            # Send results in chunks based on string length limit (500 chars)
+            max_string_size = 900
+            
+            # Build chunks based on string length limit
+            chunks = []
+            current_chunk = []
+            current_string_length = 0
+            
+            for formatted_result in formatted_results:
+                # Add separator if not first item
+                result_entry = formatted_result
+                if current_chunk:
+                    result_entry = ", " + result_entry
+                
+                # Check if adding this result would exceed the string limit
+                if current_string_length + len(result_entry) > max_string_size and current_chunk:
+                    # Save current chunk and start a new one
+                    chunks.append(current_chunk)
+                    current_chunk = [formatted_result]
+                    current_string_length = len(formatted_result)
+                else:
+                    # Add to current chunk
+                    if current_chunk:
+                        current_chunk.append(formatted_result)
+                        current_string_length += len(result_entry)
+                    else:
+                        current_chunk = [formatted_result]
+                        current_string_length = len(formatted_result)
+            
+            # Add the last chunk if it has results
+            if current_chunk:
+                chunks.append(current_chunk)
+            
+            # Send the chunks using BatchExecute for multiple chunks
+            if len(chunks) == 1:
+                self.Say(f"Found {len(results)} matching teams: {', '.join(chunks[0])}")
+            else:
+                # Batch output for multiple chunks - build proper command list
+                batchCmds = [f"say {self.msg_prefix}{len(results)} matching teams: {', '.join(chunks[0])}"]
+                batchCmds += [f"say {self.msg_prefix}{', '.join(chunk)}" for chunk in chunks[1:]]
+                self.server_data.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
+
+        except Exception as e:
+            logging.error(f"Error in _handle_teamsearch: {str(e)}")
+            self.SvTell(player.GetId(), "An error occurred while searching for teams.")
+
+        return True
+
+    def get_extralives_for_pid(self, player_id: int):
         """Get extra lives count for the player's current character/class name; returns 0 if unknown."""
         name = self.player_class_by_pid.get(player_id)
         if not name:
             return 0
-        return int(self.extralives_map.get(name, 0))
+        return int(self.server_data.extralives_map.get(name, 0))
 
     def _on_client_changed(self, event: Event):
         """Track player's current class/character name when they change class."""
@@ -1155,6 +1539,29 @@ class BankingPlugin:
             self.SvTell(event.client.GetId(), f"You have been awarded {self.config.cfg['objectiveCredits']['credits']} credits ({colors.ColorizeText(str(self.get_credits(event.client.GetId())), self.themecolor)}) for completing the objective!")
         return True
 
+    def _on_map_change(self, event : Event):
+        # Refund any purchased teams that weren't applied (because RTV didn't happen)
+        for team_var in ["team1_purchased_teams", "team2_purchased_teams"]:
+            purchased_teams = self.server_data.GetServerVar(team_var)
+            if purchased_teams:
+                for team_data in purchased_teams:
+                    # Handle both old format (str) and new format (dict) for safety during transition
+                    if isinstance(team_data, PurchasedTeam):
+                        buyer_id = team_data.buyer_id
+                        price = team_data.price
+                        team_name = team_data.name
+                        
+                        if buyer_id != None and price != None:
+                            # Re-add credits
+                            self.add_credits(buyer_id, price)
+                            
+                            # Try to notify if player is still there
+                            self.SvTell(buyer_id, f"Map changed manually. Refunded {price} credits for team {team_name}.")
+                                
+                # Clear the variable
+                self.server_data.SetServerVar(team_var, None)
+                
+        return True
 
     def SvTell(self, pid: int, message: str):
         """Send message to player"""
@@ -1234,6 +1641,8 @@ def OnEvent(event: Event) -> bool:
         banking_plugin._on_client_changed(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_OBJECTIVE:
         banking_plugin._on_objective(event)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
+        banking_plugin._on_map_change(event)
     return False
 
 

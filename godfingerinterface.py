@@ -138,6 +138,9 @@ class IServerInterface():
     def Test(self):
         pass
 
+    def MarkTK(self, player_id : int, time : int) -> str:
+        return
+
 class AServerInterface(IServerInterface):
 
     def __init__(self):
@@ -362,9 +365,14 @@ class RconInterface(AServerInterface):
             return self._rcon.SmSay(msg)
         return None
 
-    def Exec(self, filename : str) -> str:
+    def ExecFile(self, filename : str) -> str:
         if self.IsOpened():
-            return self._rcon.Exec(filename)
+            return self._rcon.ExecFile(filename)
+        return None
+
+    def MarkTK(self, player_id : int, time : int) -> str:
+        if self.IsOpened():
+            return self._rcon.MarkTK(player_id, time)
         return None
 
     def ParseLogThreadHandler(self, control, sleepTime):

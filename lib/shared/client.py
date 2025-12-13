@@ -1,6 +1,7 @@
 import logging
 import lib.shared.teams as teams;
 import threading;
+from lib.shared.timeout import Timeout
 
 log = logging.getLogger(__name__)
 
@@ -15,6 +16,8 @@ class Client(object):
         self._jaguid = "";
         self._userinfo = {};
         self._lastNonSpecTeamId = None;
+        self._floodProtectionCooldown = Timeout()
+        self._lastCommand = None
     
     def GetId(self) -> int:
         return self._id;
@@ -58,11 +61,8 @@ class Client(object):
     mbc - current class
     """
     
-    def Update(self, data : str):
-        data = data.split("\\")
-        for i in range(0, len(data), 2):
-            key = data[i]
-            value = data[i+1]
+    def Update(self, data : dict[str, str]):
+        for key, value in data.items():
             if key == "n" and self._name != value:
                 # logMessage(f"Client {self} has changed their name to {value}")
                 self._name = value

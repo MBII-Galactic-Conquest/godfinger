@@ -23,6 +23,7 @@ __pycache__/*
 
 !docker/godfinger-egg.json
 !start/autostart.cfg
+!data/extralives.json
 
 godfingerCfg.json
 automessageCfg.json
@@ -36,3 +37,7 @@ ignored/*
 venv/*
 
 /logs/*
+aishit.md
+test_unicode_name.py
+test.py
+*.zip
