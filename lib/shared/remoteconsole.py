@@ -133,6 +133,7 @@ class RCON(object):
                         self._Send(payload);
                         if not self._ReadResponse(responseSize, timeout):
                             Log.warn(f'Message with payload {str(payload)} not received after {timeout} seconds, will attempt to resend.')
+                            timeout *= 2;
                             continue;
                         else:
                             result = self._PopUnread();
