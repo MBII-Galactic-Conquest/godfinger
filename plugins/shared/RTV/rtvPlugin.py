@@ -1196,6 +1196,11 @@ class RTV(object):
         if self._currentVote != None:
             print("last player dc'ed, killing current vote")
             self._currentVote = None
+
+        votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        if votesInProgress != None and "RTV" in votesInProgress:
+            votesInProgress.remove("RTV")
+            self._serverData.SetServerVar("votesInProgress", votesInProgress)            
         
         # Reset siege teams
         self._serverData.SetServerVar("team1_purchased_teams", None)
