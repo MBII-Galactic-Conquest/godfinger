@@ -56,7 +56,6 @@ CONFIG_FALLBACK = \
         "credits": 10
     },
     "MBIIPath": "your/mbii/path/here",
-    "portFilter": 29070,
     "siegeteamBanList": [],
     "siegeteamBanListIsWhitelist": false,
     "priceOverride": {},
