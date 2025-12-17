@@ -81,6 +81,7 @@ CONFIG_FALLBACK = '''{
     "MBIIPath": "your/mbii/path/here",
     "pluginThemeColor": "green",
     "MessagePrefix": "[RTV]^7: ",
+    "portFilter": 29070,
     "RTVPrefix": "!",
     "caseSensitiveCommands": false,
     "requirePrefix": false,
@@ -422,6 +423,7 @@ class RTV(object):
         self._themeColor = self._config.cfg["pluginThemeColor"]
         self._players : dict[int, RTVPlayer] = {}
         self._serverData : serverdata.ServerData = serverData
+        self.target_port = self._config.cfg.get("portFilter")
         
         # RTV state tracking
         self._wantsToRTV : list[int] = []
@@ -486,20 +488,34 @@ class RTV(object):
         if self._config.cfg["useSayOnly"] == True:
             self.SvSay = self.Say
 
-    def Say(self, saystr : str, usePrefix : bool = True):
-        """Send console message to all players"""
-        prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.Say(prefix + saystr)
+    def _get_interface(self):
+        # Ensure these lines are pushed over to the right
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        
+        return self._serverData.interface
 
-    def SvSay(self, saystr : str, usePrefix : bool = True):
-        """Send chat message to all players"""
+    def Say(self, saystr: str, usePrefix: bool = True):
+        """Standard Say command required by RTV logic."""
+        interface = self._get_interface()
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.SvSay(prefix + saystr)
-    
-    def SvTell(self, pid: int, saystr : str, usePrefix : bool = True):
-        """Send chat message to one player given their ID"""
+        if interface:
+            return interface.Say(prefix + saystr)
+        return False
+
+    def SvSay(self, saystr: str, usePrefix: bool = True):
+        interface = self._get_interface()
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.SvTell(pid, prefix + saystr)
+        if interface:
+            return interface.SvSay(prefix + saystr)
+        return False
+
+    def SvTell(self, pid: int, saystr: str, usePrefix: bool = True):
+        interface = self._get_interface()
+        prefix = self._messagePrefix if usePrefix else ""
+        if interface:
+            return interface.SvTell(pid, prefix + saystr)
+        return False
 
     def _getAllPlayers(self):
         """Get all connected players"""
@@ -1181,11 +1197,6 @@ class RTV(object):
             print("last player dc'ed, killing current vote")
             self._currentVote = None
         
-        votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        if votesInProgress != None and "RTV" in votesInProgress:
-            votesInProgress.remove("RTV")
-            self._serverData.SetServerVar("votesInProgress", votesInProgress)
-
         # Reset siege teams
         self._serverData.SetServerVar("team1_purchased_teams", None)
         self._serverData.SetServerVar("team2_purchased_teams", None)
@@ -1456,6 +1467,21 @@ def API_StartRTVVote(allowNoChange=True):
 def OnEvent(event) -> bool:
     """Route Godfinger events to appropriate handlers"""
     global PluginInstance
+    if not PluginInstance:
+        return False
+
+    # --- PORT FILTERING START ---
+    # This prevents Server A's plugin from reacting to Server B's chat
+    data = getattr(event, 'data', None)
+    if isinstance(data, dict):
+        msg_port = data.get('source_port')
+        # Only filter if a target port is defined in the plugin config
+        target = getattr(PluginInstance, 'target_port', None)
+
+        if msg_port is not None and target is not None:
+            if str(msg_port) != str(target):
+                return False
+                
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return PluginInstance.OnChatMessage( event.client, event.message, event.teamId )
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:

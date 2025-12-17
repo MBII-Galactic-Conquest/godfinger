@@ -56,6 +56,7 @@ CONFIG_FALLBACK = \
         "credits": 10
     },
     "MBIIPath": "your/mbii/path/here",
+    "portFilter": 29070,
     "siegeteamBanList": [],
     "siegeteamBanListIsWhitelist": false,
     "priceOverride": {},
@@ -317,6 +318,7 @@ class BankingPlugin:
         # END OF MODIFIED CODE FOR CONFIG LOADING
 
         self.server_data = server_data
+        self.target_port = getattr(server_data, 'config', {}).get('portFilter')
         self.accountsystem_xprts = None
 
         self.get_account_by_uid = None
@@ -340,6 +342,12 @@ class BankingPlugin:
         self.team_container = SiegeTeamContainer(GetAllTeams(), self)
         self._register_commands()
         # self.initialize_banking_table()
+
+    def _get_interface(self):
+        # Look up the specific interface for our port
+        if hasattr(self.server_data, 'interfaceMap') and self.target_port:
+            return self.server_data.interfaceMap.get(int(self.target_port))
+        return self.server_data.interface    
 
     def _register_commands(self):
         self._command_list = {
@@ -1403,8 +1411,25 @@ class BankingPlugin:
     def get_extralives_for_pid(self, player_id: int):
         """Get extra lives count for the player's current character/class name; returns 0 if unknown."""
         name = self.player_class_by_pid.get(player_id)
+        
+        # If class name is missing, try a manual check on the correct port
+        if not name:
+            try:
+                # Use the router to ask the correct server for the player's status
+                status = self._get_interface().GetStatus()
+                # Find the class name for this specific PID in the status string
+                for line in status.split('\n'):
+                    if line.startswith(str(player_id)):
+                        # Usually the class name is the last part of the status line
+                        name = line.split()[-1]
+                        self.player_class_by_pid[player_id] = name
+                        break
+            except Exception:
+                return 0
+
         if not name:
             return 0
+            
         return int(self.server_data.extralives_map.get(name, 0))
 
     def _on_client_changed(self, event: Event):
@@ -1565,13 +1590,13 @@ class BankingPlugin:
 
     def SvTell(self, pid: int, message: str):
         """Send message to player"""
-        self.server_data.interface.SvTell(pid, f"{self.msg_prefix}{message}")
+        self._get_interface().SvTell(pid, f"{self.msg_prefix}{message}")
 
     def SvSay(self, message: str):
-        self.server_data.interface.SvSay(f"{self.msg_prefix}{message}")
+        self._get_interface().SvSay(f"{self.msg_prefix}{message}")
 
     def Say(self, message: str):
-        self.server_data.interface.Say(f"{self.msg_prefix}{message}")
+        self._get_interface().Say(f"{self.msg_prefix}{message}")
 
 
 def OnStart() -> bool:
@@ -1620,9 +1645,21 @@ def OnFinish():
 
 
 def OnEvent(event: Event) -> bool:
-    global banking_plugin
+    global banking_plugin  # Use the local global variable
     if not banking_plugin:
         return False
+
+    # Safety check for event data
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        # Port filtering
+        event_port = event.data.get('source_port')
+        # FIX: Ensure this line uses banking_plugin, not account_plugin
+        target = getattr(banking_plugin, 'target_port', None)
+        
+        if target and event_port and int(event_port) != int(target):
+            return False
 
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return banking_plugin._on_chat_message(event.client, event.message,
@@ -1638,7 +1675,10 @@ def OnEvent(event: Event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
         banking_plugin._on_init_game(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
-        banking_plugin._on_client_changed(event)
+        event_port = event.data.get('source_port')
+        target = getattr(banking_plugin, 'target_port', None)
+        if target and event_port and int(event_port) == int(target):
+            banking_plugin._on_client_changed(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_OBJECTIVE:
         banking_plugin._on_objective(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MAPCHANGE:
@@ -1649,6 +1689,7 @@ def OnEvent(event: Event) -> bool:
 def OnInitialize(server_data: ServerData, exports=None):
     global banking_plugin
     banking_plugin = BankingPlugin(server_data)
+    
     if exports is not None:
         exports.Add("GetCredits", banking_plugin.get_credits)
         exports.Add("AddCredits", banking_plugin.add_credits)

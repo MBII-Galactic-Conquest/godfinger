@@ -16,6 +16,14 @@ def MyCoolFunction() -> int:
 class MyVariables():
     def __init__(self):
         self.myCoolVariable = 0;
+        self.target_port = self._config.cfg.get("portFilter") 
+        # self.target_port = getattr(serverData, 'config', {}).get('portFilter')
+
+        def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface       
 
 MyCoolVariablesTable : MyVariables = MyVariables();
 
@@ -48,7 +56,7 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     # You can get your cross plugin dependancies here, e.g
-    targetPlug = SERVER_DATA.API.GetPlugin("plugins.shared.test.testPlugin");
+    targetPlug = _get_interface().API.GetPlugin("plugins.shared.test.testPlugin");
     if targetPlug != None:
         xprts = targetPlug.GetExports();
         if xprts != None:
@@ -78,6 +86,15 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
+    global PluginInstance
+    if not PluginInstance:
+        return False
+
+    event_port = event.data.get('source_port') if event.data else None
+    target = getattr(PluginInstance, 'target_port', None)
+    if target and event_port and int(event_port) != int(target):
+        return False
+
     #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False;

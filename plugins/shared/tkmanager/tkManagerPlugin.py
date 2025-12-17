@@ -21,6 +21,7 @@ Log = logging.getLogger(__name__);
 class TKManagerPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
         self._serverData = serverData
+        self.target_port = getattr(serverData, 'config', {}).get('portFilter')
         self._messagePrefix = colors.ColorizeText("[TK]", "orange") + ": "
         self._commandList = \
             {
@@ -45,6 +46,13 @@ class TKManagerPlugin(object):
         self._ipList = []
         self._ipListPath = os.path.join(os.path.dirname(__file__), IP_LIST_FILE)
         self.LoadIpList()
+
+    def _get_interface(self):
+        # Look up the specific interface for our port from the map we built in godfinger.py
+        if hasattr(self._serverData, 'interfaceMap') and hasattr(self, 'target_port'):
+            if self.target_port:
+                return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface    
 
     def HandleResetTK(self, playerName, smodID, adminIP, messageParse):
         self._serverData.interface.ExecVstr("clearTK")
@@ -79,7 +87,7 @@ class TKManagerPlugin(object):
 
     def HandleAutoMarkTk(self, playerName, smodID, adminIP, cmdArgs):
         if len(cmdArgs) < 2:
-            self._serverData.interface.SmSay(self._messagePrefix + "Usage: !automarktk <name_substring>")
+            self._get_interface().SmSay(self._messagePrefix + "Usage: !automarktk <name_substring>")
             return True
         
         targetName = " ".join(cmdArgs[1:]).lower()
@@ -90,26 +98,26 @@ class TKManagerPlugin(object):
                 matchingPlayers.append(client)
         
         if len(matchingPlayers) == 0:
-            self._serverData.interface.SmSay(self._messagePrefix + f"No players found matching '{targetName}'.")
+            self._get_interface().SmSay(self._messagePrefix + f"No players found matching '{targetName}'.")
             return True
         elif len(matchingPlayers) > 1:
             names = ", ".join([p.GetName() for p in matchingPlayers])
-            self._serverData.interface.SmSay(self._messagePrefix + f"Multiple matches found: {names}. Please be more specific.")
+            self._get_interface().SmSay(self._messagePrefix + f"Multiple matches found: {names}. Please be more specific.")
             return True
         
         targetPlayer = matchingPlayers[0]
         targetIp = targetPlayer.GetIp()
         
         # MarkTK the player immediately
-        self._serverData.interface.MarkTK(targetPlayer.GetId(), AUTOMARKTK_DURATION)
+        self._get_interface().MarkTK(targetPlayer.GetId(), AUTOMARKTK_DURATION)
         
         # Add IP to list if not already present
         if targetIp not in self._ipList:
             self._ipList.append(targetIp)
             self.SaveIpList()
-            self._serverData.interface.SmSay(self._messagePrefix + f"Auto-marked {targetPlayer.GetName()}^7 and added IP {targetIp} to list.")
+            self._get_interface().SmSay(self._messagePrefix + f"Auto-marked {targetPlayer.GetName()}^7 and added IP {targetIp} to list.")
         else:
-            self._serverData.interface.SmSay(self._messagePrefix + f"Auto-marked {targetPlayer.GetName()}^7. IP {targetIp} was already in list.")
+            self._get_interface().SmSay(self._messagePrefix + f"Auto-marked {targetPlayer.GetName()}^7. IP {targetIp} was already in list.")
             
         return True
 
@@ -117,8 +125,8 @@ class TKManagerPlugin(object):
         clientIp = client.GetIp()
         if clientIp in self._ipList:
             Log.info(f"Auto-marking TK for {client.GetName()} (IP {clientIp} in ban list)")
-            self._serverData.interface.MarkTK(client.GetId(), AUTOMARKTK_DURATION)
-            self._serverData.interface.SmSay(self._messagePrefix + f"Auto-marked {client.GetName()}^7 for {AUTOMARKTK_DURATION} minutes (IP Match).")
+            self._get_interface().MarkTK(client.GetId(), AUTOMARKTK_DURATION)
+            self._get_interface().SmSay(self._messagePrefix + f"Auto-marked {client.GetName()}^7 for {AUTOMARKTK_DURATION} minutes (IP Match).")
 
     def OnSmsay(self, playerName, smodID, adminIP, message):
         message = message.lower()
@@ -173,11 +181,11 @@ def OnStart():
     global PluginInstance
     startTime = time()
     resetTKVstr = r'"settk 0 0;wait 1;settk 1 0;wait 1;settk 2 0;wait 1;settk 3 0;settk 4 0;wait 1;settk 5 0;wait 1;settk 6 0;settk 7 0;wait 1;settk 8 0;wait 9;settk 10 0;wait 1;settk 11 0;settk 12 0;wait 1;settk 13 0;wait 1;settk 14 0;settk 15 0;wait 1;settk 16 0;wait 1;settk 17 0;wait 1;settk 18 0;settk 19 0;wait 1;settk 20 0;wait 1;settk 21 0;settk 22 0;wait 1;settk 23 0;wait 1;settk 24 0;wait 1;settk 25 0;settk 26 0;wait 1;settk 27 0;wait 1;settk 28 0;settk 29 0;wait 1;settk 30 0;wait 1;settk 31 0"'
-    PluginInstance._serverData.interface.SetVstr('clearTK', resetTKVstr)
+    PluginInstance._get_interface().SetVstr('clearTK', resetTKVstr)
     for i in PluginInstance._serverData.API.GetAllClients():
         PluginInstance.OnClientConnect(i)
     loadTime = time() - startTime
-    # PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"TK Manager started in {loadTime:.2f} seconds!")
+    # PluginInstance._get_interface.Say(PluginInstance._messagePrefix + f"TK Manager started in {loadTime:.2f} seconds!")
     return True; # indicate plugin start success
 
 # Called each loop tick from the system
@@ -190,6 +198,21 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
+    global PluginInstance;
+    if not PluginInstance:
+        return False;
+
+    # ADD THIS: Safety check and Port Filtering
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        event_port = event.data.get('source_port')
+        target = getattr(PluginInstance, 'target_port', None)
+        
+        # If the port doesn't match our filter, ignore the event
+        if target and event_port and int(event_port) != int(target):
+            return False
+
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:

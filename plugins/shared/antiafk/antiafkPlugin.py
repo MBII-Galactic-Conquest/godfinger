@@ -64,8 +64,15 @@ class AntiAFKPlugin:
         self._config = self._load_config()
         self._messagePrefix = self._config["messagePrefix"]
         self._smod_ip_to_client = {}  # Map SMOD IP to client for login tracking
+        self.target_port = getattr(server_data, 'config', {}).get('portFilter')
         
         Log.info("Anti-AFK Plugin initialized")
+
+    def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface        
     
     def _load_config(self) -> dict:
         """Load configuration from JSON file or create default"""
@@ -167,7 +174,7 @@ class AntiAFKPlugin:
         self.SvSay(f"{player_name}^7 {self._config['kickMessage']}")
         
         # Kick the player
-        self._serverData.interface.ClientKick(player_id)
+        self._get_interface().ClientKick(player_id)
     
     def _send_warning(self, player_client: client.Client, message: str):
         """Send warning message to player"""
@@ -342,11 +349,11 @@ class AntiAFKPlugin:
     
     def SvTell(self, player_id: int, message: str):
         """Send message to specific player"""
-        self._serverData.interface.SvTell(player_id, f"{self._messagePrefix}{message}")
+        self._get_interface().SvTell(player_id, f"{self._messagePrefix}{message}")
     
     def SvSay(self, message: str):
         """Send message to all players"""
-        self._serverData.interface.SvSay(f"{self._messagePrefix}{message}")
+        self._get_interface().SvSay(f"{self._messagePrefix}{message}")
 
 
 # Global plugin instance
@@ -406,6 +413,20 @@ def OnFinish():
 def OnEvent(event) -> bool:
     """Route events to appropriate handlers"""
     global PluginInstance
+    
+    if not PluginInstance:
+        return False
+
+    # ADD THIS: Port Filtering Gatekeeper
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        event_port = event.data.get('source_port')
+        target = getattr(PluginInstance, 'target_port', None)
+        
+        # Ignore events from other ports
+        if target and event_port and int(event_port) != int(target):
+            return False
     
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False

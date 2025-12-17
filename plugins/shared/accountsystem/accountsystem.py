@@ -515,6 +515,8 @@ def OnFinish():
 def OnInitialize(server_data: ServerData, exports=None):
     global account_plugin
     account_plugin = AccountPlugin(server_data)
+    account_plugin.target_port = getattr(server_data, 'config', {}).get('portFilter')
+
     if exports is not None:
         exports.Add("GetAccountByUserID",
                     account_plugin.get_account_by_user_id)
@@ -539,6 +541,17 @@ def OnEvent(event: Event) -> bool:
     if not account_plugin:
         return False
 
+    # Safety check for event data
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        # Port filtering
+        event_port = event.data.get('source_port')
+        target = getattr(account_plugin, 'target_port', None)
+        
+        if target and event_port and int(event_port) != int(target):
+            return False
+            
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
         account_plugin._on_client_connect(event)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:

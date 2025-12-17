@@ -18,7 +18,6 @@ Log = logging.getLogger(__name__);
 ## Ensure file extension is included #
 
 PLACEHOLDER = "placeholder"
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "sbConfig.json");
 PYTHON_CMD = sys.executable
 
 class soundBoardPlugin(object):
@@ -30,31 +29,44 @@ class soundBoardPlugin(object):
         self.message_global_sound_path = None
         self.player_start_sound_path = None
 
+        # Capture the port for multi-instance support
+        self.target_port = getattr(serverData, 'config', {}).get('portFilter')
+        
+        # Define unique config file for THIS port
+        cfg_name = f"sbConfig_{self.target_port}.json" if self.target_port else "sbConfig.json"
+        self.config_file = os.path.join(os.path.dirname(__file__), cfg_name)
+
+    def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface        
+
 class ClientInfo():
   def __init__(self):
     self.hasBeenGreeted = False # Tracks if they've been greeted
     # Enter more conditions if you desire for client info
 ClientsData : dict[int, ClientInfo] = {};
 
-def SV_LoadJson():
+def SV_LoadJson(config_path):
 
     FALLBACK_JSON = {
-        "PLAYERJOIN_SOUND_PATH": "placeholder",
-        "PLAYERLEAVE_SOUND_PATH": "placeholder",
-        "MESSAGEGLOBAL_SOUND_PATH": "placeholder",
-        "PLAYERSTART_SOUND_PATH": "placeholder"
+        "PLAYERJOIN_SOUND_PATH": "sound/interface/button1.wav",
+        "PLAYERLEAVE_SOUND_PATH": "void",
+        "MESSAGEGLOBAL_SOUND_PATH": "sound/chat/message.wav",
+        "PLAYERSTART_SOUND_PATH": "sound/interface/welcome.mp3"
     }
 
-    if not os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "w") as file:
+    if not os.path.exists(config_path):
+        with open(config_path, "w") as file:
             json.dump(FALLBACK_JSON, file, indent=4)
-        Log.info(f"Created {CONFIG_FILE} with default fallback values.")
+        Log.info(f"Created {config_path} with default fallback values.")
     
-    with open(CONFIG_FILE, "r") as file:
+    with open(config_path, "r") as file:
         CONFIG = json.load(file)
 
     if any(PLACEHOLDER in str(value) for value in CONFIG.values()):
-        Log.error(f"Placeholder values found in {CONFIG_FILE}, please fill out sbConfig.json and return...")
+        Log.error(f"Placeholder values found in {config_path}, please fill out the config and return...")
         sys.exit(0)
 
     PLAYERJOIN_SOUND_PATH = CONFIG["PLAYERJOIN_SOUND_PATH"]
@@ -74,7 +86,7 @@ def SV_PlayerJoin(PLAYERJOIN_SOUND_PATH):
     if PLAYERJOIN_SOUND_PATH == "void":
         return;
 
-    PluginInstance._serverData.interface.SvSound(f"{PLAYERJOIN_SOUND_PATH}")
+    PluginInstance._get_interface().SvSound(f"{PLAYERJOIN_SOUND_PATH}")
     Log.info(f"{PLAYERJOIN_SOUND_PATH} has been played to all players...")
 
     return;
@@ -89,7 +101,7 @@ def SV_PlayerLeave(PLAYERLEAVE_SOUND_PATH):
     if PLAYERLEAVE_SOUND_PATH == "void":
         return;
 
-    PluginInstance._serverData.interface.SvSound(f"{PLAYERLEAVE_SOUND_PATH}")
+    PluginInstance._get_interface().SvSound(f"{PLAYERLEAVE_SOUND_PATH}")
     Log.info(f"{PLAYERLEAVE_SOUND_PATH} has been played to all players...")
 
     return;
@@ -104,7 +116,7 @@ def SV_MessageGlobal(MESSAGEGLOBAL_SOUND_PATH):
     if MESSAGEGLOBAL_SOUND_PATH == "void":
         return;
 
-    PluginInstance._serverData.interface.SvSound(f"{MESSAGEGLOBAL_SOUND_PATH}")
+    PluginInstance._get_interface().SvSound(f"{MESSAGEGLOBAL_SOUND_PATH}")
     Log.info(f"{MESSAGEGLOBAL_SOUND_PATH} has been played to all players...")
 
     return;
@@ -131,9 +143,9 @@ def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
 
     if ID in ClientsData:   # check if client is present ( shouldnt be negative anyway )
         if ClientsData[ID].hasBeenGreeted == False: # check if client wasnt greeted yet
-            PluginInstance._serverData.interface.ClientSound(f"{PLAYERSTART_SOUND_PATH}", ID)
+            PluginInstance._get_interface().ClientSound(f"{PLAYERSTART_SOUND_PATH}", ID)
             Log.info(f"{PLAYERSTART_SOUND_PATH} has been played to Client {ID}...")
-            PluginInstance._serverData.interface.SvSay(f"{NAME} ^7has made it into the server.")
+            PluginInstance._get_interface().SvSay(f"{NAME} ^7has made it into the server.")
             ClientsData[ID].hasBeenGreeted = True; # we greeted them, now the above check wont pass again
     else:
         return;
@@ -188,10 +200,10 @@ def OnStart():
     (PluginInstance.player_join_sound_path,
      PluginInstance.player_leave_sound_path,
      PluginInstance.message_global_sound_path,
-     PluginInstance.player_start_sound_path) = SV_LoadJson()
+     PluginInstance.player_start_sound_path) = SV_LoadJson(PluginInstance.config_file)
     startTime = time.time()
     loadTime = time.time() - startTime
-    PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"Soundboard started in {loadTime:.2f} seconds!")
+    PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"Soundboard started in {loadTime:.2f} seconds!")
     return True; # indicate plugin start success
 
 # Called each loop tick from the system, TODO? maybe add a return timeout for next call
@@ -204,6 +216,15 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
+    global PluginInstance
+    if not PluginInstance:
+        return False
+
+    event_port = event.data.get('source_port') if event.data else None
+    target = getattr(PluginInstance, 'target_port', None)
+    if target and event_port and int(event_port) != int(target):
+        return False
+
     #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         SV_MessageGlobal(PluginInstance.message_global_sound_path);

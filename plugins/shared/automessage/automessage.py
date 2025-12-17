@@ -40,11 +40,18 @@ class Automessage():
     def __init__(self, serverData : serverdata.ServerData):
         self._serverData = serverData;
         self.config = AutomessageConfig;
+        self.target_port = getattr(serverData, 'config', {}).get('portFilter')
         self._threadLock = threading.Lock();
         self._threadControl = threadcontrol.ThreadControl();
         self._thread = threading.Thread(target=self._main_thread, daemon=True, args=(self._threadControl, self.config.cfg["interval"]));
         self._allowLastMessageTwice = self.config.cfg["allowLastMessageTwice"]
         self._lastMessage = ""
+
+    def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface    
 
     def Start(self) -> bool:
         self._thread.start();
@@ -66,7 +73,7 @@ class Automessage():
                 while message == self._lastMessage:
                     message = random.choice(messages)
         self._lastMessage = message
-        self._serverData.interface.SvSay(self.config.cfg["prefix"] + message);
+        self._get_interface().SvSay(self.config.cfg["prefix"] + message);
 
     def _main_thread(self, control, interval):
         while(True):
@@ -117,6 +124,21 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
+    global PluginInstance;
+    if not PluginInstance:
+        return False;
+
+    # ADD THIS: Port Filtering Gatekeeper
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        event_port = event.data.get('source_port')
+        target = getattr(PluginInstance, 'target_port', None)
+        
+        # Ignore events from other ports
+        if target and event_port and int(event_port) != int(target):
+            return False
+
     return False; # Just skip all events
     #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:

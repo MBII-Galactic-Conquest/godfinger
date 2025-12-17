@@ -43,6 +43,13 @@ class discordBotPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[DISC]", "lblue") + ": "
+        self.target_port = getattr(serverData, 'config', {}).get('portFilter')
+
+    def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface    
 
 # Load environment variables
 def load_env_variables():
@@ -317,6 +324,21 @@ def OnFinish():
 
 # Called from the system on some event raising
 def OnEvent(event) -> bool:
+    global PluginInstance
+    if not PluginInstance:
+        return False
+
+    # ADD THIS: Port Filtering Gatekeeper
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        event_port = event.data.get('source_port')
+        target = getattr(PluginInstance, 'target_port', None)
+        
+        # Ignore events from other ports
+        if target and event_port and int(event_port) != int(target):
+            return False
+            
     return False
 
 if __name__ == "__main__":

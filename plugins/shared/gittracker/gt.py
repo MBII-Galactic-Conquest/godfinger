@@ -67,6 +67,7 @@ class gitTrackerPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
         self._serverData : serverdata.ServerData = serverData
         self._messagePrefix = colors.ColorizeText("[GT]", "lblue") + ": "
+        self.target_port = getattr(serverData, 'config', {}).get('portFilter')
         self._hardUpdateSetting = 0
         self._commandList = \
             {
@@ -90,6 +91,12 @@ class gitTrackerPlugin(object):
                 tuple(["hardupdate", "hardupdate"]) : ("<0/1> - when set to 1, determines if the mbiided process is forcibly restarted when forcing updates", self.HandleHardUpdate),
                 tuple(["build", "build"]) : ("!<build <git|svn|winscp> [true|false]> - check or set build status for git, svn, or winscp", self.HandleBuilding)
             }
+
+    def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface        
     
     def HandleUpdate(self, playerName, smodID, adminIP, cmdArgs):
         ID, NAME = self.fetch_client_info(playerName, smodID)
@@ -98,18 +105,18 @@ class gitTrackerPlugin(object):
             return False
 
         if self._hardUpdateSetting == 1:
-            self._serverData.interface.SvSound("sound/sup/bloop.mp3")
-            self._serverData.interface.SvSay(self._messagePrefix + f"^1SMOD has requested a hard restart!!")
+            self._get_interface().SvSound("sound/sup/bloop.mp3")
+            self._get_interface().SvSay(self._messagePrefix + f"^1SMOD has requested a hard restart!!")
             Log.warning(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested a hard restart!!")
         else:
-            self._serverData.interface.SvSound("sound/sup/bloop.mp3")
-            self._serverData.interface.SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger update.")
+            self._get_interface().SvSound("sound/sup/bloop.mp3")
+            self._get_interface().SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger update.")
             Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) requested godfinger update.")
 
         ForceUpdate(self, hard_update_override=self._hardUpdateSetting)
 
-        self._serverData.interface.SvSay(self._messagePrefix + "^2Godfinger update process completed.")
-        self._serverData.interface.SvSound("sound/sup/message.mp3")
+        self._get_interface().SvSay(self._messagePrefix + "^2Godfinger update process completed.")
+        self._get_interface().SvSound("sound/sup/message.mp3")
         return True
 
     def HandleRestart(self, playerName, smodID, adminIP, cmdArgs):
@@ -120,8 +127,8 @@ class gitTrackerPlugin(object):
             Log.error(f"Failed to resolve client info for '{playerName}'. Cannot send message.")
             return False
 
-        self._serverData.interface.SvSound("sound/sup/bloop.mp3")
-        self._serverData.interface.SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger restart.")
+        self._get_interface().SvSound("sound/sup/bloop.mp3")
+        self._get_interface().SvSay(self._messagePrefix + f"^3SMOD has requested a godfinger restart.")
 
         Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) force restarted godfinger...")
         self._serverData.API.Restart(timeoutSeconds)
@@ -138,7 +145,7 @@ class gitTrackerPlugin(object):
 
         if len(cmdArgs) < 2:
             message = f"{self._messagePrefix}Current hard update mode: ^5{self._hardUpdateSetting} ^7Usage: ^5!hardupdate <0|1>"
-            self._serverData.interface.SmSay(message)
+            self._get_interface().SmSay(message)
             Log.info(f"{playerName} checked hardupdate setting (current: {self._hardUpdateSetting}).")
             return True
 
@@ -147,7 +154,7 @@ class gitTrackerPlugin(object):
             if value == 0 or value == 1:
                 self._hardUpdateSetting = value
                 message = f"{self._messagePrefix}Hard update mode set to: ^5{self._hardUpdateSetting}"
-                self._serverData.interface.SmSay(message)
+                self._get_interface().SmSay(message)
                 Log.info(f"{playerName} set hardupdate mode to {value}.")
                 if value == 1:
                     MANUALLY_UPDATED = True
@@ -159,12 +166,12 @@ class gitTrackerPlugin(object):
             else:
                 # If it's a number but not 0 or 1
                 message = f"{self._messagePrefix}^1Invalid value '{value}'. ^7Please use ^50 ^7or ^51."
-                self._serverData.interface.SmSay(message)
+                self._get_interface().SmSay(message)
                 Log.warning(f"{playerName} tried to set hardupdate to invalid value {value}.")
                 return False
         except ValueError:
             message = f"{self._messagePrefix}^1Invalid argument '{cmdArgs[1]}'. ^7Please use ^50 ^7or ^51."
-            self._serverData.interface.SmSay(message)
+            self._get_interface().SmSay(message)
             Log.warning(f"{playerName} tried to set hardupdate with non-numeric value '{cmdArgs[1]}'.")
             return False
 
@@ -178,7 +185,7 @@ class gitTrackerPlugin(object):
 
         if len(cmdArgs) < 2:
             message = f"{self._messagePrefix}^7Usage: ^5!build ^9<git|svn|winscp> ^3[true|false]"
-            self._serverData.interface.SmSay(message)
+            self._get_interface().SmSay(message)
             Log.warning(f"{playerName} used !build without enough arguments.")
             return False
 
@@ -193,14 +200,14 @@ class gitTrackerPlugin(object):
             config_key = "isWinSCPBuilding"
         else:
             message = f"{self._messagePrefix}^1Invalid build component: '{component}'. ^7Use ^5git^7, ^5svn^7, or ^5winscp^7."
-            self._serverData.interface.SmSay(message)
+            self._get_interface().SmSay(message)
             Log.warning(f"{playerName} tried to set build for an unknown component: '{component}'.")
             return False
         
         current_config = load_config()
         if not current_config:
             Log.error(f"Failed to load configuration for !build command.")
-            self._serverData.interface.SmSay(f"{self._messagePrefix}^1Error: Could not load configuration.")
+            self._get_interface().SmSay(f"{self._messagePrefix}^1Error: Could not load configuration.")
             return False
 
         # If a value is provided
@@ -213,7 +220,7 @@ class gitTrackerPlugin(object):
                 new_value = False
             else:
                 message = f"{self._messagePrefix}^1Invalid value '{value_str}'. ^7Please use ^5true ^7or ^5false."
-                self._serverData.interface.SmSay(message)
+                self._get_interface().SmSay(message)
                 Log.warning(f"{playerName} tried to set build status to an invalid value '{value_str}'.")
                 return False
             
@@ -222,18 +229,18 @@ class gitTrackerPlugin(object):
             
             if write_config(current_config):
                 message = f"{self._messagePrefix}Build status for ^5{component}^7 set to: ^5{new_value}"
-                self._serverData.interface.SmSay(message)
+                self._get_interface().SmSay(message)
                 Log.info(f"{playerName} set build status for {component} to {new_value}.")
                 return True
             else:
-                self._serverData.interface.SmSay(f"{self._messagePrefix}^1Error saving configuration.")
+                self._get_interface().SmSay(f"{self._messagePrefix}^1Error saving configuration.")
                 Log.error(f"{playerName} failed to save config for !build {component} {new_value}.")
                 return False
         else:
             # If no value is provided, just tell the current status
             current_status = current_config.get(config_key, False) # Default to False if key somehow missing
             message = f"{self._messagePrefix}Build status for ^5{component}^7 is: ^5{current_status}"
-            self._serverData.interface.SmSay(message)
+            self._get_interface().SmSay(message)
             Log.info(f"{playerName} checked build status for {component} (current: {current_status}).")
             return True
 
@@ -289,6 +296,7 @@ def check_git_installed():
 def create_config_placeholder():
     if not os.path.exists(CONFIG_FILE):
         default_config = {
+            "portFilter": 29070,
             "repositories": [
                 {
                     "repository": PLACEHOLDER_REPO,
@@ -413,11 +421,11 @@ def update_json_if_needed(repo_url, branch_name, commit_hash, commit_message, is
         # Only update if hash has changed
         save_json(config_file_path, commit_hash)
         full_message = f"^5{commit_hash} ^7- {repo_name}/{branch_name} - ^5{commit_message}"
-        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + full_message)
-        PluginInstance._serverData.interface.SvSound("sound/sup/message.mp3")
+        PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + full_message)
+        PluginInstance._get_interface().SvSound("sound/sup/message.mp3")
         
         if isGFBuilding == True and UPDATE_NEEDED == False and GODFINGER in repo_name and gfBuildBranch in branch_name:
-            PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
+            PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + "^1[!] ^7Godfinger change detected, applying when all players leave the server...")
             Log.debug(f"Godfinger change intercepted, automatically building '{gfBuildBranch}' and private deployments when all players leave the server...")
             UPDATE_NEEDED = True
             return UPDATE_NEEDED
@@ -804,7 +812,7 @@ def OnStart():
     start_monitoring()
     startTime = time.time()
     loadTime = time.time() - startTime
-    PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"Git Tracker started in {loadTime:.2f} seconds!")
+    PluginInstance._get_interface().Say(PluginInstance._messagePrefix + f"Git Tracker started in {loadTime:.2f} seconds!")
     return True; # indicate plugin start success
 
 # Called each loop tick from the system, TODO? maybe add a return timeout for next call
@@ -817,6 +825,21 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
+    global PluginInstance
+    if not PluginInstance:
+        return False
+
+    # ADD THIS: Port Filtering Gatekeeper
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        event_port = event.data.get('source_port')
+        target = getattr(PluginInstance, 'target_port', None)
+        
+        # Ignore events from other ports
+        if target and event_port and int(event_port) != int(target):
+            return False
+
     #print("Calling OnEvent function from plugin with event %s!" % (str(event)));
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False;

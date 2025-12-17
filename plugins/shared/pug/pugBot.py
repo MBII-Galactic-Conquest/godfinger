@@ -18,172 +18,155 @@ import asyncio
 import os
 
 SERVER_DATA = None
+PluginInstance = None
 Log = logging.getLogger(__name__)
 
-# Environment File
-env_file = os.path.join(os.path.dirname(__file__), "pugConfig.env")
-
-def check_and_create_env():
-    """Checks if the .env file exists and creates it with defaults if not."""
-    if not os.path.exists(env_file):
-        print(f"{env_file} not found. Creating a new one with default values.")
-        with open(env_file, 'w') as f:
-            f.write("""
-# Queue Configuration
-QUEUE_TIMEOUT=1800  # 30 minutes in seconds
-MAX_QUEUE_SIZE=10
-MIN_QUEUE_SIZE=6
-NEW_QUEUE_COOLDOWN=300 # 5 minutes in seconds
-
-# Discord Configuration
-BOT_TOKEN=
-PUG_ROLE_ID=
-ADMIN_ROLE_ID=
-ALLOWED_CHANNEL_ID= # Text channel for commands and updates
-PUG_VC_IDS=         # Voice channels for automatic queue management, seperated by comma (e.g., 123456789,987654321)
-SERVER_PASSWORD=None
-SERVER_IP=           # Static IP for display in embeds if SERVER_DATA.game_ip is not available dynamically
-GUILD_ID=            # The ID of your Discord server/guild for faster slash command syncing
-
-# Persistence Configuration
-COOLDOWN_FILE=.cooldown
-PERSIST_FILE=.persist
-
-# Miscellaneous Configuration
-EMBED_IMAGE=
-            """)
-        load_dotenv(dotenv_path=env_file)
-
-    if os.path.exists(env_file):
-        load_dotenv(dotenv_path=env_file)
-        print(f"Environment variables loaded from {env_file}")
-
-# List of environment variables to reset before loading, to ensure fresh load
-env_vars_to_reset = [
-    "QUEUE_TIMEOUT", "MAX_QUEUE_SIZE", "MIN_QUEUE_SIZE", "NEW_QUEUE_COOLDOWN",
-    "BOT_TOKEN", "PUG_ROLE_ID", "ADMIN_ROLE_ID",
-    "ALLOWED_CHANNEL_ID", "PUG_VC_IDS", "SERVER_PASSWORD", "COOLDOWN_FILE", "EMBED_IMAGE",
-    "SERVER_IP", "GUILD_ID"
-]
-
-def reset_env_vars(vars_list):
-    """Resets specified environment variables to ensure clean reload."""
-    for var in vars_list:
-        os.environ.pop(var, None)
-
-    Log.debug(f"Environment variables reset: {', '.join(vars_list)}")
-
-reset_env_vars(env_vars_to_reset)
-check_and_create_env()
-
-# --- Load Config from .env ---
-try:
-    QUEUE_TIMEOUT = int(os.getenv("QUEUE_TIMEOUT"))
-    MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE"))
-    MIN_QUEUE_SIZE = int(os.getenv("MIN_QUEUE_SIZE"))
-    NEW_QUEUE_COOLDOWN = int(os.getenv("NEW_QUEUE_COOLDOWN"))
-
-    BOT_TOKEN = os.getenv("BOT_TOKEN")
-    PUG_ROLE_ID = int(os.getenv("PUG_ROLE_ID"))
-    ADMIN_ROLE_ID = int(os.getenv("ADMIN_ROLE_ID"))
-    ALLOWED_CHANNEL_ID = int(os.getenv("ALLOWED_CHANNEL_ID"))
-
-    pug_vc_ids_str = os.getenv("PUG_VC_IDS")
-    if pug_vc_ids_str:
-        PUG_VC_IDS = [int(vc_id.strip()) for vc_id in pug_vc_ids_str.split(',') if vc_id.strip().isdigit()]
-    else:
-        PUG_VC_IDS = []
-    Log.info(f"Configured PUG Voice Channel IDs: {PUG_VC_IDS}")
-
-    SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
-    STATIC_SERVER_IP = os.getenv("SERVER_IP")
-    COOLDOWN_FILE = os.path.join(os.path.dirname(__file__), os.getenv("COOLDOWN_FILE"))
-    PERSIST_FILE = os.path.join(os.path.dirname(__file__), os.getenv("PERSIST_FILE"))
-    EMBED_IMAGE = os.getenv("EMBED_IMAGE")
-    # Load GUILD_ID
-    GUILD_ID = int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None
-
-except Exception as e:
-    Log.error(f"Error loading environment variables: {e}. Please check your pugConfig.env file.")
-    # Exit or handle error appropriately if essential variables are missing/malformed
-    exit(1)
-
-def create_persist_file():
-    """Creates a temporary .persist file for recurring games in progress on shutdown event."""
-    try:
-        with open(PERSIST_FILE, 'w') as f:
-            f.write("")
-        Log.info(f"Persisting file {PERSIST_FILE} created.")
-    except IOError as e:
-        Log.error(f"Error creating persisting file {PERSIST_FILE}: {e}")
-
-def check_persist_file_exists():
-    """Checks if the temporary .persist file exists."""
-    return os.path.exists(PERSIST_FILE)
-
-def clear_persist_file():
-    """Removes the temporary .persist file."""
-    if os.path.exists(PERSIST_FILE):
-        try:
-            os.remove(PERSIST_FILE)
-            Log.info(f"Cooldown file {PERSIST_FILE} removed.")
-        except OSError as e:
-            Log.error(f"Error removing cooldown file {PERSIST_FILE}: {e}")
-
-def create_cooldown_file():
-    """Creates an empty cooldown file to signal an active cooldown."""
-    try:
-        with open(COOLDOWN_FILE, 'w') as f:
-            f.write("")
-        Log.info(f"Cooldown file {COOLDOWN_FILE} created.")
-    except IOError as e:
-        Log.error(f"Error creating cooldown file {COOLDOWN_FILE}: {e}")
-
-def check_cooldown_file_exists():
-    """Checks if the cooldown file exists."""
-    return os.path.exists(COOLDOWN_FILE)
-
-def clear_cooldown_file():
-    """Removes the cooldown file."""
-    if os.path.exists(COOLDOWN_FILE):
-        try:
-            os.remove(COOLDOWN_FILE)
-            Log.info(f"Cooldown file {COOLDOWN_FILE} removed.")
-        except OSError as e:
-            Log.error(f"Error removing cooldown file {COOLDOWN_FILE}: {e}")
-
-def check_embed_image_exists():
-    global EMBED_IMAGE
-    """Checks if the image for embed use exists."""
-    if not EMBED_IMAGE or EMBED_IMAGE.strip() == "":
-        EMBED_IMAGE = None
-        return None
-    else:
-        EMBED_IMAGE = EMBED_IMAGE.strip()
-    return EMBED_IMAGE
-
-# === Misc ===
-SERVER_EMPTIED = False
-
-# === Queue State ===
-player_queue = []
-queue_created_time = None
-last_join_time = None
-last_queue_clear_time = None
-game_in_progress = False # Flag to indicate if a game has started and auto-join/leave should be paused
-
-# --- Discord Bot Setup ---
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.voice_states = True
-# Set command_prefix to something irrelevant like '!' or omit it if you don't use prefix commands
-bot = commands.Bot(command_prefix='!', intents=intents)
+BOT_TOKEN = None
+PUG_ROLE_ID = 0
+ADMIN_ROLE_ID = 0
+ALLOWED_CHANNEL_ID = 0
+GUILD_ID = 0
+QUEUE_TIMEOUT = 1800
+MAX_QUEUE_SIZE = 10
+MIN_QUEUE_SIZE = 6
+NEW_QUEUE_COOLDOWN = 300
+SERVER_PASSWORD = None
+STATIC_SERVER_IP = None
+COOLDOWN_FILE = None
+PERSIST_FILE = None
+EMBED_IMAGE = None
 
 class pugBotPlugin(object):
     def __init__(self, serverData : serverdata.ServerData) -> None:
-        self._serverData : serverdata.ServerData = serverData
+        self._serverData = serverData
         self._messagePrefix = colors.ColorizeText("[PUG]", "lblue") + ": "
+        
+        # Capture the port (e.g., 29070)
+        self.target_port = getattr(serverData, 'config', {}).get('portFilter')
+
+        # Define the unique file for THIS port
+        env_name = f"pugConfig_{self.target_port}.env" if self.target_port else "pugConfig.env"
+        self.env_file = os.path.join(os.path.dirname(__file__), env_name)
+
+        # Create the file if it doesn't exist, then load it
+        self._internal_check_and_create_env()
+        load_dotenv(self.env_file, override=True)
+        self._load_env_variables()
+
+    def _internal_check_and_create_env(self):
+        """Creates a port-specific .env file if one is missing"""
+        if not os.path.exists(self.env_file):
+            Log.info(f"Generating new configuration: {self.env_file}")
+            with open(self.env_file, 'w') as f:
+                f.write((
+                    "QUEUE_TIMEOUT=1800\n"
+                    "MAX_QUEUE_SIZE=10\n"
+                    "MIN_QUEUE_SIZE=6\n"
+                    "NEW_QUEUE_COOLDOWN=300\n"
+                    "BOT_TOKEN=PASTE_YOUR_TOKEN_HERE\n"
+                    "PUG_ROLE_ID=0\n"
+                    "ADMIN_ROLE_ID=0\n"
+                    "ALLOWED_CHANNEL_ID=0\n"
+                    "GUILD_ID=0\n"
+                    "PUG_VC_IDS=\n"
+                    "SERVER_PASSWORD=\n"
+                    "SERVER_IP=\n"
+                    "COOLDOWN_FILE=.cooldown\n"
+                    "PERSIST_FILE=.persist\n"
+                    "EMBED_IMAGE=\n"
+                ))
+
+    def _load_env_variables(self):
+        """Safely loads variables into the global placeholders"""
+        try:
+            global BOT_TOKEN, PUG_ROLE_ID, ADMIN_ROLE_ID, ALLOWED_CHANNEL_ID
+            global QUEUE_TIMEOUT, MAX_QUEUE_SIZE, MIN_QUEUE_SIZE, NEW_QUEUE_COOLDOWN
+            global SERVER_PASSWORD, STATIC_SERVER_IP, COOLDOWN_FILE, PERSIST_FILE, EMBED_IMAGE, GUILD_ID
+
+            # Numerical values with safety defaults to prevent int('') crashes
+            QUEUE_TIMEOUT = int(os.getenv("QUEUE_TIMEOUT", "1800") or 1800)
+            MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", "10") or 10)
+            MIN_QUEUE_SIZE = int(os.getenv("MIN_QUEUE_SIZE", "6") or 6)
+            NEW_QUEUE_COOLDOWN = int(os.getenv("NEW_QUEUE_COOLDOWN", "300") or 300)
+            PUG_ROLE_ID = int(os.getenv('PUG_ROLE_ID', '0') or 0)
+            ADMIN_ROLE_ID = int(os.getenv('ADMIN_ROLE_ID', '0') or 0)
+            ALLOWED_CHANNEL_ID = int(os.getenv('ALLOWED_CHANNEL_ID', '0') or 0)
+            GUILD_ID = int(os.getenv("GUILD_ID", "0") or 0)
+
+            # String values
+            BOT_TOKEN = os.getenv('BOT_TOKEN')
+            SERVER_PASSWORD = os.getenv("SERVER_PASSWORD")
+            STATIC_SERVER_IP = os.getenv("SERVER_IP")
+            EMBED_IMAGE = os.getenv("EMBED_IMAGE")
+            
+            # File paths
+            COOLDOWN_FILE = os.path.join(os.path.dirname(__file__), os.getenv("COOLDOWN_FILE", ".cooldown"))
+            PERSIST_FILE = os.path.join(os.path.dirname(__file__), os.getenv("PERSIST_FILE", ".persist"))
+
+            if not BOT_TOKEN or BOT_TOKEN == "PASTE_YOUR_TOKEN_HERE":
+                Log.error(f"CRITICAL: BOT_TOKEN is not set in {self.env_file}!")
+        except Exception as e:
+            Log.error(f"Error parsing PUG environment variables: {e}")
+
+    def create_persist_file(self):
+        """Creates a temporary .persist file."""
+        try: # <--- Make sure 'try:' is here
+            with open(self.PERSIST_FILE, 'w') as f:
+                f.write("")
+            Log.info(f"Persisted file {self.PERSIST_FILE} created.")
+        except IOError as e: # <--- Line 116 is likely here
+            Log.error(f"Error creating persisting file {self.PERSIST_FILE}: {e}")
+
+    def check_persist_file_exists(self):
+        """Checks if the temporary .persist file exists."""
+        return os.path.exists(PERSIST_FILE)
+
+    def clear_persist_file(self):
+        """Removes the temporary .persist file."""
+        if os.path.exists(PERSIST_FILE):
+            try:
+                os.remove(PERSIST_FILE)
+                Log.info(f"Cooldown file {PERSIST_FILE} removed.")
+            except OSError as e:
+                Log.error(f"Error removing cooldown file {PERSIST_FILE}: {e}")
+
+    def create_cooldown_file(self):
+        """Creates an empty cooldown file to signal an active cooldown."""
+        try:
+            with open(COOLDOWN_FILE, 'w') as f:
+                f.write("")
+            Log.info(f"Cooldown file {COOLDOWN_FILE} created.")
+        except IOError as e:
+            Log.error(f"Error creating cooldown file {COOLDOWN_FILE}: {e}")
+
+    def check_cooldown_file_exists(self):
+        """Checks if the cooldown file exists."""
+        return os.path.exists(COOLDOWN_FILE)
+
+    def clear_cooldown_file(self):
+        """Removes the cooldown file."""
+        if os.path.exists(COOLDOWN_FILE):
+            try:
+                os.remove(COOLDOWN_FILE)
+                Log.info(f"Cooldown file {COOLDOWN_FILE} removed.")
+            except OSError as e:
+                Log.error(f"Error removing cooldown file {COOLDOWN_FILE}: {e}") 
+
+    def check_embed_image_exists(self):
+        global EMBED_IMAGE
+        """Checks if the image for embed use exists."""
+        if not EMBED_IMAGE or EMBED_IMAGE.strip() == "":
+            EMBED_IMAGE = None
+            return None
+        else:
+            EMBED_IMAGE = EMBED_IMAGE.strip()
+        return EMBED_IMAGE
+
+    def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface
 
 # New asynchronous function to repeatedly ensure game_in_progress is True
 async def ensure_game_in_progress_repeatedly():
@@ -210,7 +193,7 @@ async def monitor_queue_task():
             await channel.send("**Queue timed out due to inactivity!**\n> Clearing queue...")
             # Access _serverData through the global PluginInstance if needed
             if 'PluginInstance' in globals() and PluginInstance._serverData:
-                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A discord pug queue has been cleared due to inactivity!")
+                PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"^5A discord pug queue has been cleared due to inactivity!")
         player_queue.clear()
         last_queue_clear_time = datetime.utcnow()
         last_join_time = None
@@ -225,6 +208,20 @@ async def monitor_queue_task():
         game_in_progress = False
         Log.info("Monitor task: Resetting game_in_progress as queue is empty and game likely finished.")
 
+# === Queue State ===
+player_queue = []
+queue_created_time = None
+last_join_time = None
+last_queue_clear_time = None
+game_in_progress = False # Flag to indicate if a game has started and auto-join/leave should be paused
+
+# --- Discord Bot Setup ---
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+intents.voice_states = True
+# Set command_prefix to something irrelevant like '!' or omit it if you don't use prefix commands
+bot = commands.Bot(command_prefix='!', intents=intents)  
 
 @bot.event
 async def on_ready():
@@ -353,7 +350,7 @@ async def handle_queue_join(member: discord.Member, channel: discord.TextChannel
         pug_mention = f"<@&{PUG_ROLE_ID}>"
         # Access _serverData through the global PluginInstance
         if 'PluginInstance' in globals() and PluginInstance._serverData:
-            PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A discord PUG queue has been started! ^9({MIN_QUEUE_SIZE}) ^5players required to begin...")
+            PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"^5A discord PUG queue has been started! ^9({MIN_QUEUE_SIZE}) ^5players required to begin...")
         await channel.send(f"{member.mention} started a new queue! {pug_mention}\n> `{MIN_QUEUE_SIZE}` players required to `/queue start` without admin.")
 
     player_queue.append(member)
@@ -362,7 +359,7 @@ async def handle_queue_join(member: discord.Member, channel: discord.TextChannel
     needed = MAX_QUEUE_SIZE - len(player_queue)
     # Access _serverData through the global PluginInstance
     if 'PluginInstance' in globals() and PluginInstance._serverData:
-        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A player has joined the discord PUG queue, ^9({len(player_queue)}/{MAX_QUEUE_SIZE}) ^5needed to start...")
+        PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"^5A player has joined the discord PUG queue, ^9({len(player_queue)}/{MAX_QUEUE_SIZE}) ^5needed to start...")
     await channel.send(f"{member.mention} has joined the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
 
     if len(player_queue) >= MAX_QUEUE_SIZE:
@@ -379,7 +376,7 @@ async def handle_queue_leave(member: discord.Member, channel: discord.TextChanne
         if not player_queue:
             # Access _serverData through the global PluginInstance
             if 'PluginInstance' in globals() and PluginInstance._serverData:
-                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5The discord PUG queue is now empty and has been cancelled...")
+                PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"^5The discord PUG queue is now empty and has been cancelled...")
             await channel.send(f"{member.mention} has left the queue!\n> **The queue is now empty and has been cancelled.**")
             last_queue_clear_time = datetime.utcnow()
             game_in_progress = False # Reset if queue becomes empty due to a leave (a forming queue was abandoned)
@@ -388,7 +385,7 @@ async def handle_queue_leave(member: discord.Member, channel: discord.TextChanne
             needed = MAX_QUEUE_SIZE - len(player_queue)
             # Access _serverData through the global PluginInstance
             if 'PluginInstance' in globals() and PluginInstance._serverData:
-                PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A player has left the discord PUG queue, ^9({len(player_queue)}/{MAX_QUEUE_SIZE}) ^5needed to start...")
+                PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"^5A player has left the discord PUG queue, ^9({len(player_queue)}/{MAX_QUEUE_SIZE}) ^5needed to start...")
             await channel.send(f"{member.mention} has left the queue!\n> (`{len(player_queue)}/{MAX_QUEUE_SIZE}`, `{needed}` more to start)")
     else:
         Log.info(f"{member.display_name} left VC, but was not found in active queue.")
@@ -615,7 +612,7 @@ async def start_queue(channel):
     game_in_progress = True
 
     if 'PluginInstance' in globals() and PluginInstance._serverData:
-        PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"^5A discord PUG queue has begun!")
+        PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"^5A discord PUG queue has begun!")
     Log.info("Queue started. player_queue cleared and game_in_progress set to True.")
 
 
@@ -748,13 +745,14 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     global PluginInstance
     PluginInstance = pugBotPlugin(serverData)
 
-    if check_persist_file_exists():
-        clear_persist_file();
+    if PluginInstance.check_persist_file_exists():
+        Log.info("Persist file found during initialization.")
+        PluginInstance.clear_persist_file()
 
-    if check_cooldown_file_exists():
+    if PluginInstance.check_cooldown_file_exists():
         last_queue_clear_time = datetime.utcnow()
-        Log.info(f"Persistent cooldown file found. Applying full {NEW_QUEUE_COOLDOWN}s cooldown from bot startup.")
-        clear_cooldown_file()
+        Log.info(f"Persistent cooldown file found. Applying full {NEW_QUEUE_COOLDOWN}s cooldown.")
+        PluginInstance.clear_cooldown_file()
     else:
         Log.info("No persistent cooldown file found, proceeding as normal.")
 
@@ -765,7 +763,7 @@ def OnStart():
     global PluginInstance
     startTime = time.time()
     loadTime = time.time() - startTime
-    PluginInstance._serverData.interface.SvSay(PluginInstance._messagePrefix + f"PUGBot started in {loadTime:.2f} seconds!")
+    PluginInstance._get_interface().SvSay(PluginInstance._messagePrefix + f"PUGBot started in {loadTime:.2f} seconds!")
     return True
 
 # Called each loop tick from the system
@@ -775,8 +773,8 @@ def OnLoop():
 # Called before the plugin is unloaded by the system
 def OnFinish():
     ClearExistingQueue();
-    if check_persist_file_exists():
-        clear_persist_file()
+    if PluginInstance.check_persist_file_exists():
+        PluginInstance.clear_persist_file()
 
     try:
         if bot.is_closed() is False:
@@ -792,6 +790,25 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
+    global PluginInstance
+    if not PluginInstance:
+        return False
+
+    # ADD THIS: Port Filtering Gatekeeper
+    if event.data is None or not isinstance(event.data, dict):
+        pass 
+    else:
+        event_port = event.data.get('source_port')
+        target = getattr(PluginInstance, 'target_port', None)
+        
+        # Ignore events from other ports
+        if target and event_port and int(event_port) != int(target):
+            return False
+
+    # Existing event logic...
+    if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
+        return False
+
     global player_queue, last_queue_clear_time, game_in_progress, SERVER_EMPTIED
 
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
@@ -821,11 +838,11 @@ def OnEvent(event) -> bool:
             player_queue.clear()
             last_queue_clear_time = datetime.utcnow()
             game_in_progress = False
-            if check_persist_file_exists():
-                clear_persist_file()
+            if PluginInstance.check_persist_file_exists():
+                PluginInstance.clear_persist_file()
 
-            if check_if_gittracker_used():
-                create_cooldown_file()
+            if PluginInstance.check_if_gittracker_used():
+                PluginInstance.create_cooldown_file()
 
         SERVER_EMPTIED = True
 
@@ -833,12 +850,12 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
 
         if game_in_progress:
-            if check_persist_file_exists():
+            if PluginInstance.check_persist_file_exists():
                 return False;
             else:
-                create_persist_file()
+                PluginInstance.create_persist_file()
         else:
-            if check_persist_file_exists():
+            if PluginInstance.check_persist_file_exists():
                 game_in_progress = True
 
         return False
@@ -873,6 +890,19 @@ def OnEvent(event) -> bool:
 
 # === Run the Bot ===
 def run_bot():
+    global BOT_TOKEN, PluginInstance  
+    
+    timeout = 10
+    # This loop waits for the main thread to create the PluginInstance
+    while PluginInstance is None and timeout > 0:
+        time.sleep(1)
+        timeout -= 1
+
+    if PluginInstance is None or BOT_TOKEN is None:
+        Log.error("Bot startup failed: PluginInstance or BOT_TOKEN not initialized.")
+        return
+
+    Log.info(f"PluginInstance detected. Starting Discord Bot...")
     bot.run(BOT_TOKEN)
 
 thread = threading.Thread(target=run_bot, daemon=True)

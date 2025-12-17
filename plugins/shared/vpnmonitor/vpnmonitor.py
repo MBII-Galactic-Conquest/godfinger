@@ -42,40 +42,53 @@ CONFIG_FALLBACK = \
     "svsayOnAction" : true
 }
 """
-global VPNMonitorConfig;
-VPNMonitorConfig = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
 
 # DISCLAIMER : DO NOT LOCK ANY OF THESE FUNCTIONS, IF YOU WANT MAKE INTERNAL LOOPS FOR PLUGINS - MAKE OWN THREADS AND MANAGE THEM, LET THESE FUNCTIONS GO.
 
 Log = logging.getLogger(__name__);
 
-
 PluginInstance = None;
 
-class VPNMonitor():
+class vpnMonitorPlugin(object): # Match the class name used in OnInitialize
     def __init__(self, serverData : serverdata.ServerData):
-        self._status = 0;
-        self._serverData = serverData;
-        self.config = VPNMonitorConfig;
-        self._messagePrefix = "^9[VPN]^7: "
-        if self.config.cfg["apikey"] == "your_api_key":
-            self._status -1;
-            Log.error("Please specify valid api key in vpnmonitorCfg.json");
+        self._serverData = serverData
+        self._status = 0
         
-        self._database : database.ADatabase = None;
-        dbPath = os.path.join(os.path.dirname(__file__), "vpn.db");
-        dbRes = self._serverData.API.CreateDatabase(dbPath, "vpnmonitor");
-        if dbRes == database.DatabaseManager.DBM_RESULT_ALREADY_EXISTS or dbRes == database.DatabaseManager.DBM_RESULT_OK:
-            self._database = self._serverData.API.GetDatabase("vpnmonitor");
+        self.target_port = getattr(serverData, 'config', {}).get('portFilter')
+        
+        cfg_name = f"vpnmonitorCfg_{self.target_port}.json" if self.target_port else "vpnmonitorCfg.json"
+        self.config_path = os.path.join(os.path.dirname(__file__), cfg_name)
+        
+        self.config = config.Config.fromJSON(self.config_path, CONFIG_FALLBACK)
+        self._messagePrefix = "^9[VPN]^7: "
+
+        if self.config.cfg.get("apikey") == "your_api_key":
+            self._status = -1
+            Log.error(f"Please specify valid api key in {cfg_name}")
+        
+        # Database setup
+        db_file = f"vpn_{self.target_port}.db" if self.target_port else "vpn.db"
+        db_id = f"vpnmonitor_{self.target_port}" if self.target_port else "vpnmonitor"
+        dbPath = os.path.join(os.path.dirname(__file__), db_file)
+        
+        dbRes = self._serverData.API.CreateDatabase(dbPath, db_id)
+        if dbRes in [database.DatabaseManager.DBM_RESULT_ALREADY_EXISTS, database.DatabaseManager.DBM_RESULT_OK]:
+            self._database = self._serverData.API.GetDatabase(db_id)
             self._database.ExecuteQuery("""CREATE TABLE IF NOT EXISTS iplist (
                                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                         ip varchar(30),
                                         vpn int,
                                         date DATETIME DEFAULT CURRENT_TIMESTAMP
-                                        );""");
+                                        );""")
         else:
-            Log.error("Failed to create database at %s with code %d", (dbPath, str(dbRes)));
-            self._status = -1;
+            Log.error(f"DB Error: {dbRes}")
+            self._status = -1
+
+    def _get_interface(self):
+        """Returns the interface for the specific target port"""
+        if hasattr(self._serverData, 'interfaceMap') and self.target_port:
+            return self._serverData.interfaceMap.get(int(self.target_port))
+        return self._serverData.interface          
 
     def Start(self) -> bool:
         allClients = self._serverData.API.GetAllClients();
@@ -138,10 +151,10 @@ class VPNMonitor():
             Log.debug("Kicking a player with ip %s due to VPN block rules" % ip);
             if self.config.GetValue("action", 0) == 1:
                 Log.debug("Banning ip %s" % ip)
-                self._serverData.interface.ClientBan(ip);
-            self._serverData.interface.ClientKick(id);
+                self._get_interface().ClientBan(ip);
+            self._get_interface().ClientKick(id);
             if self.config.cfg["svsayOnAction"] == True:
-                self._serverData.interface.SvSay(self._messagePrefix + f"Kicked player {client.GetName()}^7 for suspected VPN usage.")
+                self._get_interface().SvSay(self._messagePrefix + f"Kicked player {client.GetName()}^7 for suspected VPN usage.")
             return;
         
         blacklist = self.config.cfg["blacklist"];
@@ -149,10 +162,10 @@ class VPNMonitor():
             Log.debug("Kicking a player with ip %s due to VPN blacklist rules" % ip);
             if self.config.GetValue("action", 0) == 1:
                 Log.debug("Banning ip %s" % ip)
-                self._serverData.interface.ClientBan(ip);
-            self._serverData.interface.ClientKick(id);
+                self._get_interface().ClientBan(ip);
+            self._get_interface().ClientKick(id);
             if self.config.cfg["svsayOnAction"] == True:
-                self._serverData.interface.SvSay(self._messagePrefix + f"Kicked player {client.GetName()}^7 for suspected VPN usage.")
+                self._get_interface().SvSay(self._messagePrefix + f"Kicked player {client.GetName()}^7 for suspected VPN usage.")
             return;
 
     def OnClientDisconnect(self, client : client.Client, reason, data ) -> bool:
@@ -164,7 +177,7 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     global SERVER_DATA;
     SERVER_DATA = serverData; # keep it stored
     global PluginInstance;
-    PluginInstance = VPNMonitor(serverData);
+    PluginInstance = vpnMonitorPlugin(serverData)
     if exports != None:
         pass;
     return True; # indicate plugin load success
@@ -185,7 +198,17 @@ def OnFinish():
 
 # Called from system on some event raising, return True to indicate event being captured in this module, False to continue tossing it to other plugins in chain
 def OnEvent(event) -> bool:
-    global PluginInstance;
+    global PluginInstance
+    if not PluginInstance:
+        return False
+
+    # Check if the event came from the port this plugin is assigned to
+    event_port = event.data.get('source_port') if event.data else None
+    target = getattr(PluginInstance, 'target_port', None)
+    
+    if target and event_port and int(event_port) != int(target):
+        return False # Ignore events from other server instances   
+
     if event.type == godfingerEvent.GODFINGER_EVENT_TYPE_MESSAGE:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCONNECT:
