@@ -99,7 +99,7 @@ while depth < max_depth:
                     "+set", "com_logChat", "2",
                     "+set", "dedicated", "2",
                     "+set", "fs_game", "MBII",
-                    "+exec", cfg_file, ,
+                    "+exec", cfg_file,
                     "+set", "net_port", port  # Set the specific port
                 ]
 
