@@ -1,5 +1,5 @@
 {
-  "total_characters": 1116,
+  "total_characters": 1139,
   "characters": {
     "AG_Tengu": {
       "filename": "Ext_Data/MB2/character/AG_Tengu.mbch",
@@ -205,12 +205,6 @@
       "mb_class": "MB_CLASS_ELITETROOPER",
       "extralives": 3
     },
-    "halob_41": {
-      "filename": "Ext_Data/MB2/character/halob_41.mbch",
-      "name": "halob_41",
-      "mb_class": "MB_CLASS_ELITETROOPER",
-      "extralives": 3
-    },
     "halob_5": {
       "filename": "Ext_Data/MB2/character/halob_5.mbch",
       "name": "halob_5",
@@ -268,12 +262,6 @@
     "halor_4": {
       "filename": "Ext_Data/MB2/character/halor_4.mbch",
       "name": "halor_4",
-      "mb_class": "MB_CLASS_ELITETROOPER",
-      "extralives": 3
-    },
-    "halor_41": {
-      "filename": "Ext_Data/MB2/character/halor_41.mbch",
-      "name": "halor_41",
       "mb_class": "MB_CLASS_ELITETROOPER",
       "extralives": 3
     },
@@ -661,6 +649,114 @@
       "mb_class": "MB_CLASS_JEDI",
       "extralives": 2
     },
+    "halob_41": {
+      "filename": "Ext_Data/MB2/character/halob_41.mbch",
+      "name": "halob_41",
+      "mb_class": "MB_CLASS_ELITETROOPER",
+      "extralives": 3
+    },
+    "halor_41": {
+      "filename": "Ext_Data/MB2/character/halor_41.mbch",
+      "name": "halor_41",
+      "mb_class": "MB_CLASS_ELITETROOPER",
+      "extralives": 3
+    },
+    "db_goku": {
+      "filename": "ext_data/mb2/character/db_goku.mbch",
+      "name": "db_goku",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_goku_ssj": {
+      "filename": "ext_data/mb2/character/db_goku_ssj.mbch",
+      "name": "db_goku_ssj",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_goku_ssj3": {
+      "filename": "ext_data/mb2/character/db_goku_ssj3.mbch",
+      "name": "db_goku_ssj3",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_piccolo": {
+      "filename": "ext_data/mb2/character/db_piccolo.mbch",
+      "name": "db_piccolo",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_saiyaman": {
+      "filename": "ext_data/mb2/character/db_saiyaman.mbch",
+      "name": "db_saiyaman",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_super_buu": {
+      "filename": "ext_data/mb2/character/db_super_buu.mbch",
+      "name": "db_super_buu",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_vegeta": {
+      "filename": "ext_data/mb2/character/db_vegeta.mbch",
+      "name": "db_vegeta",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_vegeta_ssj": {
+      "filename": "ext_data/mb2/character/db_vegeta_ssj.mbch",
+      "name": "db_vegeta_ssj",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_vegeta_ssj2": {
+      "filename": "ext_data/mb2/character/db_vegeta_ssj2.mbch",
+      "name": "db_vegeta_ssj2",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_vegito": {
+      "filename": "ext_data/mb2/character/db_vegito.mbch",
+      "name": "db_vegito",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_vegito_ssj": {
+      "filename": "ext_data/mb2/character/db_vegito_ssj.mbch",
+      "name": "db_vegito_ssj",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_broly": {
+      "filename": "ext_data/mb2/character/db_broly.mbch",
+      "name": "db_broly",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_broly_ssj": {
+      "filename": "ext_data/mb2/character/db_broly_ssj.mbch",
+      "name": "db_broly_ssj",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_cell_imperfect": {
+      "filename": "ext_data/mb2/character/db_cell_imperfect.mbch",
+      "name": "db_cell_imperfect",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_cell_perfect": {
+      "filename": "ext_data/mb2/character/db_cell_perfect.mbch",
+      "name": "db_cell_perfect",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "db_cell_semi": {
+      "filename": "ext_data/mb2/character/db_cell_semi.mbch",
+      "name": "db_cell_semi",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
     "Arena_JoeJedi1": {
       "filename": "ext_data/mb2/character/Arena_Joejedi1.mbch",
       "name": "Arena_JoeJedi1",
@@ -695,12 +791,6 @@
       "filename": "ext_data/mb2/character/Arena_droideka2.mbch",
       "name": "Arena_droideka2",
       "mb_class": "MB_CLASS_DROIDEKA",
-      "extralives": 1
-    },
-    "Arena_geo": {
-      "filename": "ext_data/mb2/character/Arena_geo.mbch",
-      "name": "Arena_geo",
-      "mb_class": "MB_CLASS_MANDALORIAN",
       "extralives": 1
     },
     "Arena_geo2": {
@@ -1381,12 +1471,6 @@
       "mb_class": "MB_CLASS_ARCTROOPER",
       "extralives": 2
     },
-    "ns_b_eclipseT": {
-      "filename": "ext_data/mb2/character/ns_b_eclipseT.mbch",
-      "name": "ns_b_eclipseT",
-      "mb_class": "MB_CLASS_WOOKIE",
-      "extralives": 1
-    },
     "ns_b_eclipseW": {
       "filename": "ext_data/mb2/character/ns_b_eclipseW.mbch",
       "name": "ns_b_eclipseW",
@@ -1777,12 +1861,6 @@
       "mb_class": "MB_CLASS_CLONETROOPER",
       "extralives": 4
     },
-    "Telos_TSF_Ithorian": {
-      "filename": "ext_data/mb2/character/Telos_TSF_Ithorian.mbch",
-      "name": "Telos_TSF_Ithorian",
-      "mb_class": "MB_CLASS_SOLDIER",
-      "extralives": 2
-    },
     "ascb_eng": {
       "filename": "ext_data/mb2/character/ascb_eng.mbch",
       "name": "ascb_eng",
@@ -1872,6 +1950,24 @@
       "name": "htl_reb_scout",
       "mb_class": "MB_CLASS_HERO",
       "extralives": 1
+    },
+    "Arena_geo": {
+      "filename": "ext_data/mb2/character/Arena_geo.mbch",
+      "name": "Arena_geo",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "ns_b_eclipseT": {
+      "filename": "ext_data/mb2/character/ns_b_eclipseT.mbch",
+      "name": "ns_b_eclipseT",
+      "mb_class": "MB_CLASS_WOOKIE",
+      "extralives": 1
+    },
+    "Telos_TSF_Ithorian": {
+      "filename": "ext_data/mb2/character/Telos_TSF_Ithorian.mbch",
+      "name": "Telos_TSF_Ithorian",
+      "mb_class": "MB_CLASS_SOLDIER",
+      "extralives": 2
     },
     "SOM_H1_Ewok": {
       "filename": "ext_data/mb2/character/SOM_H1_Ewok.mbch",
@@ -2119,12 +2215,6 @@
       "mb_class": "MB_CLASS_SOLDIER",
       "extralives": 4
     },
-    "pb1_duck": {
-      "filename": "ext_data/mb2/character/pb1_duck.mbch",
-      "name": "pb1_duck",
-      "mb_class": "MB_CLASS_SBD",
-      "extralives": 1
-    },
     "pb1_duelist": {
       "filename": "ext_data/mb2/character/pb1_duelist.mbch",
       "name": "pb1_duelist",
@@ -2275,12 +2365,6 @@
       "mb_class": null,
       "extralives": 1
     },
-    "pb1_sword_of_doom": {
-      "filename": "ext_data/mb2/character/pb1_sword_of_doom.mbch",
-      "name": "pb1_sword_of_doom",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
-    },
     "pb1_tank": {
       "filename": "ext_data/mb2/character/pb1_tank.mbch",
       "name": "pb1_tank",
@@ -2371,12 +2455,6 @@
       "mb_class": "MB_CLASS_BOUNTY_HUNTER",
       "extralives": 1
     },
-    "pbfa_2_b_banhammer": {
-      "filename": "ext_data/mb2/character/pbfa_2_b_banhammer.mbch",
-      "name": "pbfa_2_b_banhammer",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
-    },
     "pbfa_2_b_daftpunk": {
       "filename": "ext_data/mb2/character/pbfa_2_b_daftpunk.mbch",
       "name": "pbfa_2_b_daftpunk",
@@ -2387,12 +2465,6 @@
       "filename": "ext_data/mb2/character/pbfa_2_b_herobrine.mbch",
       "name": "pbfa_2_r_herobrine",
       "mb_class": "MB_CLASS_CLONETROOPER",
-      "extralives": 1
-    },
-    "pbfa_2_b_umbrella_of_doom": {
-      "filename": "ext_data/mb2/character/pbfa_2_b_umbrella_of_doom.mbch",
-      "name": "pbfa_2_b_umbrella_of_doom",
-      "mb_class": "MB_CLASS_MANDALORIAN",
       "extralives": 1
     },
     "pbfa_2_b_waluigi": {
@@ -2502,12 +2574,6 @@
       "name": "pbfa_5_b_bender",
       "mb_class": "MB_CLASS_SBD",
       "extralives": 2
-    },
-    "pbfa_5_b_duck": {
-      "filename": "ext_data/mb2/character/pbfa_5_b_duck.mbch",
-      "name": "pbfa_5_b_duck",
-      "mb_class": "MB_CLASS_SBD",
-      "extralives": 1
     },
     "pbfa_5_b_maxrebo": {
       "filename": "ext_data/mb2/character/pbfa_5_b_maxrebo.mbch",
@@ -2635,23 +2701,11 @@
       "mb_class": "MB_CLASS_MANDALORIAN",
       "extralives": 5
     },
-    "PB3_G_Flysaber": {
-      "filename": "ext_data/mb2/character/PB3_G_Flysaber.mbch",
-      "name": "PB3_G_Flysaber",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
-    },
     "PB3_G_Fortnite": {
       "filename": "ext_data/mb2/character/PB3_G_Fortnite.mbch",
       "name": "PB3_G_Fortnite",
       "mb_class": "MB_CLASS_JEDI",
       "extralives": 3
-    },
-    "PB3_G_Jesus": {
-      "filename": "ext_data/mb2/character/PB3_G_Jesus.mbch",
-      "name": "PB3_G_Jesus",
-      "mb_class": "MB_CLASS_JEDI",
-      "extralives": 1
     },
     "PB3_G_JFW": {
       "filename": "ext_data/mb2/character/PB3_G_JFW.mbch",
@@ -2803,12 +2857,6 @@
       "mb_class": null,
       "extralives": 2
     },
-    "pbfa_2_r_badman": {
-      "filename": "ext_data/mb2/character/pbfa_2_r_badman.mbch",
-      "name": "pbfa_2_r_badman",
-      "mb_class": null,
-      "extralives": 1
-    },
     "pbfa_2_r_legolas": {
       "filename": "ext_data/mb2/character/pbfa_2_r_legolas.mbch",
       "name": "pbfa_2_r_legolas",
@@ -2911,15 +2959,63 @@
       "mb_class": "MB_CLASS_HERO",
       "extralives": 2
     },
-    "pbfa_4_r_goku": {
-      "filename": "ext_data/mb2/character/pbfa_4_r_goku.mbch",
-      "name": "pbfa_4_r_goku",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
-    },
     "pbfa_4_r_mmando": {
       "filename": "ext_data/mb2/character/pbfa_4_r_mmando.mbch",
       "name": "pbfa_4_r_mmando",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "pb1_duck": {
+      "filename": "ext_data/mb2/character/pb1_duck.mbch",
+      "name": "pb1_duck",
+      "mb_class": "MB_CLASS_SBD",
+      "extralives": 1
+    },
+    "pb1_sword_of_doom": {
+      "filename": "ext_data/mb2/character/pb1_sword_of_doom.mbch",
+      "name": "pb1_sword_of_doom",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "pbfa_2_b_banhammer": {
+      "filename": "ext_data/mb2/character/pbfa_2_b_banhammer.mbch",
+      "name": "pbfa_2_b_banhammer",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "pbfa_2_b_umbrella_of_doom": {
+      "filename": "ext_data/mb2/character/pbfa_2_b_umbrella_of_doom.mbch",
+      "name": "pbfa_2_b_umbrella_of_doom",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "pbfa_5_b_duck": {
+      "filename": "ext_data/mb2/character/pbfa_5_b_duck.mbch",
+      "name": "pbfa_5_b_duck",
+      "mb_class": "MB_CLASS_SBD",
+      "extralives": 1
+    },
+    "PB3_G_Flysaber": {
+      "filename": "ext_data/mb2/character/PB3_G_Flysaber.mbch",
+      "name": "PB3_G_Flysaber",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "PB3_G_Jesus": {
+      "filename": "ext_data/mb2/character/PB3_G_Jesus.mbch",
+      "name": "PB3_G_Jesus",
+      "mb_class": "MB_CLASS_JEDI",
+      "extralives": 1
+    },
+    "pbfa_2_r_badman": {
+      "filename": "ext_data/mb2/character/pbfa_2_r_badman.mbch",
+      "name": "pbfa_2_r_badman",
+      "mb_class": null,
+      "extralives": 1
+    },
+    "pbfa_4_r_goku": {
+      "filename": "ext_data/mb2/character/pbfa_4_r_goku.mbch",
+      "name": "pbfa_4_r_goku",
       "mb_class": "MB_CLASS_MANDALORIAN",
       "extralives": 1
     },
@@ -3835,12 +3931,6 @@
       "mb_class": "MB_CLASS_HERO",
       "extralives": 3
     },
-    "olympus_demonMage": {
-      "filename": "ext_data/mb2/character/olympus_demonMage.mbch",
-      "name": "olympus_demonMage",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
-    },
     "olympus_greaterDemon": {
       "filename": "ext_data/mb2/character/olympus_greaterDemon.mbch",
       "name": "olympus_greaterDemon",
@@ -3864,12 +3954,6 @@
       "name": "olympus_lesserSpirit",
       "mb_class": "MB_CLASS_WOOKIE",
       "extralives": 6
-    },
-    "olympus_spiritMage": {
-      "filename": "ext_data/mb2/character/olympus_spiritMage.mbch",
-      "name": "olympus_spiritMage",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
     },
     "pirate_scoundrel": {
       "filename": "ext_data/mb2/character/pirate_scoundrel.mbch",
@@ -4669,6 +4753,18 @@
       "mb_class": "MB_CLASS_ELITETROOPER",
       "extralives": 1
     },
+    "olympus_demonMage": {
+      "filename": "ext_data/mb2/character/olympus_demonMage.mbch",
+      "name": "olympus_demonMage",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "olympus_spiritMage": {
+      "filename": "ext_data/mb2/character/olympus_spiritMage.mbch",
+      "name": "olympus_spiritMage",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
     "BOC_SPDroid": {
       "filename": "ext_data/mb2/character/BOC_SPDroid.mbch",
       "name": "BOC_SPDroid",
@@ -5376,12 +5472,6 @@
       "name": "YA_Jedi",
       "mb_class": "MB_CLASS_JEDI",
       "extralives": 1
-    },
-    "YA_NRCommando": {
-      "filename": "ext_data/mb2/character/YA_NRCommando.mbch",
-      "name": "YA_NRCommando",
-      "mb_class": "MB_CLASS_ELITETROOPER",
-      "extralives": 2
     },
     "YA_NRInfantry": {
       "filename": "ext_data/mb2/character/YA_NRInfantry.mbch",
@@ -6175,23 +6265,11 @@
       "mb_class": "MB_CLASS_WOOKIE",
       "extralives": 2
     },
-    "YR_r_Marksman": {
-      "filename": "ext_data/mb2/character/YR_r_Marksman.mbch",
-      "name": "YR_r_Marksman",
-      "mb_class": null,
-      "extralives": 1
-    },
     "YR_r_Soldier": {
       "filename": "ext_data/mb2/character/YR_r_Soldier.mbch",
       "name": "YR_r_Soldier",
       "mb_class": "MB_CLASS_ELITETROOPER",
       "extralives": 2
-    },
-    "Dxun_me_Rodian": {
-      "filename": "ext_data/mb2/character/Dxun_me_Rodian.mbch",
-      "name": "Dxun_me_Rodian",
-      "mb_class": "MB_CLASS_ELITETROOPER",
-      "extralives": 1
     },
     "dxun_me_trando": {
       "filename": "ext_data/mb2/character/Dxun_me_trando.mbch",
@@ -6271,23 +6349,11 @@
       "mb_class": "MB_CLASS_WOOKIE",
       "extralives": 1
     },
-    "YA_Swamptrooper3": {
-      "filename": "ext_data/mb2/character/YA_Swamptrooper3.mbch",
-      "name": "YA_Swamptrooper3",
-      "mb_class": "MB_CLASS_ARCTROOPER",
-      "extralives": 1
-    },
     "htk_s_insane": {
       "filename": "ext_data/mb2/character/htk_s_insane.mbch",
       "name": "htk_s_insane",
       "mb_class": "MB_CLASS_MANDALORIAN",
       "extralives": 3
-    },
-    "htk_s_paranoid": {
-      "filename": "ext_data/mb2/character/htk_s_paranoid.mbch",
-      "name": "htk_s_paranoid",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
     },
     "man_s_Disciple": {
       "filename": "ext_data/mb2/character/man_s_Disciple.mbch",
@@ -6295,23 +6361,11 @@
       "mb_class": "MB_CLASS_JEDI",
       "extralives": 1
     },
-    "man_s_Medic": {
-      "filename": "ext_data/mb2/character/man_s_Medic.mbch",
-      "name": "man_s_Medic",
-      "mb_class": "MB_CLASS_SOLDIER",
-      "extralives": 2
-    },
     "YA_Swamptrooper4": {
       "filename": "ext_data/mb2/character/YA_Swamptrooper4.mbch",
       "name": "YA_Swamptrooper4",
       "mb_class": "MB_CLASS_CLONETROOPER",
       "extralives": 1
-    },
-    "htk_s_scientist": {
-      "filename": "ext_data/mb2/character/htk_s_scientist.mbch",
-      "name": "htk_s_scientist",
-      "mb_class": "MB_CLASS_SOLDIER",
-      "extralives": 2
     },
     "uds_ZJawa": {
       "filename": "ext_data/mb2/character/uds_ZJawa.mbch",
@@ -6325,12 +6379,6 @@
       "mb_class": "MB_CLASS_ARCTROOPER",
       "extralives": 1
     },
-    "YR_I_Officer": {
-      "filename": "ext_data/mb2/character/YR_I_Officer.mbch",
-      "name": "YR_I_Officer",
-      "mb_class": null,
-      "extralives": 1
-    },
     "YR_r_Spy": {
       "filename": "ext_data/mb2/character/YR_r_Spy.mbch",
       "name": "YR_r_Spy",
@@ -6340,12 +6388,6 @@
     "YA_NRShocktrooper": {
       "filename": "ext_data/mb2/character/YA_NRShocktrooper.mbch",
       "name": "YA_NRShocktrooper",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 1
-    },
-    "man_s_RepTech": {
-      "filename": "ext_data/mb2/character/man_s_RepTech.mbch",
-      "name": "man_s_RepTech",
       "mb_class": "MB_CLASS_MANDALORIAN",
       "extralives": 1
     },
@@ -6390,12 +6432,6 @@
       "name": "Myg_Clone",
       "mb_class": "MB_CLASS_CLONETROOPER",
       "extralives": 2
-    },
-    "JT_Clone": {
-      "filename": "ext_data/mb2/character/JT_Clone.mbch",
-      "name": "JT_Clone",
-      "mb_class": "MB_CLASS_MANDALORIAN",
-      "extralives": 4
     },
     "JT_Jedi_FormII": {
       "filename": "ext_data/mb2/character/JT_Jedi_FormII.mbch",
@@ -6451,21 +6487,75 @@
       "mb_class": "MB_CLASS_JEDI",
       "extralives": 1
     },
-    "v1_ImpSold": {
-      "filename": "ext_data/mb2/character/v1_ImpSold.mbch",
-      "name": "v1_ImpSold",
-      "mb_class": "MB_CLASS_SOLDIER",
-      "extralives": 4
+    "YA_NRCommando": {
+      "filename": "ext_data/mb2/character/YA_NRCommando.mbch",
+      "name": "YA_NRCommando",
+      "mb_class": "MB_CLASS_ELITETROOPER",
+      "extralives": 2
     },
-    "v9_SAcolyte": {
-      "filename": "ext_data/mb2/character/v9_SAcolyte.mbch",
-      "name": "v9_SAcolyte",
-      "mb_class": "MB_CLASS_SITH",
+    "YR_r_Marksman": {
+      "filename": "ext_data/mb2/character/YR_r_Marksman.mbch",
+      "name": "YR_r_Marksman",
+      "mb_class": null,
       "extralives": 1
     },
-    "h1_RebelET": {
-      "filename": "ext_data/mb2/character/h1_RebelET.mbch",
-      "name": "h1_RebelET",
+    "Dxun_me_Rodian": {
+      "filename": "ext_data/mb2/character/Dxun_me_Rodian.mbch",
+      "name": "Dxun_me_Rodian",
+      "mb_class": "MB_CLASS_ELITETROOPER",
+      "extralives": 1
+    },
+    "YA_Swamptrooper3": {
+      "filename": "ext_data/mb2/character/YA_Swamptrooper3.mbch",
+      "name": "YA_Swamptrooper3",
+      "mb_class": "MB_CLASS_ARCTROOPER",
+      "extralives": 1
+    },
+    "htk_s_paranoid": {
+      "filename": "ext_data/mb2/character/htk_s_paranoid.mbch",
+      "name": "htk_s_paranoid",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "man_s_Medic": {
+      "filename": "ext_data/mb2/character/man_s_Medic.mbch",
+      "name": "man_s_Medic",
+      "mb_class": "MB_CLASS_SOLDIER",
+      "extralives": 2
+    },
+    "htk_s_scientist": {
+      "filename": "ext_data/mb2/character/htk_s_scientist.mbch",
+      "name": "htk_s_scientist",
+      "mb_class": "MB_CLASS_SOLDIER",
+      "extralives": 2
+    },
+    "YR_I_Officer": {
+      "filename": "ext_data/mb2/character/YR_I_Officer.mbch",
+      "name": "YR_I_Officer",
+      "mb_class": null,
+      "extralives": 1
+    },
+    "man_s_RepTech": {
+      "filename": "ext_data/mb2/character/man_s_RepTech.mbch",
+      "name": "man_s_RepTech",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 1
+    },
+    "JT_Clone": {
+      "filename": "ext_data/mb2/character/JT_Clone.mbch",
+      "name": "JT_Clone",
+      "mb_class": "MB_CLASS_MANDALORIAN",
+      "extralives": 4
+    },
+    "grey_child": {
+      "filename": "Ext_Data/MB2/character/grey_child.mbch",
+      "name": "grey_child",
+      "mb_class": "MB_CLASS_SOLDIER",
+      "extralives": 9
+    },
+    "grey_ch_boss": {
+      "filename": "Ext_Data/MB2/character/grey_ch_boss.mbch",
+      "name": "grey_ch_boss",
       "mb_class": "MB_CLASS_SOLDIER",
       "extralives": 2
     },
@@ -6475,22 +6565,22 @@
       "mb_class": "MB_CLASS_BOUNTY_HUNTER",
       "extralives": 1
     },
-    "h7_Spy": {
-      "filename": "ext_data/mb2/character/h7_Spy.mbch",
-      "name": "h7_Spy",
-      "mb_class": "MB_CLASS_ARCTROOPER",
-      "extralives": 1
-    },
     "v1_ImpComm": {
       "filename": "ext_data/mb2/character/v1_ImpComm.mbch",
       "name": "v1_ImpComm",
       "mb_class": "MB_CLASS_SOLDIER",
       "extralives": 2
     },
-    "h3_CloneSpec": {
-      "filename": "ext_data/mb2/character/h3_CloneSpec.mbch",
-      "name": "h3_CloneSpec",
-      "mb_class": "MB_CLASS_CLONETROOPER",
+    "h9_JYoung": {
+      "filename": "ext_data/mb2/character/h9_JYoung.mbch",
+      "name": "h9_JYoung",
+      "mb_class": "MB_CLASS_JEDI",
+      "extralives": 2
+    },
+    "v8_GamoPig": {
+      "filename": "ext_data/mb2/character/v8_GamoPig.mbch",
+      "name": "v8_GamoPig",
+      "mb_class": "MB_CLASS_WOOKIE",
       "extralives": 1
     },
     "v1_NTroop": {
@@ -6499,28 +6589,70 @@
       "mb_class": "MB_CLASS_COMMANDER",
       "extralives": 3
     },
-    "v1_Undead": {
-      "filename": "ext_data/mb2/character/v1_Undead.mbch",
-      "name": "v1_Undead",
+    "h1_OldRepET": {
+      "filename": "ext_data/mb2/character/h1_OldRepET.mbch",
+      "name": "h1_OldRepET",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 1
+    },
+    "v7_ImpAgent": {
+      "filename": "ext_data/mb2/character/v7_ImpAgent.mbch",
+      "name": "v7_ImpAgent",
+      "mb_class": "MB_CLASS_BOUNTY_HUNTER",
+      "extralives": 1
+    },
+    "h1_Talz": {
+      "filename": "ext_data/mb2/character/h1_Talz.mbch",
+      "name": "h1_Talz",
       "mb_class": "MB_CLASS_WOOKIE",
+      "extralives": 1
+    },
+    "h7_RebEngie": {
+      "filename": "ext_data/mb2/character/h7_RebEngie.mbch",
+      "name": "h7_RebEngie",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 1
+    },
+    "h8_Taunt": {
+      "filename": "ext_data/mb2/character/h8_Taunt.mbch",
+      "name": "h8_Taunt",
+      "mb_class": "MB_CLASS_WOOKIE",
+      "extralives": 1
+    },
+    "v1_Talz": {
+      "filename": "ext_data/mb2/character/v1_Talz.mbch",
+      "name": "v1_Talz",
+      "mb_class": "MB_CLASS_WOOKIE",
+      "extralives": 1
+    },
+    "v8_Wampa": {
+      "filename": "ext_data/mb2/character/v8_Wampa.mbch",
+      "name": "v8_Wampa",
+      "mb_class": "MB_CLASS_WOOKIE",
+      "extralives": 1
+    },
+    "v1_ImpSold": {
+      "filename": "ext_data/mb2/character/v1_ImpSold.mbch",
+      "name": "v1_ImpSold",
+      "mb_class": "MB_CLASS_SOLDIER",
       "extralives": 4
+    },
+    "h1_RebelET": {
+      "filename": "ext_data/mb2/character/h1_RebelET.mbch",
+      "name": "h1_RebelET",
+      "mb_class": "MB_CLASS_SOLDIER",
+      "extralives": 2
+    },
+    "h7_Spy": {
+      "filename": "ext_data/mb2/character/h7_Spy.mbch",
+      "name": "h7_Spy",
+      "mb_class": "MB_CLASS_ARCTROOPER",
+      "extralives": 1
     },
     "h7_RebSapper": {
       "filename": "ext_data/mb2/character/h7_RebSapper.mbch",
       "name": "h7_RebSapper",
       "mb_class": "MB_CLASS_ELITETROOPER",
-      "extralives": 1
-    },
-    "h9_JYoung": {
-      "filename": "ext_data/mb2/character/h9_JYoung.mbch",
-      "name": "h9_JYoung",
-      "mb_class": "MB_CLASS_JEDI",
-      "extralives": 2
-    },
-    "h9_JKnight": {
-      "filename": "ext_data/mb2/character/h9_JKnight.mbch",
-      "name": "h9_JKnight",
-      "mb_class": "MB_CLASS_JEDI",
       "extralives": 1
     },
     "h5_CloneJet": {
@@ -6529,22 +6661,10 @@
       "mb_class": "MB_CLASS_CLONETROOPER",
       "extralives": 1
     },
-    "v4_RoyalPr": {
-      "filename": "ext_data/mb2/character/v4_RoyalPr.mbch",
-      "name": "v4_RoyalPr",
-      "mb_class": "MB_CLASS_SITH",
-      "extralives": 1
-    },
     "v5_JumpTr": {
       "filename": "ext_data/mb2/character/v5_JumpTr.mbch",
       "name": "v5_JumpTr",
       "mb_class": "MB_CLASS_WOOKIE",
-      "extralives": 1
-    },
-    "h1_OldRepET": {
-      "filename": "ext_data/mb2/character/h1_OldRepET.mbch",
-      "name": "h1_OldRepET",
-      "mb_class": "MB_CLASS_CLONETROOPER",
       "extralives": 1
     },
     "h1_Rebel": {
@@ -6559,18 +6679,6 @@
       "mb_class": "MB_CLASS_HERO",
       "extralives": 2
     },
-    "h4_SenGuard": {
-      "filename": "ext_data/mb2/character/h4_SenGuard.mbch",
-      "name": "h4_SenGuard",
-      "mb_class": "MB_CLASS_CLONETROOPER",
-      "extralives": 1
-    },
-    "v1_ORSithTr": {
-      "filename": "ext_data/mb2/character/v1_ORSithTr.mbch",
-      "name": "v1_ORSithTr",
-      "mb_class": "MB_CLASS_CLONETROOPER",
-      "extralives": 1
-    },
     "v2_KMonkeyL": {
       "filename": "ext_data/mb2/character/v2_KMonkeyL.mbch",
       "name": "v2_KMonkeyL",
@@ -6581,6 +6689,90 @@
       "filename": "ext_data/mb2/character/v3_DeathTr.mbch",
       "name": "v3_DeathTr",
       "mb_class": "MB_CLASS_ARCTROOPER",
+      "extralives": 1
+    },
+    "v5_Geonos": {
+      "filename": "ext_data/mb2/character/v5_Geonos.mbch",
+      "name": "v5_Geonos",
+      "mb_class": "MB_CLASS_ARCTROOPER",
+      "extralives": 1
+    },
+    "v7_ImpSpec": {
+      "filename": "ext_data/mb2/character/v7_ImpSpec.mbch",
+      "name": "v7_ImpSpec",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 1
+    },
+    "h1_NPrisoner": {
+      "filename": "ext_data/mb2/character/h1_NPrisoner.mbch",
+      "name": "h1_NPrisoner",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 4
+    },
+    "h3_Clone": {
+      "filename": "ext_data/mb2/character/h3_Clone.mbch",
+      "name": "h3_Clone",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 1
+    },
+    "v1_Thug": {
+      "filename": "ext_data/mb2/character/v1_Thug.mbch",
+      "name": "v1_Thug",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 1
+    },
+    "v4_MagnaG": {
+      "filename": "ext_data/mb2/character/v4_MagnaG.mbch",
+      "name": "v4_MagnaG",
+      "mb_class": "MB_CLASS_SITH",
+      "extralives": 1
+    },
+    "h7_Scavenge": {
+      "filename": "ext_data/mb2/character/h7_Scavenge.mbch",
+      "name": "h7_Scavenge",
+      "mb_class": "MB_CLASS_BOUNTY_HUNTER",
+      "extralives": 2
+    },
+    "v9_SAcolyte": {
+      "filename": "ext_data/mb2/character/v9_SAcolyte.mbch",
+      "name": "v9_SAcolyte",
+      "mb_class": "MB_CLASS_SITH",
+      "extralives": 1
+    },
+    "h3_CloneSpec": {
+      "filename": "ext_data/mb2/character/h3_CloneSpec.mbch",
+      "name": "h3_CloneSpec",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 1
+    },
+    "v1_Undead": {
+      "filename": "ext_data/mb2/character/v1_Undead.mbch",
+      "name": "v1_Undead",
+      "mb_class": "MB_CLASS_WOOKIE",
+      "extralives": 4
+    },
+    "h9_JKnight": {
+      "filename": "ext_data/mb2/character/h9_JKnight.mbch",
+      "name": "h9_JKnight",
+      "mb_class": "MB_CLASS_JEDI",
+      "extralives": 1
+    },
+    "v4_RoyalPr": {
+      "filename": "ext_data/mb2/character/v4_RoyalPr.mbch",
+      "name": "v4_RoyalPr",
+      "mb_class": "MB_CLASS_SITH",
+      "extralives": 1
+    },
+    "h4_SenGuard": {
+      "filename": "ext_data/mb2/character/h4_SenGuard.mbch",
+      "name": "h4_SenGuard",
+      "mb_class": "MB_CLASS_CLONETROOPER",
+      "extralives": 1
+    },
+    "v1_ORSithTr": {
+      "filename": "ext_data/mb2/character/v1_ORSithTr.mbch",
+      "name": "v1_ORSithTr",
+      "mb_class": "MB_CLASS_CLONETROOPER",
       "extralives": 1
     },
     "v6_Tusk": {
@@ -6601,35 +6793,11 @@
       "mb_class": "MB_CLASS_SOLDIER",
       "extralives": 2
     },
-    "v5_Geonos": {
-      "filename": "ext_data/mb2/character/v5_Geonos.mbch",
-      "name": "v5_Geonos",
-      "mb_class": "MB_CLASS_ARCTROOPER",
-      "extralives": 1
-    },
     "v6_ScoutTr": {
       "filename": "ext_data/mb2/character/v6_ScoutTr.mbch",
       "name": "v6_ScoutTr",
       "mb_class": "MB_CLASS_HERO",
       "extralives": 1
-    },
-    "v7_ImpAgent": {
-      "filename": "ext_data/mb2/character/v7_ImpAgent.mbch",
-      "name": "v7_ImpAgent",
-      "mb_class": "MB_CLASS_BOUNTY_HUNTER",
-      "extralives": 1
-    },
-    "v7_ImpSpec": {
-      "filename": "ext_data/mb2/character/v7_ImpSpec.mbch",
-      "name": "v7_ImpSpec",
-      "mb_class": "MB_CLASS_CLONETROOPER",
-      "extralives": 1
-    },
-    "h1_NPrisoner": {
-      "filename": "ext_data/mb2/character/h1_NPrisoner.mbch",
-      "name": "h1_NPrisoner",
-      "mb_class": "MB_CLASS_CLONETROOPER",
-      "extralives": 4
     },
     "h8_WookWarr": {
       "filename": "ext_data/mb2/character/h8_WookWarr.mbch",
@@ -6640,18 +6808,6 @@
     "v3_HeavyStorm": {
       "filename": "ext_data/mb2/character/v3_HeavyStorm.mbch",
       "name": "v3_HeavyStorm",
-      "mb_class": "MB_CLASS_CLONETROOPER",
-      "extralives": 1
-    },
-    "h3_Clone": {
-      "filename": "ext_data/mb2/character/h3_Clone.mbch",
-      "name": "h3_Clone",
-      "mb_class": "MB_CLASS_CLONETROOPER",
-      "extralives": 1
-    },
-    "v1_Thug": {
-      "filename": "ext_data/mb2/character/v1_Thug.mbch",
-      "name": "v1_Thug",
       "mb_class": "MB_CLASS_CLONETROOPER",
       "extralives": 1
     },
@@ -6666,24 +6822,6 @@
       "name": "v3_Trando",
       "mb_class": "MB_CLASS_WOOKIE",
       "extralives": 1
-    },
-    "v4_MagnaG": {
-      "filename": "ext_data/mb2/character/v4_MagnaG.mbch",
-      "name": "v4_MagnaG",
-      "mb_class": "MB_CLASS_SITH",
-      "extralives": 1
-    },
-    "v8_GamoPig": {
-      "filename": "ext_data/mb2/character/v8_GamoPig.mbch",
-      "name": "v8_GamoPig",
-      "mb_class": "MB_CLASS_WOOKIE",
-      "extralives": 1
-    },
-    "h7_Scavenge": {
-      "filename": "ext_data/mb2/character/h7_Scavenge.mbch",
-      "name": "h7_Scavenge",
-      "mb_class": "MB_CLASS_BOUNTY_HUNTER",
-      "extralives": 2
     },
     "h1_TORtroop": {
       "filename": "ext_data/mb2/character/h1_TORtroop.mbch",
