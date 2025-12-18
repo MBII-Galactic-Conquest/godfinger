@@ -13,7 +13,8 @@ max_depth = 25
 SERVER_INSTANCES = [
     {
         "port": "29070",
-        "log_file": "server.log"
+        "log_file": "server.log",
+        "config_file": "server.cfg"      # Config for Port 1
     }
     # Add more instances here if needed.
 ]
@@ -98,7 +99,7 @@ while depth < max_depth:
                     "+set", "com_logChat", "2",
                     "+set", "dedicated", "2",
                     "+set", "fs_game", "MBII",
-                    "+exec", "server.cfg",
+                    "+exec", cfg_file,
                     "+set", "net_port", port  # Set the specific port
                 ]
 
