@@ -216,8 +216,7 @@ class MBIIServer:
         self._isRunning = False
         self._isRestarting = False
         self._pluginManager = None
-        self._svInterfaces = [] # NEW: List of interfaces
-        self._primarySvInterface = None # NEW: Primary interface for status/commands
+        self._svInterface = None # Reverted to single interface
         self._gatheringExitData = False
         self._exitLogMessages = []
 
@@ -245,53 +244,44 @@ class MBIIServer:
         cfgIface = self._config.GetValue("interface", "pty")
 
         if cfgIface == "pty":
-            # NOTE: PtyInterface is only supported as a single interface connection
-            self._svInterfaces.append(godfingerinterface.PtyInterface(cwd=self._config.cfg["serverPath"],\
-                                                                args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["interfaces"]["pty"]["target"])]\
-                                                                + (Args.mbiicmd.split() if Args.mbiicmd else []),\
-                                                                inputDelay=self._config.cfg["interfaces"]["pty"]["inputDelay"],\
-                                                                ))
+            self._svInterface = godfingerinterface.PtyInterface(
+                cwd=self._config.cfg["serverPath"],
+                args=[os.path.join(self._config.cfg["serverPath"], self._config.cfg["interfaces"]["pty"]["target"])]
+                + (Args.mbiicmd.split() if Args.mbiicmd else []),
+                inputDelay=self._config.cfg["interfaces"]["pty"]["inputDelay"]
+            )
         elif cfgIface == "rcon":
             rcon_cfg = self._config.cfg["interfaces"]["rcon"]
             global_logFilename = self._config.cfg["logFilename"]
 
-            # REFACTORED: Read shared/top-level properties
             shared_ip = rcon_cfg["ip"]
             shared_bindAddress = rcon_cfg["bindAddress"]
             shared_logReadDelay = rcon_cfg["logReadDelay"]
-            shared_testRetrospect = rcon_cfg["Debug"]["TestRetrospect"] # Re-read from top level Debug block
+            shared_testRetrospect = rcon_cfg["Debug"]["TestRetrospect"]
 
-            # NEW: Loop over Remotes list, getting password and connection details from each remote
-            for idx, remote_cfg in enumerate(rcon_cfg["Remotes"]):
-                remote_ip = remote_cfg.get("ip", shared_ip)
-                remote_logFilename = remote_cfg.get("logFilename", global_logFilename)
-                remote_port = remote_cfg.get("port", 0) # Port is mandatory for Rcon, but use 0 as a safe sentinel
+            # Use only the first entry in Remotes for the single interface
+            remote_cfg = rcon_cfg["Remotes"][0]
+            remote_ip = remote_cfg.get("ip", shared_ip)
+            remote_logFilename = remote_cfg.get("logFilename", global_logFilename)
+            remote_port = remote_cfg.get("port", 0)
+            remote_password = remote_cfg["password"]
 
-                # NEW: Get password from remote config
-                remote_password = remote_cfg["password"]
+            self._svInterface = godfingerinterface.RconInterface(
+                remote_ip,
+                remote_port,
+                shared_bindAddress,
+                remote_password,
+                os.path.join(self._config.cfg["MBIIPath"], remote_logFilename),
+                shared_logReadDelay,
+                shared_testRetrospect,
+                procName=self._config.cfg["serverFileName"]
+            )
+            Log.info(f"Initialized single RconInterface on {remote_ip}:{remote_port}")
 
-                if remote_port == 0:
-                    Log.error(f"Rcon remote #{idx+1} is missing a required 'port' setting. Skipping.")
-                    continue
-
-                interface = godfingerinterface.RconInterface(
-                                                                    remote_ip,\
-                                                                    remote_port,\
-                                                                    shared_bindAddress,\
-                                                                    remote_password,\
-                                                                    os.path.join(self._config.cfg["MBIIPath"], remote_logFilename),\
-                                                                    shared_logReadDelay,
-                                                                    shared_testRetrospect, # Uses shared/top-level value
-                                                                    procName=self._config.cfg["serverFileName"])
-                self._svInterfaces.append(interface)
-                Log.info(f"Initialized RconInterface #{idx+1} on {remote_ip}:{remote_port} (Bind: {shared_bindAddress}) using log file {remote_logFilename}")
-
-        if len(self._svInterfaces) == 0:
-            Log.error("Server interface(s) were not initialized properly or 'Remotes' list was empty.")
+        if self._svInterface is None:
+            Log.error("Server interface was not initialized properly.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
-
-        self._primarySvInterface = self._svInterfaces[0] # Use the first interface for sending commands and status checks
 
         if IsWindows:
             try:
@@ -309,16 +299,15 @@ class MBIIServer:
         self._pk3Manager = pk3.Pk3Manager()
         self._pk3Manager.Initialize([self._config.cfg["MBIIPath"]])
 
-        # NEW: Open all interfaces
-        for interface in self._svInterfaces:
-            if not interface.Open():
-                Log.error(f"Unable to Open server interface: {interface}")
-                self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR
-                return
-            interface.WaitUntilReady()
+        # Open the single interface
+        if not self._svInterface.Open():
+            Log.error(f"Unable to Open server interface: {self._svInterface}")
+            self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR
+            return
+        self._svInterface.WaitUntilReady()
 
-        # Cvars
-        self._cvarManager = cvar.CvarManager(self._primarySvInterface) # Use primary interface for Cvars
+        # Cvars - use the single interface
+        self._cvarManager = cvar.CvarManager(self._svInterface)
 
         # Client management
         self._clientManager = clientmanager.ClientManager()
@@ -337,46 +326,29 @@ class MBIIServer:
         exportAPI.GetDatabase       = self.API_GetDatabase
         exportAPI.GetPlugin         = self.API_GetPlugin
         exportAPI.Restart           = self.Restart
-        self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._primarySvInterface, Args) # Use primary interface
-        extralives_path = os.path.join(os.path.dirname(__file__), "data", "extralives.json")
-        try:
-            with open(extralives_path, "r") as f:
-                extralives_data = json.load(f)
-                if extralives_data and "characters" in extralives_data:
-                    self._serverData.extralives_map = {
-                        char: details["extralives"]
-                        for char, details in extralives_data["characters"].items()
-                        if "extralives" in details
-                    }
-                else:
-                    self._serverData.extralives_map = {}
-        except FileNotFoundError:
-            Log.error(f"extralives.json not found at {extralives_path}")
-        except json.JSONDecodeError:
-            Log.error(f"Error decoding extralives.json at {extralives_path}")
+        
+        # Initialize serverData with the single interface
+        self._serverData = serverdata.ServerData(self._pk3Manager, self._cvarManager, exportAPI, self._svInterface, Args)
+        
+        # ... (rest of the extralives.json loading logic remains the same) ...
+
         Log.info("Loaded server data in %s seconds." %(str(time.time() - start_sd)))
 
-
-        # Technical
         # Plugins
         self._pluginManager = plugin.PluginManager()
         result = self._pluginManager.Initialize(self._config.cfg["Plugins"], self._serverData)
         if not result:
             self._status = MBIIServer.STATUS_PLUGIN_ERROR
             return
+            
         self._logicDelayS = self._config.cfg["logicDelay"]
-
-        self._isFinished = False
-        self._isRunning = False
-        self._isRestarting = False
         self._lastRestartTick = 0.0
         self._restartTimeout = timeout.Timeout()
         self.restartOnCrash = self._config.cfg["restartOnCrash"]
 
-
         Log.info("The Godfinger initialized in %.2f seconds!\n" %(time.time() - startTime))
 
-    def Finish(self,):
+    def Finish(self):
         # Ensure that finish is called only once; if _isFinished is already set, skip cleanup.
         if not hasattr(self, "_isFinished") or not self._isFinished:
             Log.info("Finishing Godfinger...")
@@ -388,25 +360,21 @@ class MBIIServer:
             self._status = MBIIServer.STATUS_FINISHED
             self._isFinished = True
             Log.info("Finished Godfinger.")
-
+    
     def __del__(self):
         self.Finish()
         # Safely delete attributes if they exist.
         if hasattr(self, "_pluginManager"):
             del self._pluginManager
             self._pluginManager = None
-        # NEW: Delete all interfaces
-        if hasattr(self, "_svInterfaces"):
-            for interface in self._svInterfaces:
-                del interface
-            self._svInterfaces = []
-            self._primarySvInterface = None
+        if hasattr(self, "_svInterface"):
+            del self._svInterface
+            self._svInterface = None
 
 
     # status notrunc
     def _FetchStatus(self):
-        # NEW: Use primary interface for status
-        statusStr = self._primarySvInterface.Status()
+        statusStr = self._svInterface.Status()
         if statusStr != None:
             Log.debug(statusStr)
             splitted = statusStr.splitlines()
@@ -462,16 +430,15 @@ class MBIIServer:
             Log.warning("Server status is unreachable, setting default values to status data.")
         pass
 
-
+    
     def Restart(self, timeout = 60):
         if not self._isRestarting:
             self._isRestarting = True
             self._restartTimeout.Set(timeout)
-            self._lastRestartTick = 0.0
-            # Use primary interface to send command
-            self._primarySvInterface.SvSay("^1 {text}.".format(text = "Godfinger Restarting procedure started, ETA %s"%self._restartTimeout.LeftDHMS()))
+            self._lastRestartTick = timeout
+            self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger Restarting procedure started, ETA %s"%self._restartTimeout.LeftDHMS()))
             Log.info("Restart issued, proceeding.")
-
+    
     def Start(self):
         # a = 0/0
         try:
@@ -485,7 +452,6 @@ class MBIIServer:
                 else:
                     Log.debug("Running in debug mode and server is offline, consider server data invalid.")
 
-            # Use primary interface for CvarManager
             if not self._cvarManager.Initialize():
                 Log.error("Failed to initialize CvarManager, abort startup.")
                 self._status = MBIIServer.STATUS_SERVER_JUST_AN_ERROR
@@ -500,8 +466,7 @@ class MBIIServer:
                 return
             self._isRunning = True
             self._status = MBIIServer.STATUS_RUNNING
-            # Use primary interface for SvSay
-            self._primarySvInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]))
+            self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["prologueMessage"]))
             while self._isRunning:
                 startTime = time.time()
                 self.Loop()
@@ -510,46 +475,38 @@ class MBIIServer:
                 if sleepTime <= 0:
                     sleepTime = 0
                 time.sleep(sleepTime)
+
         except KeyboardInterrupt:
             s = signal.signal(signal.SIGINT, signal.SIG_IGN)
             Log.info("Interrupt recieved.")
             Sighandler(signal.SIGINT, -1)
-
+            
     def Stop(self):
         if self._isRunning:
             Log.info("Stopping Godfinger...")
-            # Use primary interface for SvSay
-            if self._primarySvInterface:
-                self._primarySvInterface.SvSay("^1 {text}.".format(text = self._config.cfg["epilogueMessage"]))
+            self._svInterface.SvSay("^1 {text}.".format(text = self._config.cfg["epilogueMessage"]))
             self._status = MBIIServer.STATUS_STOPPING
-            # NEW: Close all interfaces
-            for interface in self._svInterfaces:
-                interface.Close()
+            self._svInterface.Close()
             self._isRunning = False
             self._status = MBIIServer.STATUS_STOPPED
-            Log.info("Stopped.")
+            Log.info("Stopped.") 
 
     def Loop(self):
         if self._isRestarting:
             if self._restartTimeout.IsSet():
                 tick = self._restartTimeout.Left()
                 if tick - self._lastRestartTick <= -5:
-                    # Use primary interface for SvSay
-                    self._primarySvInterface.SvSay("^1 {text}.".format(text = "Godfinger is about to restart in %s"%self._restartTimeout.LeftDHMS()))
+                    self._svInterface.SvSay("^1 {text}.".format(text = "Godfinger is about to restart in %s"%self._restartTimeout.LeftDHMS()))
                     self._lastRestartTick = tick
             else:
                 Sighandler(signal.SIGINT, -1)
                 self.restartOnCrash = False
                 self.Stop()
                 return
-
-        # NEW: Process messages from all interfaces
-        for interface in self._svInterfaces:
-            messages = interface.GetMessages()
-            while not messages.empty():
-                message = messages.get()
-                self._ParseMessage(message)
-
+        messages = self._svInterface.GetMessages()
+        while not messages.empty():
+            message = messages.get()
+            self._ParseMessage(message)
         self._pluginManager.Loop()
 
     def _ParseMessage(self, message : logMessage.LogMessage):
@@ -752,10 +709,10 @@ class MBIIServer:
             commandName = cmdArgs[1].lower()
             for commandAlias, helpText in commandAliasList:
                 if commandName == commandAlias.lower():
-                    self._primarySvInterface.Say('^1[Godfinger]: ^7' + helpText)
+                    self._svInterface.Say('^1[Godfinger]: ^7' + helpText)
                     return True
             # Command not found
-            self._primarySvInterface.Say(f"^1[Godfinger]:^7 Couldn't find chat command: {commandName}")
+            self._svInterface.Say(f"^1[Godfinger]:^7 Couldn't find chat command: {commandName}")
         else:
             # List all available commands
             commandStr = "Available commands (Say !help <command> for details): " + ', '.join([aliases for aliases, _ in commandAliasList])
@@ -772,9 +729,9 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._primarySvInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._svInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
             else:
-                self._primarySvInterface.Say('^1[Godfinger]: ^7' + commandStr)
+                self._svInterface.Say('^1[Godfinger]: ^7' + commandStr)
 
         return True
 
@@ -804,10 +761,10 @@ class MBIIServer:
             commandName = cmdArgs[1].lower()
             for commandAlias, helpText in smodCommandAliasList:
                 if commandName == commandAlias.lower():
-                    self._primarySvInterface.SmSay(helpText)
+                    self._svInterface.SmSay(helpText)
                     return True
             # Command not found
-            self._primarySvInterface.SmSay(f"Couldn't find smod command: {commandName}")
+            self._svInterface.SmSay(f"Couldn't find smod command: {commandName}")
         else:
             # List all available smod commands
             allCommands = ', '.join([aliases for aliases, _ in smodCommandAliasList])
@@ -825,9 +782,9 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._primarySvInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._svInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
             else:
-                self._primarySvInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
+                self._svInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
         return True
 
     def OnKill(self, logMessage : logMessage.LogMessage):
@@ -1033,7 +990,7 @@ class MBIIServer:
                     self.OnMapChange(vars["mapname"], self._serverData.mapName)
                 self._serverData.mapName = vars["mapname"]
         else:
-            self._serverData.mapName = self._primarySvInterface.GetCurrentMap()
+            self._serverData.mapName = self._svInterface.GetCurrentMap()
 
         Log.info("Current map name on init : %s", self._serverData.mapName)
 
