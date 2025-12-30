@@ -8,6 +8,7 @@ import os;
 import database;
 import lib.shared.client as client;
 import requests;
+import ipaddress;
 
 SERVER_DATA = None;
 
@@ -102,12 +103,25 @@ class VPNMonitor():
         ip = client.GetIp();
         return self.GetIpVpnType(ip);
         
+    def _IsIpMatch(self, ip: str, item) -> bool:
+        try:
+            target_ip = ipaddress.ip_address(ip)
+            if isinstance(item, str):
+                return target_ip == ipaddress.ip_address(item)
+            elif isinstance(item, list) and len(item) == 2:
+                start_ip = ipaddress.ip_address(item[0])
+                end_ip = ipaddress.ip_address(item[1])
+                return start_ip <= target_ip <= end_ip
+        except Exception as e:
+            Log.error(f"Error checking IP {ip} against {item}: {e}")
+        return False
 
     def GetIpVpnType(self, ip : str ) -> int:
         whitelist = self.config.cfg["whitelist"];
-        if ip in whitelist:
-            Log.debug("IP %s is whitelisted, skipping VPN check.", ip);
-            return -1;
+        for entry in whitelist:
+            if self._IsIpMatch(ip, entry):
+                Log.debug("IP %s matches whitelist entry %s, skipping VPN check.", ip, str(entry));
+                return -1;
     
         Log.debug("Getting vpn associated with ip address %s", ip);
         existing = self._database.ExecuteQuery("SELECT vpn FROM iplist WHERE ip=\""+ip+"\"", True);
@@ -145,8 +159,9 @@ class VPNMonitor():
             return;
         
         blacklist = self.config.cfg["blacklist"];
-        if ip in blacklist:
-            Log.debug("Kicking a player with ip %s due to VPN blacklist rules" % ip);
+        for entry in blacklist:
+            if self._IsIpMatch(ip, entry):
+                Log.debug("Kicking a player with ip %s due to VPN blacklist match: %s", ip, str(entry));
             if self.config.GetValue("action", 0) == 1:
                 Log.debug("Banning ip %s" % ip)
                 self._serverData.interface.ClientBan(ip);
