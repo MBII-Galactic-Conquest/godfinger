@@ -13,6 +13,7 @@ FEATURES:
 - Configurable block actions (kick only or ban + kick)
 - Server broadcast messages when blocking players
 - Master enable/disable switch
+- SMOD commands for real-time whitelist management (!whitelist, !blacklist)
 
 INSTALLATION:
 1. Ensure the whitelist plugin directory is in: plugins/shared/whitelist/
@@ -57,6 +58,29 @@ ALIAS MATCHING:
 - Case-insensitive (e.g., "PlayerName" matches "playername")
 - Automatically strips MB2 color codes (^0-^9)
 - Example: "^1Admin^7Name" matches "AdminName"
+
+SMOD COMMANDS:
+Admins with SMOD privileges can manage the whitelist in real-time using chat commands:
+
+!whitelist <IP or PlayerName> (alias: !wl)
+  - Add an IP address to the whitelist
+  - Examples:
+    /smod smsay !whitelist 192.168.1.100
+    /smod smsay !whitelist PlayerName
+    /smod smsay !wl 10.0.0.50
+
+!blacklist <IP or PlayerName> (alias: !bl)
+  - Remove an IP address from the whitelist
+  - Examples:
+    /smod smsay !blacklist 192.168.1.100
+    /smod smsay !blacklist PlayerName
+    /smod smsay !bl 10.0.0.50
+
+Notes on SMOD commands:
+- If you specify a player name, the plugin will look up their current IP address
+- Player name matching is case-insensitive and strips color codes
+- Changes are immediately saved to whitelistCfg.json
+- Feedback is sent to SMOD chat (SmSay)
 
 EXAMPLES:
 
