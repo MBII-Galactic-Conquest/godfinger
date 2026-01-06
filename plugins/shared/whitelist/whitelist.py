@@ -8,6 +8,7 @@ import lib.shared.colors as colors
 import ipaddress
 import re
 import os
+import json
 
 SERVER_DATA = None
 
@@ -52,6 +53,13 @@ class Whitelist():
         if self.config.cfg["action"] not in [0, 1]:
             Log.error("Invalid action value %d, defaulting to 0", self.config.cfg["action"])
             self.config.cfg["action"] = 0
+
+        # Smod command list
+        self._smodCommandList = \
+            {
+                tuple(["whitelist", "wl"]) : ("!<whitelist | wl> <IP or PlayerName> - add IP to whitelist", self.HandleWhitelist),
+                tuple(["blacklist", "bl"]) : ("!<blacklist | bl> <IP or PlayerName> - remove IP from whitelist", self.HandleBlacklist)
+            }
 
     def Start(self) -> bool:
         allClients = self._serverData.API.GetAllClients()
@@ -157,6 +165,149 @@ class Whitelist():
                 self._messagePrefix + f"Blocked player {name}^7 - not on whitelist"
             )
 
+    def _SaveConfig(self):
+        """Save current configuration to JSON file"""
+        try:
+            with open(CONFIG_DEFAULT_PATH, "w") as f:
+                json.dump(self.config.cfg, f, indent=4)
+            Log.info("Configuration saved to %s", CONFIG_DEFAULT_PATH)
+            return True
+        except Exception as e:
+            Log.error("Failed to save configuration: %s", e)
+            return False
+
+    def _GetClientByName(self, playerName):
+        """Find a connected client by name (case-insensitive, color-stripped)"""
+        try:
+            connected_clients = self._serverData.API.GetAllClients()
+            playerName_stripped = colors.StripColorCodes(playerName).lower()
+
+            for cl in connected_clients:
+                client_name_stripped = colors.StripColorCodes(cl.GetName()).lower()
+                if client_name_stripped == playerName_stripped:
+                    return cl
+            return None
+        except Exception as e:
+            Log.error("Error getting client by name: %s", e)
+            return None
+
+    def _IsValidIp(self, ip_string):
+        """Check if string is a valid IP address"""
+        try:
+            ipaddress.ip_address(ip_string)
+            return True
+        except:
+            return False
+
+    def HandleWhitelist(self, playerName, smodID, adminIP, cmdArgs):
+        """Handle !whitelist command - add IP to whitelist"""
+        if len(cmdArgs) < 2:
+            message = f"{self._messagePrefix}^7Usage: ^5!whitelist ^9<IP or PlayerName>"
+            self._serverData.interface.SmSay(message)
+            Log.info(f"SMOD '{playerName}' used !whitelist without arguments")
+            return False
+
+        target = cmdArgs[1]
+        target_ip = None
+
+        # Check if target is a valid IP
+        if self._IsValidIp(target):
+            target_ip = target
+        else:
+            # Try to find player by name
+            target_client = self._GetClientByName(target)
+            if target_client:
+                target_ip = target_client.GetIp()
+                Log.info(f"SMOD '{playerName}' whitelisting player '{target_client.GetName()}' with IP {target_ip}")
+            else:
+                message = f"{self._messagePrefix}^1Player '{target}' not found and not a valid IP"
+                self._serverData.interface.SmSay(message)
+                Log.warning(f"SMOD '{playerName}' tried to whitelist invalid target: {target}")
+                return False
+
+        # Check if IP already in whitelist
+        if target_ip in self.config.cfg["ipWhitelist"]:
+            message = f"{self._messagePrefix}^3IP ^5{target_ip}^3 is already whitelisted"
+            self._serverData.interface.SmSay(message)
+            Log.info(f"SMOD '{playerName}' tried to whitelist already listed IP: {target_ip}")
+            return True
+
+        # Add to whitelist
+        self.config.cfg["ipWhitelist"].append(target_ip)
+
+        if self._SaveConfig():
+            message = f"{self._messagePrefix}^2Added ^5{target_ip}^2 to whitelist"
+            self._serverData.interface.SmSay(message)
+            Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) added {target_ip} to whitelist")
+            return True
+        else:
+            message = f"{self._messagePrefix}^1Error saving configuration"
+            self._serverData.interface.SmSay(message)
+            return False
+
+    def HandleBlacklist(self, playerName, smodID, adminIP, cmdArgs):
+        """Handle !blacklist command - remove IP from whitelist"""
+        if len(cmdArgs) < 2:
+            message = f"{self._messagePrefix}^7Usage: ^5!blacklist ^9<IP or PlayerName>"
+            self._serverData.interface.SmSay(message)
+            Log.info(f"SMOD '{playerName}' used !blacklist without arguments")
+            return False
+
+        target = cmdArgs[1]
+        target_ip = None
+
+        # Check if target is a valid IP
+        if self._IsValidIp(target):
+            target_ip = target
+        else:
+            # Try to find player by name
+            target_client = self._GetClientByName(target)
+            if target_client:
+                target_ip = target_client.GetIp()
+                Log.info(f"SMOD '{playerName}' blacklisting player '{target_client.GetName()}' with IP {target_ip}")
+            else:
+                message = f"{self._messagePrefix}^1Player '{target}' not found and not a valid IP"
+                self._serverData.interface.SmSay(message)
+                Log.warning(f"SMOD '{playerName}' tried to blacklist invalid target: {target}")
+                return False
+
+        # Check if IP is in whitelist
+        if target_ip not in self.config.cfg["ipWhitelist"]:
+            message = f"{self._messagePrefix}^3IP ^5{target_ip}^3 is not in whitelist"
+            self._serverData.interface.SmSay(message)
+            Log.info(f"SMOD '{playerName}' tried to blacklist IP not in whitelist: {target_ip}")
+            return True
+
+        # Remove from whitelist
+        self.config.cfg["ipWhitelist"].remove(target_ip)
+
+        if self._SaveConfig():
+            message = f"{self._messagePrefix}^1Removed ^5{target_ip}^1 from whitelist"
+            self._serverData.interface.SmSay(message)
+            Log.info(f"SMOD '{playerName}' (ID: {smodID}, IP: {adminIP}) removed {target_ip} from whitelist")
+            return True
+        else:
+            message = f"{self._messagePrefix}^1Error saving configuration"
+            self._serverData.interface.SmSay(message)
+            return False
+
+    def HandleSmodCommand(self, playerName, smodID, adminIP, cmdArgs):
+        """Route smod commands to appropriate handlers"""
+        command = cmdArgs[0]
+        if command.startswith("!"):
+            command = command[1:]  # Remove ! prefix
+
+        for c in self._smodCommandList:
+            if command in c:
+                return self._smodCommandList[c][1](playerName, smodID, adminIP, cmdArgs)
+        return False
+
+    def OnSmsay(self, playerName, smodID, adminIP, message):
+        """Handle SMSAY events"""
+        message = message.lower()
+        messageParse = message.split()
+        return self.HandleSmodCommand(playerName, smodID, adminIP, messageParse)
+
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
@@ -170,6 +321,17 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
     if PluginInstance._status < 0:
         Log.error("Whitelist plugin failed to initialize")
         return False
+
+    # Register smod commands
+    newVal = []
+    rCommands = SERVER_DATA.GetServerVar("registeredSmodCommands")
+    if rCommands != None:
+        newVal.extend(rCommands)
+    for cmd in PluginInstance._smodCommandList:
+        for alias in cmd:
+            if not alias.isdecimal():
+                newVal.append((alias, PluginInstance._smodCommandList[cmd][0]))
+    SERVER_DATA.SetServerVar("registeredSmodCommands", newVal)
 
     return True # indicate plugin load success
 
@@ -194,6 +356,8 @@ def OnEvent(event) -> bool:
             return False # Ignore startup messages
         else:
             return PluginInstance.OnClientConnect(event.client, event.data)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
+        return PluginInstance.OnSmsay(event.playerName, event.smodID, event.adminIP, event.message)
     return False
 
 if __name__ == "__main__":
