@@ -119,6 +119,23 @@ class Whitelist():
         name = client.GetName()
         matchMode = self.config.cfg["matchMode"]
 
+        # Check if VPN monitor plugin exists and has whitelisted this IP
+        # This prevents conflicts where VPN monitor allows but whitelist blocks
+        try:
+            vpn_plugin = self._serverData.API.GetPlugin("plugins.shared.vpnmonitor.vpnmonitor")
+            if vpn_plugin:
+                vpn_exports = vpn_plugin.GetExports()
+                if vpn_exports:
+                    # If VPN monitor has this IP whitelisted, allow them through
+                    vpn_instance = vpn_plugin.GetInstance()
+                    if vpn_instance and hasattr(vpn_instance, 'config'):
+                        vpn_whitelist = vpn_instance.config.cfg.get("whitelist", [])
+                        if ip in vpn_whitelist:
+                            Log.debug("IP %s is whitelisted in VPN monitor, allowing through whitelist plugin", ip)
+                            return True
+        except Exception as e:
+            Log.debug("Could not check VPN monitor whitelist (plugin may not be loaded): %s", e)
+
         # Check IP whitelist
         ip_matched = False
         for entry in self.config.cfg["ipWhitelist"]:

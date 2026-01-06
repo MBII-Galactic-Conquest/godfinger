@@ -139,9 +139,16 @@ TROUBLESHOOTING:
   * Ensure whitelistCfg.json has valid JSON syntax
   * Check file permissions
 
+VPN MONITOR INTEGRATION:
+- If the vpnmonitor plugin is loaded, the whitelist plugin will automatically allow any IPs
+  that are in the vpnmonitor's whitelist
+- This prevents conflicts where vpnmonitor allows an IP but whitelist blocks it
+- To whitelist an IP, you can add it to either plugin's configuration
+
 NOTES:
 - No external dependencies required (uses Python standard library)
 - No database needed (all config from JSON)
 - Plugin checks both existing players on startup and new connections
 - Returns False from event handler to allow other plugins to process events
 - Color code format follows MB2 standard (^0-^9)
+- Automatically detects and respects vpnmonitor whitelist to avoid conflicts
