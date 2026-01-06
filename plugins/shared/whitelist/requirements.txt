@@ -1,0 +1,7 @@
+# Whitelist Plugin - No External Dependencies Required
+#
+# This plugin uses only Python standard library modules:
+# - logging (built-in)
+# - ipaddress (built-in, Python 3.3+)
+# - re (built-in)
+# - os (built-in)
