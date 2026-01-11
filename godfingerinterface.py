@@ -60,7 +60,7 @@ class IServerInterface():
     def MbMode(self, mode : int, mapToChange : str = None) -> str:
         return "Not implemented"
     
-    def ClientMute(self, pid : int) -> str:
+    def ClientMute(self, pid : int, minutes : int = 10) -> str:
         return "Not implemented"
     
     def ClientUnmute(self, pid : int) -> str:
@@ -139,6 +139,9 @@ class IServerInterface():
         pass
 
     def MarkTK(self, player_id : int, time : int) -> str:
+        return
+
+    def UnmarkTK(self, player_id : int) -> str:
         return
 
 class AServerInterface(IServerInterface):
@@ -255,9 +258,9 @@ class RconInterface(AServerInterface):
             return self._rcon.MbMode(mode, mapToChange)
         return None
     
-    def ClientMute(self, pid : int) -> str:
+    def ClientMute(self, pid : int, minutes : int = 10) -> str:
         if self.IsOpened():
-            return self._rcon.ClientMute(pid)
+            return self._rcon.ClientMute(pid, minutes)
         return None
     
     def ClientUnmute(self, pid : int) -> str:
@@ -373,6 +376,11 @@ class RconInterface(AServerInterface):
     def MarkTK(self, player_id : int, time : int) -> str:
         if self.IsOpened():
             return self._rcon.MarkTK(player_id, time)
+        return None
+
+    def UnmarkTK(self, player_id : int) -> str:
+        if self.IsOpened():
+            return self._rcon.UnmarkTK(player_id)
         return None
 
     def ParseLogThreadHandler(self, control, sleepTime):
@@ -807,9 +815,9 @@ class PtyInterface(AServerInterface):
             return self.ExecuteCommand(cmdStr, proc)
         return None
     
-    def ClientMute(self, pid : int) -> str:
+    def ClientMute(self, pid : int, minutes : int = 10) -> str:
         if self.IsOpened():
-            cmdStr = "mute %i" % (pid)
+            cmdStr = "mute %i %i" % (pid, minutes)
             proc = PtyInterface.EchoProcessor(cmdStr)
             return self.ExecuteCommand(cmdStr, proc)
         return None
