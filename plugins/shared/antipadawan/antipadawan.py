@@ -204,8 +204,9 @@ class AntiPadawan():
             name = client.GetName()
             name_stripped = colors.StripColorCodes(name).lower()
 
-            # Remove special characters for better matching
-            name_clean = re.sub(r":|-|\.|,|;|=|\/|\\|\||`|~|\"|'|[|]|(|)|_", "", name_stripped)
+            # Remove special characters and digits for better matching
+            # This handles cases like "padawan[1]" -> "padawan"
+            name_clean = re.sub(r"[:\-.,;=/\\|`~\"'\[\]\(\)_\d]", "", name_stripped)
 
             # Support both legacy "detectedWord" (string) and new "detectedWords" (list)
             detected_words = []
