@@ -1019,17 +1019,22 @@ class RTV(object):
             capture = True
         elif len(cmdArgs) == 2:
             capture = True
-            # Get page from cached pages
-            try:
-                page_index = int(cmdArgs[1]) - 1
-                if page_index < 0:
-                    raise ValueError
-                if page_index >= len(self._mapContainer._pages):
-                    self.SvTell(player.GetId(), f"Index out of range! (1-{len(self._mapContainer._pages)})")
-                else:
-                    self.Say(self._mapContainer._pages[page_index])
-            except (ValueError, IndexError):
-                self.SvTell(player.GetId(), f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+            if cmdArgs[1].lower() == "all":
+                # Batch execute all pages
+                batchCmds = [f"say {self._messagePrefix}{x}" for x in self._mapContainer._pages]
+                self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
+            else:
+                # Get page from cached pages
+                try:
+                    page_index = int(cmdArgs[1]) - 1
+                    if page_index < 0:
+                        raise ValueError
+                    if page_index >= len(self._mapContainer._pages):
+                        self.SvTell(player.GetId(), f"Index out of range! (1-{len(self._mapContainer._pages)})")
+                    else:
+                        self.Say(self._mapContainer._pages[page_index])
+                except (ValueError, IndexError):
+                    self.SvTell(player.GetId(), f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
