@@ -858,6 +858,10 @@ def OnEvent(event) -> bool:
                 ensure_game_in_progress_repeatedly(),
                 bot.loop
             )
+            # Create persist file to ensure game_in_progress survives map change
+            if not check_persist_file_exists():
+                create_persist_file()
+                Log.info(f"MAPCHANGE: Created persist file to preserve game_in_progress state across map change")
 
         return False
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
