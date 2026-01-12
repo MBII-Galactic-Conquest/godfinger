@@ -14,7 +14,7 @@ SERVER_DATA = None
 
 CONFIG_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "antipadawanCfg.json")
 TRACKING_FILE_PATH = os.path.join(os.path.dirname(__file__), "antipadawan_tracking.json")
-ADMIN_TRACKING_FILE_PATH = os.path.join(os.path.dirname(__file__), "antipadawan_admintracking.json")
+# Admin tracking is in-memory only (not persisted to disk - cleared on restart)
 
 CONFIG_FALLBACK = \
 """{
