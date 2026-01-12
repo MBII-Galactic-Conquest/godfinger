@@ -42,6 +42,8 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > [!IMPORTANT]
 > [`** REQUIRES PYTHON 3.12.7+ **`](https://www.python.org/downloads/release/python-3127/)
 >
+> Ensure godfinger folder is installed in `Jedi Academy/GameData/.`
+>
 > Ensure your logfile is set to `server.log` in your `server.cfg.`
 > 
 > Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, `g_logClientInfo` is `"2"`, `g_statLog` is `"1"`, and `g_statLogFile` is `statlog.log` in your `server.cfg.`
