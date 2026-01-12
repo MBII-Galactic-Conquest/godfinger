@@ -14,6 +14,7 @@ SERVER_DATA = None
 
 CONFIG_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "antipadawanCfg.json")
 TRACKING_FILE_PATH = os.path.join(os.path.dirname(__file__), "antipadawan_tracking.json")
+ADMIN_TRACKING_FILE_PATH = os.path.join(os.path.dirname(__file__), "antipadawan_admintracking.json")
 
 CONFIG_FALLBACK = \
 """{
@@ -53,6 +54,11 @@ class AntiPadawan():
         # Load tracking data
         self._tracking = self._LoadTracking()
 
+        # Track admin-applied marks and mutes (in-memory only, cleared on restart)
+        # Format: { "player_ip": { "marktk": {...}, "mute": {...} } }
+        # Each entry: { "expires": timestamp, "duration": minutes, "admin_name": str, "admin_id": str }
+        self._admin_tracking = {}
+
     def Start(self) -> bool:
         """Check all existing players on startup"""
         if not self.config.cfg["enabled"]:
@@ -90,7 +96,7 @@ class AntiPadawan():
         return False  # Don't capture event
 
     def OnClientChanged(self, client: client.Client, data: dict) -> bool:
-        """Handle client info changes - remove penalties if name changed from blocked name"""
+        """Handle client info changes - apply penalties if name changed to blocked name"""
         try:
             # Check if plugin is enabled
             if not self.config.cfg["enabled"]:
@@ -101,50 +107,24 @@ class AntiPadawan():
                 return False  # Name didn't change, ignore
 
             player_ip = client.GetIp()
-            player_id = client.GetId()
             new_name = client.GetName()
             old_name = data["name"]
 
-            # Check if this IP was previously penalized
-            if player_ip in self._tracking:
-                # Check if their NEW name is allowed (no longer a padawan name)
-                if not self._IsPadawanName(client):
-                    # Name is now allowed - remove penalties
-                    Log.info(f"Player changed name from '{old_name}' to '{new_name}' (IP: {player_ip}) - removing penalties")
+            # Check if NEW name is blocked
+            if self._IsPadawanName(client):
+                # Player changed TO a blocked name while in-game
+                # Apply penalties and track them
+                Log.info(f"Player changed name to blocked name '{new_name}' (IP: {player_ip}) - applying penalties")
+                self._HandlePadawan(client)
 
-                    # Unmute if they were muted
-                    if self._tracking[player_ip].get("muted", False):
-                        try:
-                            self._serverData.interface.ClientUnmute(player_id)
-                            Log.info(f"Unmuted {new_name} (ID: {player_id})")
-                        except Exception as e:
-                            Log.error(f"Failed to unmute player {player_id}: {e}")
-
-                    # Unmark TK if they were marked
-                    if self._tracking[player_ip].get("markedTK", False):
-                        try:
-                            self._serverData.interface.UnmarkTK(player_id)
-                            Log.info(f"Cleared TK mark for {new_name} (ID: {player_id})")
-                        except Exception as e:
-                            Log.error(f"Failed to clear TK mark for player {player_id}: {e}")
-
-                    # Send message letting them know they're cleared (unless in silent mode)
-                    if not self.config.cfg.get("silentMode", False):
-                        try:
-                            self._serverData.interface.SvTell(player_id,
-                                self._messagePrefix + "^2Thank you for changing your name! Penalties removed.")
-                        except Exception as e:
-                            Log.error(f"Failed to send clear message to player {player_id}: {e}")
-
-                    # Remove from tracking
-                    try:
-                        del self._tracking[player_ip]
-                        self._SaveTracking()
-                    except Exception as e:
-                        Log.error(f"Failed to remove tracking for IP {player_ip}: {e}")
-                else:
-                    # New name is still blocked
-                    Log.info(f"Player {new_name} (IP: {player_ip}) changed name but it's still blocked - penalties remain")
+            # If player changed FROM blocked name to allowed name while in-game:
+            # DO NOT remove penalties here - they must disconnect and rejoin to clear penalties
+            # This prevents the exploit where players use name changes to clear admin-applied marks
+            elif player_ip in self._tracking:
+                Log.info(f"Player '{old_name}' changed name to '{new_name}' - penalties remain until disconnect/rejoin")
+                # Update tracking with new name
+                self._tracking[player_ip]["lastSeenName"] = new_name
+                self._SaveTracking()
         except Exception as e:
             Log.error(f"Error in OnClientChanged: {e}")
             return False
@@ -169,21 +149,51 @@ class AntiPadawan():
                     # Name is now allowed - remove penalties
                     Log.info(f"Player {player_name} (IP: {player_ip}) changed name from blocked name - removing penalties")
 
-                    # Unmute if they were muted
+                    # Unmute if they were muted BY THE PLUGIN
                     if self._tracking[player_ip].get("muted", False):
-                        try:
-                            self._serverData.interface.ClientUnmute(player_id)
-                            Log.info(f"Unmuted {player_name} (ID: {player_id})")
-                        except Exception as e:
-                            Log.error(f"Failed to unmute player {player_id}: {e}")
+                        # Check if there's an active admin mute - if so, don't clear
+                        has_admin_mute = False
+                        if player_ip in self._admin_tracking and "mute" in self._admin_tracking[player_ip]:
+                            # Clean up expired admin mutes
+                            if time.time() >= self._admin_tracking[player_ip]["mute"]["expires"]:
+                                del self._admin_tracking[player_ip]["mute"]
+                                if not self._admin_tracking[player_ip]:  # Empty dict
+                                    del self._admin_tracking[player_ip]
+                                Log.info(f"Admin mute for {player_ip} has expired")
+                            else:
+                                has_admin_mute = True
+                                Log.warning(f"Player {player_name} has admin mute - NOT clearing mute (expires in {int((self._admin_tracking[player_ip]['mute']['expires'] - time.time()) / 60)} min)")
 
-                    # Unmark TK if they were marked
+                        if not has_admin_mute:
+                            # No admin mute or it expired - safe to clear
+                            try:
+                                self._serverData.interface.ClientUnmute(player_id)
+                                Log.info(f"Unmuted {player_name} (ID: {player_id})")
+                            except Exception as e:
+                                Log.error(f"Failed to unmute player {player_id}: {e}")
+
+                    # Unmark TK if they were marked BY THE PLUGIN
                     if self._tracking[player_ip].get("markedTK", False):
-                        try:
-                            self._serverData.interface.UnmarkTK(player_id)
-                            Log.info(f"Cleared TK mark for {player_name} (ID: {player_id})")
-                        except Exception as e:
-                            Log.error(f"Failed to clear TK mark for player {player_id}: {e}")
+                        # Check if there's an active admin mark - if so, don't clear
+                        has_admin_mark = False
+                        if player_ip in self._admin_tracking and "marktk" in self._admin_tracking[player_ip]:
+                            # Clean up expired admin marks
+                            if time.time() >= self._admin_tracking[player_ip]["marktk"]["expires"]:
+                                del self._admin_tracking[player_ip]["marktk"]
+                                if not self._admin_tracking[player_ip]:  # Empty dict
+                                    del self._admin_tracking[player_ip]
+                                Log.info(f"Admin mark for {player_ip} has expired")
+                            else:
+                                has_admin_mark = True
+                                Log.warning(f"Player {player_name} has admin mark - NOT clearing TK mark (expires in {int((self._admin_tracking[player_ip]['marktk']['expires'] - time.time()) / 60)} min)")
+
+                        if not has_admin_mark:
+                            # No admin mark or it expired - safe to clear
+                            try:
+                                self._serverData.interface.UnmarkTK(player_id)
+                                Log.info(f"Cleared TK mark for {player_name} (ID: {player_id})")
+                            except Exception as e:
+                                Log.error(f"Failed to clear TK mark for player {player_id}: {e}")
 
                     # Send message letting them know they're cleared (unless in silent mode)
                     if not self.config.cfg.get("silentMode", False):
@@ -383,6 +393,158 @@ class AntiPadawan():
         except Exception as e:
             Log.error(f"Failed to save tracking data: {e}")
 
+    def OnSmsay(self, playerName: str, smodID: int, adminIP: str, message: str) -> bool:
+        """Handle admin commands from smsay"""
+        # Only process if plugin is enabled
+        if not self.config.cfg["enabled"]:
+            return False
+
+        try:
+            # Only process !gf commands
+            message_lower = message.lower()
+            if message_lower.startswith("!gf"):
+                parts = message_lower.split()
+                command = parts[0]
+
+                # !gfmarktk <playername> <duration>
+                if command == "!gfmarktk" and len(parts) >= 3:
+                    target_name = parts[1]
+                    try:
+                        duration = int(parts[2])
+                    except ValueError:
+                        return False
+
+                    # Find player by name
+                    all_clients = self._serverData.API.GetAllClients()
+                    target_client = None
+                    for cl in all_clients:
+                        if target_name.lower() in cl.GetName().lower():
+                            target_client = cl
+                            break
+
+                    if target_client:
+                        target_ip = target_client.GetIp()
+                        target_id = target_client.GetId()
+
+                        # Mark the player
+                        self._serverData.interface.MarkTK(target_id, duration)
+
+                        # Track admin mark
+                        if target_ip not in self._admin_tracking:
+                            self._admin_tracking[target_ip] = {}
+                        self._admin_tracking[target_ip]["marktk"] = {
+                            "expires": time.time() + (duration * 60),
+                            "duration": duration,
+                            "admin_name": playerName,
+                            "admin_ip": adminIP
+                        }
+
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Admin marked {target_client.GetName()} for TK ({duration} min)")
+                        Log.info(f"Admin {playerName} (SMOD ID: {smodID}) marked {target_client.GetName()} (IP: {target_ip}) for TK - tracked for {duration} min")
+                        return False
+
+                # !gfmute <playername> <duration>
+                elif command == "!gfmute" and len(parts) >= 3:
+                    target_name = parts[1]
+                    try:
+                        duration = int(parts[2])
+                    except ValueError:
+                        return False
+
+                    # Find player by name
+                    all_clients = self._serverData.API.GetAllClients()
+                    target_client = None
+                    for cl in all_clients:
+                        if target_name.lower() in cl.GetName().lower():
+                            target_client = cl
+                            break
+
+                    if target_client:
+                        target_ip = target_client.GetIp()
+                        target_id = target_client.GetId()
+
+                        # Mute the player
+                        self._serverData.interface.ClientMute(target_id, duration)
+
+                        # Track admin mute
+                        if target_ip not in self._admin_tracking:
+                            self._admin_tracking[target_ip] = {}
+                        self._admin_tracking[target_ip]["mute"] = {
+                            "expires": time.time() + (duration * 60),
+                            "duration": duration,
+                            "admin_name": playerName,
+                            "admin_ip": adminIP
+                        }
+
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Admin muted {target_client.GetName()} ({duration} min)")
+                        Log.info(f"Admin {playerName} (SMOD ID: {smodID}) muted {target_client.GetName()} (IP: {target_ip}) - tracked for {duration} min")
+                        return False
+
+                # !gfunmarktk <playername>
+                elif command == "!gfunmarktk" and len(parts) >= 2:
+                    target_name = parts[1]
+
+                    # Find player by name
+                    all_clients = self._serverData.API.GetAllClients()
+                    target_client = None
+                    for cl in all_clients:
+                        if target_name.lower() in cl.GetName().lower():
+                            target_client = cl
+                            break
+
+                    if target_client:
+                        target_ip = target_client.GetIp()
+                        target_id = target_client.GetId()
+
+                        # Unmark the player
+                        self._serverData.interface.UnmarkTK(target_id)
+
+                        # Remove admin tracking for marktk
+                        if target_ip in self._admin_tracking and "marktk" in self._admin_tracking[target_ip]:
+                            del self._admin_tracking[target_ip]["marktk"]
+                            if not self._admin_tracking[target_ip]:  # Empty dict
+                                del self._admin_tracking[target_ip]
+
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Admin unmarked {target_client.GetName()}")
+                        Log.info(f"Admin {playerName} (SMOD ID: {smodID}) unmarked {target_client.GetName()} (IP: {target_ip})")
+                        return False
+
+                # !gfunmute <playername>
+                elif command == "!gfunmute" and len(parts) >= 2:
+                    target_name = parts[1]
+
+                    # Find player by name
+                    all_clients = self._serverData.API.GetAllClients()
+                    target_client = None
+                    for cl in all_clients:
+                        if target_name.lower() in cl.GetName().lower():
+                            target_client = cl
+                            break
+
+                    if target_client:
+                        target_ip = target_client.GetIp()
+                        target_id = target_client.GetId()
+
+                        # Unmute the player
+                        self._serverData.interface.ClientUnmute(target_id)
+
+                        # Remove admin tracking for mute
+                        if target_ip in self._admin_tracking and "mute" in self._admin_tracking[target_ip]:
+                            del self._admin_tracking[target_ip]["mute"]
+                            if not self._admin_tracking[target_ip]:  # Empty dict
+                                del self._admin_tracking[target_ip]
+
+                        self._serverData.interface.SvSay(self._messagePrefix + f"Admin unmuted {target_client.GetName()}")
+                        Log.info(f"Admin {playerName} (SMOD ID: {smodID}) unmuted {target_client.GetName()} (IP: {target_ip})")
+                        return False
+
+        except Exception as e:
+            Log.error(f"Error in OnSmsay: {e}")
+            return False
+
+        return False  # Don't capture event
+
+
 
 # Called once when this module ( plugin ) is loaded, return is bool to indicate success for the system
 def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
@@ -430,6 +592,11 @@ def OnEvent(event) -> bool:
             return False  # Ignore startup messages
         else:
             return PluginInstance.OnClientChanged(event.client, event.data)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
+        if event.isStartup:
+            return False  # Ignore startup messages
+        else:
+            return PluginInstance.OnSmsay(event.playerName, event.smodID, event.adminIP, event.message)
     return False
 
 if __name__ == "__main__":

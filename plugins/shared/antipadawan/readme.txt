@@ -128,15 +128,43 @@ When silentMode is enabled (set to true):
 PENALTY TRACKING (Actions 0 and 3):
 For actions that apply penalties but allow continued play (MarkTK or MarkTK+Mute):
 - Plugin tracks penalized players by IP address in antipadawan_tracking.json
-- Penalties are automatically removed when player changes to an allowed name:
-  1. When they change name while in-game (OnClientChanged event)
-  2. When they reconnect with an allowed name (OnClientBegin event)
+- Penalties are applied when:
+  1. Player JOINS with a blocked name (OnClientConnect event)
+  2. Player CHANGES to a blocked name while in-game (OnClientChanged event)
+- Penalties are ONLY removed when player reconnects with an allowed name (OnClientBegin event)
+  - Player must DISCONNECT and REJOIN with an allowed name to clear penalties
+  - In-game name changes to allowed names do NOT remove penalties (prevents exploit)
   - MarkTK is cleared using unmarktk command
   - Mute is removed using unmute command
   - Player receives a "Thank you" message confirming penalties are cleared (unless silentMode is enabled)
-- If they change to another blocked name or reconnect with a blocked name, penalties remain in effect
+- If they reconnect with a blocked name, penalties remain in effect
 - Tracking file is automatically ignored by git (.gitignore includes *.json)
 - No tracking is done for actions 1-2 (kick/ban) since player is removed from server
+
+ANTI-ABUSE PROTECTION:
+To prevent exploits that could clear legitimate admin-applied penalties:
+- Penalties can ONLY be removed by disconnecting and rejoining (not in-game name changes)
+- The unmarktk command clears ALL marks on a player, not just plugin-applied marks
+- If we allowed in-game name changes to clear marks, players could exploit:
+  Example exploit: Admin marks player → Player changes to "Padawan" → Plugin marks again →
+  Player changes to "GoodName" → Plugin calls unmarktk → Admin's legitimate mark is cleared!
+- By requiring disconnect/rejoin, players cannot exploit the system to clear admin marks
+- Players changing TO blocked names in-game ARE still penalized (and must rejoin to clear)
+
+ADMIN MARK TRACKING:
+The plugin tracks admin-applied marks to prevent accidentally clearing them:
+- Admin marks/mutes are tracked in-memory only (cleared on godfinger restart)
+- Admins should use the special !gf commands to apply marks/mutes that the plugin tracks:
+  * /smod smsay !gfmarktk <playername> <duration> - Mark player for TK and track it
+  * /smod smsay !gfmute <playername> <duration> - Mute player and track it
+  * /smod smsay !gfunmarktk <playername> - Unmark player and remove tracking
+  * /smod smsay !gfunmute <playername> - Unmute player and remove tracking
+- Plugin will NOT clear marks on players who have active admin-tracked marks
+- Admin marks automatically expire after their duration
+- In-memory tracking format: { "player_ip": { "marktk": {...}, "mute": {...} } }
+- Each entry contains: { "expires": timestamp, "duration": minutes, "admin_name": str, "admin_ip": str }
+- This ensures legitimate admin marks are never cleared by the plugin's auto-unmark feature
+- Admin tracking is cleared on godfinger/server restart (in-memory only, not persisted)
 
 EXAMPLES:
 
