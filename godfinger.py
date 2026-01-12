@@ -70,6 +70,8 @@ import lib.shared.colors as colors
 import cvar
 import godfingerinterface
 import lib.shared.timeout as timeout
+import lib.shared.pswd as pswd
+import lib.shared.observer as observer
 
 INVALID_ID = -1
 USERINFO_LEN = len("userinfo: ")
@@ -85,6 +87,11 @@ CONFIG_FALLBACK = \
     "serverFileName":"mbiided.x86.exe",
     "logicDelay":0.016,
     "restartOnCrash": false,
+    "watchdog": {
+        "enabled": false,
+        "restartServer": false,
+        "serverStartCommand": ""
+    },
     "floodProtection": {
         "enabled": false,
         "soft": false,
@@ -236,6 +243,17 @@ class MBIIServer:
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
 
+        # Set default watchdog command based on platform if not specified
+        if "watchdog" in self._config.cfg:
+            if not self._config.cfg["watchdog"].get("serverStartCommand", ""):
+                if IsWindows:
+                    # Use autostart script which only starts MB2 server, not Godfinger
+                    self._config.cfg["watchdog"]["serverStartCommand"] = os.path.join(os.getcwd(), "start", "win", "bin", "autostart_win.py")
+                else:
+                    # Use autostart script which only starts MB2 server, not Godfinger
+                    self._config.cfg["watchdog"]["serverStartCommand"] = os.path.join(os.getcwd(), "start", "linux_macOS", "bin", "autostart_linux_macOS.py")
+                Log.debug(f"Set default watchdog command: {self._config.cfg['watchdog']['serverStartCommand']}")
+
         if "paths" in self._config.cfg:
             for path in self._config.cfg["paths"]:
                 sys.path.append(os.path.normpath(path))
@@ -373,8 +391,77 @@ class MBIIServer:
         self._restartTimeout = timeout.Timeout()
         self.restartOnCrash = self._config.cfg["restartOnCrash"]
 
+        # Log watchdog configuration
+        if self._config.cfg.get("watchdog", {}).get("enabled", False):
+            Log.info(f"Watchdog restart enabled for MB2 server process '{self._config.cfg['serverFileName']}'")
 
         Log.info("The Godfinger initialized in %.2f seconds!\n" %(time.time() - startTime))
+
+    def _HandleWatchdogEvent(self, event_type):
+        """Handle watchdog events from the RconInterface watchdog"""
+        try:
+            watchdog_config = self._config.cfg.get("watchdog", {})
+
+            # Only process events if watchdog is enabled
+            if not watchdog_config.get("enabled", False):
+                return
+
+            server_name = self._config.cfg["serverFileName"]
+
+            if event_type == "unavailable":
+                Log.warning(f"Watchdog: MB2 server process '{server_name}' is not running")
+            elif event_type == "existing":
+                Log.info(f"Watchdog: MB2 server process '{server_name}' is running")
+            elif event_type == "died":
+                Log.error(f"Watchdog: MB2 server process '{server_name}' has died!")
+
+                # Attempt to restart server if configured
+                if watchdog_config.get("restartServer", False):
+                    restart_cmd_path = watchdog_config.get("serverStartCommand", "")
+
+                    if not restart_cmd_path:
+                        Log.error(f"Watchdog: serverStartCommand is not configured")
+                        return
+
+                    # Check if script exists
+                    if not os.path.exists(restart_cmd_path):
+                        Log.error(f"Watchdog: Start script not found at {restart_cmd_path}")
+                        return
+
+                    Log.info(f"Watchdog: Attempting to restart MB2 server with: {restart_cmd_path}")
+                    try:
+                        # Use current working directory for scripts
+                        working_dir = os.getcwd()
+
+                        # Determine if this is a Python script or executable
+                        is_python_script = restart_cmd_path.endswith('.py')
+
+                        if is_python_script:
+                            # Execute Python script with the same Python interpreter
+                            if IsWindows:
+                                # Windows: Run python script in detached process
+                                subprocess.Popen([sys.executable, restart_cmd_path], cwd=working_dir, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                            else:
+                                # Unix: Run python script in background
+                                subprocess.Popen([sys.executable, restart_cmd_path], cwd=working_dir, stdin=None, stdout=None, stderr=None, close_fds=True, start_new_session=True)
+                        else:
+                            # Execute batch/shell script
+                            if IsWindows:
+                                restart_cmd = f'start "" "{restart_cmd_path}"'
+                                subprocess.Popen(restart_cmd, shell=True, cwd=working_dir, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                            else:
+                                restart_cmd = f'nohup "{restart_cmd_path}" > /dev/null 2>&1 &'
+                                subprocess.Popen(restart_cmd, shell=True, cwd=working_dir, stdin=None, stdout=None, stderr=None, close_fds=True, start_new_session=True)
+
+                        Log.info("Watchdog: MB2 server restart command executed successfully")
+                    except Exception as e:
+                        Log.error(f"Watchdog: Failed to restart MB2 server: {e}")
+            elif event_type == "started":
+                Log.info(f"Watchdog: MB2 server process '{server_name}' has started")
+            elif event_type == "restarted":
+                Log.info(f"Watchdog: MB2 server process '{server_name}' has been restarted")
+        except Exception as e:
+            Log.error(f"Error in watchdog event handler: {e}")
 
     def Finish(self,):
         # Ensure that finish is called only once; if _isFinished is already set, skip cleanup.
@@ -567,14 +654,19 @@ class MBIIServer:
         if line.startswith("wd_"):
             if line == "wd_unavailable":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_UNAVAILABLE,None))
+                self._HandleWatchdogEvent("unavailable")
             elif line == "wd_existing":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_EXISTING,None))
+                self._HandleWatchdogEvent("existing")
             elif line == "wd_started":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_STARTED,None))
+                self._HandleWatchdogEvent("started")
             elif line == "wd_died":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_DIED,None))
+                self._HandleWatchdogEvent("died")
             elif line == "wd_restarted":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_RESTARTED,None))
+                self._HandleWatchdogEvent("restarted")
             return
 
         lineParse = line.split()

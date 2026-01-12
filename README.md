@@ -42,6 +42,8 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > [!IMPORTANT]
 > [`** REQUIRES PYTHON 3.12.7+ **`](https://www.python.org/downloads/release/python-3127/)
 >
+> Ensure godfinger folder is installed in `Jedi Academy/GameData/.`
+>
 > Ensure your logfile is set to `server.log` in your `server.cfg.`
 > 
 > Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, `g_logClientInfo` is `"2"`, `g_statLog` is `"1"`, and `g_statLogFile` is `statlog.log` in your `server.cfg.`
@@ -113,6 +115,10 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - "logReadDelay" : Interval of time to pass between retrieval of new log lines to parse.
 > - "paths" : A list of string paths to append to system path, used to pass import directories for dependancies of plugins and such.
 > - "restartOnCrash" : If this is set to true, the server will attempt to restart itself if a fatal exception is detected.
+> - "watchdog" : Process monitoring and auto-restart configuration for the MB2 dedicated server. The RconInterface already monitors the MB2 server process automatically - this setting enables automatic restart when the process dies.
+>    - "enabled" : If true, enables automatic restart when the MB2 server process dies. The process monitoring is always active in RconInterface.
+>    - "restartServer" : If true, attempts to restart the MB2 server when it crashes.
+>    - "serverStartCommand" : Path to the script/executable to start the MB2 server. If left empty (""), Godfinger will automatically set this to the platform-specific autostart scripts by OS.
 >
 > - "interfaces"
 >    - "pty" : Pseudo-terminal utilities (https://docs.python.org/3/library/pty.html), used to wrap the mbiided process.
