@@ -128,11 +128,13 @@ When silentMode is enabled (set to true):
 PENALTY TRACKING (Actions 0 and 3):
 For actions that apply penalties but allow continued play (MarkTK or MarkTK+Mute):
 - Plugin tracks penalized players by IP address in antipadawan_tracking.json
-- When a player reconnects with an allowed name, penalties are automatically removed:
+- Penalties are automatically removed when player changes to an allowed name:
+  1. When they change name while in-game (OnClientChanged event)
+  2. When they reconnect with an allowed name (OnClientBegin event)
   - MarkTK is cleared using unmarktk command
   - Mute is removed using unmute command
-  - Player receives a "Thank you" message confirming penalties are cleared
-- If they reconnect with a blocked name, penalties remain in effect
+  - Player receives a "Thank you" message confirming penalties are cleared (unless silentMode is enabled)
+- If they change to another blocked name or reconnect with a blocked name, penalties remain in effect
 - Tracking file is automatically ignored by git (.gitignore includes *.json)
 - No tracking is done for actions 1-2 (kick/ban) since player is removed from server
 

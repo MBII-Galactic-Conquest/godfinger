@@ -89,6 +89,68 @@ class AntiPadawan():
 
         return False  # Don't capture event
 
+    def OnClientChanged(self, client: client.Client, data: dict) -> bool:
+        """Handle client info changes - remove penalties if name changed from blocked name"""
+        try:
+            # Check if plugin is enabled
+            if not self.config.cfg["enabled"]:
+                return False
+
+            # Check if name was changed
+            if "name" not in data:
+                return False  # Name didn't change, ignore
+
+            player_ip = client.GetIp()
+            player_id = client.GetId()
+            new_name = client.GetName()
+            old_name = data["name"]
+
+            # Check if this IP was previously penalized
+            if player_ip in self._tracking:
+                # Check if their NEW name is allowed (no longer a padawan name)
+                if not self._IsPadawanName(client):
+                    # Name is now allowed - remove penalties
+                    Log.info(f"Player changed name from '{old_name}' to '{new_name}' (IP: {player_ip}) - removing penalties")
+
+                    # Unmute if they were muted
+                    if self._tracking[player_ip].get("muted", False):
+                        try:
+                            self._serverData.interface.ClientUnmute(player_id)
+                            Log.info(f"Unmuted {new_name} (ID: {player_id})")
+                        except Exception as e:
+                            Log.error(f"Failed to unmute player {player_id}: {e}")
+
+                    # Unmark TK if they were marked
+                    if self._tracking[player_ip].get("markedTK", False):
+                        try:
+                            self._serverData.interface.UnmarkTK(player_id)
+                            Log.info(f"Cleared TK mark for {new_name} (ID: {player_id})")
+                        except Exception as e:
+                            Log.error(f"Failed to clear TK mark for player {player_id}: {e}")
+
+                    # Send message letting them know they're cleared (unless in silent mode)
+                    if not self.config.cfg.get("silentMode", False):
+                        try:
+                            self._serverData.interface.SvTell(player_id,
+                                self._messagePrefix + "^2Thank you for changing your name! Penalties removed.")
+                        except Exception as e:
+                            Log.error(f"Failed to send clear message to player {player_id}: {e}")
+
+                    # Remove from tracking
+                    try:
+                        del self._tracking[player_ip]
+                        self._SaveTracking()
+                    except Exception as e:
+                        Log.error(f"Failed to remove tracking for IP {player_ip}: {e}")
+                else:
+                    # New name is still blocked
+                    Log.info(f"Player {new_name} (IP: {player_ip}) changed name but it's still blocked - penalties remain")
+        except Exception as e:
+            Log.error(f"Error in OnClientChanged: {e}")
+            return False
+
+        return False  # Don't capture event
+
     def OnClientBegin(self, client: client.Client, data: dict) -> bool:
         """Handle client begin - remove penalties if name changed (called when client is ready)"""
         try:
@@ -363,6 +425,11 @@ def OnEvent(event) -> bool:
             return False  # Ignore startup messages
         else:
             return PluginInstance.OnClientBegin(event.client, event.data)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTCHANGED:
+        if event.isStartup:
+            return False  # Ignore startup messages
+        else:
+            return PluginInstance.OnClientChanged(event.client, event.data)
     return False
 
 if __name__ == "__main__":
