@@ -538,6 +538,44 @@ class AntiPadawan():
                         Log.info(f"Admin {playerName} (SMOD ID: {smodID}) unmuted {target_client.GetName()} (IP: {target_ip})")
                         return False
 
+                # !padawanips - Show all tracked IPs to admin
+                elif command == "!padawanips":
+                    # Find the admin client to send them private messages
+                    admin_client = None
+                    for cl in self._serverData.API.GetAllClients():
+                        if cl.GetIp() == adminIP:
+                            admin_client = cl
+                            break
+
+                    if not admin_client:
+                        Log.warning(f"Could not find admin client for IP {adminIP}")
+                        return False
+
+                    admin_id = admin_client.GetId()
+
+                    # Load current tracking data
+                    tracking_data = self._LoadTracking()
+
+                    if not tracking_data:
+                        self._serverData.interface.SvTell(admin_id, self._messagePrefix + "^2No tracked IPs found.")
+                        Log.info(f"Admin {playerName} (SMOD ID: {smodID}) requested tracked IPs - none found")
+                        return False
+
+                    # Send header
+                    self._serverData.interface.SvTell(admin_id, self._messagePrefix + f"^5Tracked IPs ({len(tracking_data)} total):")
+
+                    # Send each tracked IP with details
+                    for ip, data in tracking_data.items():
+                        last_name = data.get("lastSeenName", "Unknown")
+                        marked_tk = "^1YES" if data.get("markedTK", False) else "^2NO"
+                        muted = "^1YES" if data.get("muted", False) else "^2NO"
+
+                        msg = f"^7IP: ^5{ip} ^7| Name: ^3{last_name} ^7| MarkedTK: {marked_tk} ^7| Muted: {muted}"
+                        self._serverData.interface.SvTell(admin_id, msg)
+
+                    Log.info(f"Admin {playerName} (SMOD ID: {smodID}) requested tracked IPs - sent {len(tracking_data)} entries")
+                    return False
+
         except Exception as e:
             Log.error(f"Error in OnSmsay: {e}")
             return False

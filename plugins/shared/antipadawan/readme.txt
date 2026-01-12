@@ -159,12 +159,40 @@ The plugin tracks admin-applied marks to prevent accidentally clearing them:
   * /smod smsay !gfmute <playername> <duration> - Mute player and track it
   * /smod smsay !gfunmarktk <playername> - Unmark player and remove tracking
   * /smod smsay !gfunmute <playername> - Unmute player and remove tracking
+  * /smod smsay !padawanips - Show all tracked plugin penalties (sent via SvTell to admin only)
 - Plugin will NOT clear marks on players who have active admin-tracked marks
 - Admin marks automatically expire after their duration
 - In-memory tracking format: { "player_ip": { "marktk": {...}, "mute": {...} } }
 - Each entry contains: { "expires": timestamp, "duration": minutes, "admin_name": str, "admin_ip": str }
 - This ensures legitimate admin marks are never cleared by the plugin's auto-unmark feature
 - Admin tracking is cleared on godfinger/server restart (in-memory only, not persisted)
+
+ADMIN COMMANDS:
+All admin commands are executed via /smod smsay:
+
+!gfmarktk <playername> <duration>
+  - Marks the player for teamkilling for specified duration (in minutes)
+  - Tracks the mark to prevent plugin from auto-clearing it
+  - Example: /smod smsay !gfmarktk Padawan 60
+
+!gfmute <playername> <duration>
+  - Mutes the player for specified duration (in minutes)
+  - Tracks the mute to prevent plugin from auto-clearing it
+  - Example: /smod smsay !gfmute Padawan 30
+
+!gfunmarktk <playername>
+  - Removes TK mark from player and clears admin tracking
+  - Example: /smod smsay !gfunmarktk Padawan
+
+!gfunmute <playername>
+  - Unmutes player and clears admin tracking
+  - Example: /smod smsay !gfunmute Padawan
+
+!padawanips
+  - Shows all tracked plugin penalties (IPs with blocked names)
+  - Sent privately to the admin via SvTell
+  - Displays: IP address, last seen name, MarkedTK status, Muted status
+  - Example: /smod smsay !padawanips
 
 EXAMPLES:
 
