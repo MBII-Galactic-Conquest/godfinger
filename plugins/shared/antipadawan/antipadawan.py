@@ -205,6 +205,42 @@ class AntiPadawan():
             player_id = client.GetId()
             player_name = client.GetName()
 
+            # First, check if this IP has active admin penalties that need to be re-applied
+            if player_ip in self._admin_tracking:
+                # Re-apply admin marktk if active
+                if "marktk" in self._admin_tracking[player_ip]:
+                    if time.time() < self._admin_tracking[player_ip]["marktk"]["expires"]:
+                        duration = self._admin_tracking[player_ip]["marktk"]["duration"]
+                        admin_name = self._admin_tracking[player_ip]["marktk"]["admin_name"]
+                        try:
+                            self._serverData.interface.MarkTK(player_id, duration)
+                            Log.info(f"Re-applied admin marktk to {player_name} (IP: {player_ip}) - {duration} min remaining (applied by {admin_name})")
+                        except Exception as e:
+                            Log.error(f"Failed to re-apply admin marktk to {player_id}: {e}")
+                    else:
+                        # Expired, clean up
+                        del self._admin_tracking[player_ip]["marktk"]
+                        if not self._admin_tracking[player_ip]:
+                            del self._admin_tracking[player_ip]
+                        Log.info(f"Admin marktk for {player_ip} has expired")
+
+                # Re-apply admin mute if active
+                if player_ip in self._admin_tracking and "mute" in self._admin_tracking[player_ip]:
+                    if time.time() < self._admin_tracking[player_ip]["mute"]["expires"]:
+                        duration = self._admin_tracking[player_ip]["mute"]["duration"]
+                        admin_name = self._admin_tracking[player_ip]["mute"]["admin_name"]
+                        try:
+                            self._serverData.interface.ClientMute(player_id, duration)
+                            Log.info(f"Re-applied admin mute to {player_name} (IP: {player_ip}) - {duration} min remaining (applied by {admin_name})")
+                        except Exception as e:
+                            Log.error(f"Failed to re-apply admin mute to {player_id}: {e}")
+                    else:
+                        # Expired, clean up
+                        del self._admin_tracking[player_ip]["mute"]
+                        if not self._admin_tracking[player_ip]:
+                            del self._admin_tracking[player_ip]
+                        Log.info(f"Admin mute for {player_ip} has expired")
+
             # Check if this IP was previously penalized
             if player_ip in self._tracking:
                 # Check if their current name is allowed

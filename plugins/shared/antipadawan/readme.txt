@@ -143,27 +143,52 @@ For actions that apply penalties but allow continued play (MarkTK or MarkTK+Mute
 
 ANTI-ABUSE PROTECTION:
 To prevent exploits that could clear legitimate admin-applied penalties:
-- Penalties can ONLY be removed by disconnecting and rejoining (not in-game name changes)
-- The unmarktk command clears ALL marks on a player, not just plugin-applied marks
+- Plugin penalties can ONLY be removed by disconnecting and rejoining (not in-game name changes)
+- The unmarktk/unmute commands clear ALL marks on a player, not just plugin-applied ones
 - If we allowed in-game name changes to clear marks, players could exploit:
   Example exploit: Admin marks player → Player changes to "Padawan" → Plugin marks again →
   Player changes to "GoodName" → Plugin calls unmarktk → Admin's legitimate mark is cleared!
 - By requiring disconnect/rejoin, players cannot exploit the system to clear admin marks
 - Players changing TO blocked names in-game ARE still penalized (and must rejoin to clear)
 
+ADMIN PENALTY PERSISTENCE:
+- Admin penalties applied via !gfmarktk or !gfmute are tracked by player IP
+- When a tracked player disconnects and rejoins (even with a different name):
+  * The plugin automatically re-applies their admin penalties
+  * Duration is preserved (e.g., if 45 min remain, re-applied for 45 min)
+  * Logs show who originally applied the penalty
+- This prevents players from escaping admin penalties by:
+  * Changing their name
+  * Rejoining the server
+  * Switching to different aliases
+- Admin penalties persist until:
+  * They expire naturally after their duration
+  * An admin manually removes them with !gfunmarktk or !gfunmute
+  * The server/godfinger restarts (admin tracking is in-memory only)
+
 ADMIN MARK TRACKING:
-The plugin tracks admin-applied marks to prevent accidentally clearing them:
+The plugin tracks admin-applied marks/mutes to prevent accidentally clearing them and to persist them across reconnects:
 - Admin marks/mutes are tracked in-memory only (cleared on godfinger restart)
 - Admins should use the special !gf commands to apply marks/mutes that the plugin tracks:
   * /smod smsay !gfmarktk <playername> <duration> - Mark player for TK and track it
   * /smod smsay !gfmute <playername> <duration> - Mute player and track it
   * /smod smsay !gfunmarktk <playername> - Unmark player and remove tracking
   * /smod smsay !gfunmute <playername> - Unmute player and remove tracking
-  * /smod smsay !padawanips - Show all tracked plugin penalties (sent via SvTell to admin only)
-- Plugin will NOT clear marks on players who have active admin-tracked marks
-- Admin marks automatically expire after their duration
+  * /smod smsay !padawanips - Show all tracked plugin penalties (sent to smod chat)
+  * /smod smsay !kickpadawans - Kick all players with blocked names
+
+KEY FEATURES:
+- Admin penalties PERSIST across reconnects: When a player with an admin mark/mute disconnects
+  and rejoins (even with a different name), the plugin automatically re-applies the penalty
+- Plugin will NOT clear penalties on players who have active admin-tracked marks/mutes
+- Admin penalties automatically expire after their duration
+- Players can change their name but admin penalties remain until expired or manually removed
+- Use !gfunmarktk or !gfunmute to manually remove penalties and clear tracking
+
+TECHNICAL DETAILS:
 - In-memory tracking format: { "player_ip": { "marktk": {...}, "mute": {...} } }
 - Each entry contains: { "expires": timestamp, "duration": minutes, "admin_name": str, "admin_ip": str }
+- On player reconnect, plugin checks for active admin penalties and re-applies them
 - This ensures legitimate admin marks are never cleared by the plugin's auto-unmark feature
 - Admin tracking is cleared on godfinger/server restart (in-memory only, not persisted)
 
@@ -190,7 +215,7 @@ All admin commands are executed via /smod smsay:
 
 !padawanips
   - Shows all tracked plugin penalties (IPs with blocked names)
-  - Sent privately to the admin via SvTell
+  - Sent to smod chat (visible to all admins)
   - Displays: IP address, last seen name, MarkedTK status, Muted status
   - Example: /smod smsay !padawanips
 
@@ -262,6 +287,46 @@ EXAMPLES:
        "detectedWord": "padawan"
    }
    Result: Still supports legacy "detectedWord" (string) format for backwards compatibility
+
+ADMIN COMMAND SCENARIOS:
+
+Scenario A: Griefer with good name
+   1. Player "Griefer" team kills repeatedly
+   2. Admin: /smod smsay !gfmarktk Griefer 60
+   3. Player marked for 60 minutes + tracked in admin tracking
+   4. Player leaves and rejoins as "NewName"
+   5. Plugin re-applies mark for remaining duration
+   6. Player still marked even with different name!
+   7. After 60 minutes, mark expires and tracking is cleared
+
+Scenario B: Mixed plugin + admin penalties
+   1. Player joins as "Padawan" → Plugin applies marktk/mute (action 3)
+   2. Admin sees griefing behavior: /smod smsay !gfmarktk Padawan 30
+   3. Player now has BOTH plugin penalty + admin penalty
+   4. Player leaves and rejoins as "GoodName"
+   5. Plugin removes plugin penalties (name is now allowed)
+   6. Plugin re-applies admin mark (30 min remaining)
+   7. Result: Plugin penalties cleared, admin mark persists!
+
+Scenario C: Admin removes penalty early
+   1. Admin: /smod smsay !gfmarktk Griefer 60
+   2. Player marked + tracked
+   3. Player apologizes and behaves
+   4. Admin: /smod smsay !gfunmarktk Griefer
+   5. Mark removed + admin tracking cleared
+   6. Player rejoins → No penalties applied
+
+Scenario D: Checking tracked IPs
+   1. Admin: /smod smsay !padawanips
+   2. Shows all IPs with plugin penalties (blocked names)
+   3. Displays IP, last name, marktk status, mute status
+   4. Sent to smod chat (visible to all admins)
+
+Scenario E: Mass kick blocked names
+   1. Multiple players join with "Padawan", "Padawan[1]", etc.
+   2. Admin: /smod smsay !kickpadawans
+   3. All players with blocked names kicked
+   4. Public announcement shows count and strict/loose mode
 
 LOGGING:
 The plugin logs to the Godfinger log file with these levels:
