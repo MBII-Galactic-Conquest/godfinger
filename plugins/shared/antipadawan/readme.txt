@@ -194,6 +194,12 @@ All admin commands are executed via /smod smsay:
   - Displays: IP address, last seen name, MarkedTK status, Muted status
   - Example: /smod smsay !padawanips
 
+!kickpadawans
+  - Kicks all players currently on the server with blocked names
+  - Uses the strictMatch config setting to determine matching behavior
+  - Publicly announces how many players were kicked and which mode was used
+  - Example: /smod smsay !kickpadawans
+
 EXAMPLES:
 
 1. Default Setup (MarkTK Warning):

@@ -576,6 +576,38 @@ class AntiPadawan():
                     Log.info(f"Admin {playerName} (SMOD ID: {smodID}) requested tracked IPs - sent {len(tracking_data)} entries")
                     return False
 
+                # !kickpadawans - Kick all players with blocked names
+                elif command == "!kickpadawans":
+                    # Get all connected clients
+                    all_clients = self._serverData.API.GetAllClients()
+                    kicked_players = []
+
+                    # Check each client for blocked name
+                    for cl in all_clients:
+                        if self._IsPadawanName(cl):
+                            player_name = cl.GetName()
+                            player_id = cl.GetId()
+
+                            # Kick the player
+                            try:
+                                self._serverData.interface.ClientKick(player_id)
+                                kicked_players.append(player_name)
+                                Log.info(f"Admin {playerName} kicked {player_name} (ID: {player_id}) via !kickpadawans")
+                            except Exception as e:
+                                Log.error(f"Failed to kick player {player_id}: {e}")
+
+                    # Report results
+                    if kicked_players:
+                        kicked_count = len(kicked_players)
+                        strict_mode = "strict" if self.config.cfg.get("strictMatch", True) else "loose"
+                        self._serverData.interface.SvSay(self._messagePrefix + f"^1Admin kicked {kicked_count} player(s) with blocked names (^5{strict_mode} mode^1)")
+                        Log.info(f"Admin {playerName} (SMOD ID: {smodID}) kicked {kicked_count} players: {', '.join(kicked_players)}")
+                    else:
+                        self._serverData.interface.SvSay(self._messagePrefix + "^2No players with blocked names found.")
+                        Log.info(f"Admin {playerName} (SMOD ID: {smodID}) used !kickpadawans - no players to kick")
+
+                    return False
+
         except Exception as e:
             Log.error(f"Error in OnSmsay: {e}")
             return False
