@@ -27,7 +27,12 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 ### `RTVPrefix`
 - **Description**: Command prefix for RTV/RTM commands.
 - **Example**: `"!"`
-- **Notes**: Set to `false` to disable prefix requirements.
+- **Notes**: Set to "" to disable prefix requirements.
+
+### `caseSensitiveCommands`
+- **Description**: Whether command matching should be case-sensitive.
+- **Possible Values**: true or false
+- **Example**: false
 
 ### `requirePrefix`
 - **Description**: Whether commands must include the prefix to be recognized.
@@ -39,6 +44,11 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - **Possible Values**: `true` or `false`
 - **Example**: `true`
 
+### `protectedNames`
+- **Description**: List of protected names (e.g., "admin", "server"). Case insensitive.
+- **Possible Values**: Any string value
+- **Example**: ["admin", "server"]
+
 ### `useSayOnly`
 - **Description**: Whether to use `say` instead of `svsay` for messages.
 - **Possible Values**: `true` or `false`
@@ -46,15 +56,32 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 
 ### `floodProtection`
 - **Description**: Configuration for flood protection.
-  - `enabled`: Whether flood protection is enabled.
+  - `enabled`: Whether flood protection is enabled. If `true`, each player will have a timer set to `seconds` seconds every time they say a command, during which they may not issue other commands. Timers are per player, so all players can use the plugin simultaneously without waiting.
+  - `soft` : If set to true, only enforces flood protection on the last command sent. This may help with usability but it will also make it easier for players to spam chat by alternating commands.
   - `seconds`: Time window in seconds for flood protection checks.
   - **Example**:
     ```json
     "floodProtection" : {
-        "enabled" : false,
-        "seconds" : 0
+        "enabled" : true,
+        "soft" : false,
+        "seconds" : 1.5
     }
     ```
+
+### `maxMapPageSize`
+- **Description**: Maximum size (in characters) of each page for map list commands.
+- **Possible Values**: Any valid number
+- **Example**: 950
+
+### `maxSearchPageSize`
+- **Description**: Maximum size (in characters) of each page for search results.
+- **Possible Values**: Any valid number
+- **Example**: 950
+
+### `showVoteCooldownTime`
+- **Description**: The cooldown time for the `!showvote`/`!showrtv` command. Can be set to 0 to disable.
+- **Possible Values**: Any valid number (with or without decimals)
+- **Example**: 30 (the showvote command will be disabled for all players for 30 seconds)
 
 ## RTV (Rock the Vote) Configuration
 
@@ -63,9 +90,9 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - `voteTime`: Time in seconds for the vote to last.
 - `voteAnnounceTimer`: How often to announce vote progress in seconds.
 - `voteRequiredRatio`: Minimum ratio of players needed to start a vote.
-- `automaticMaps`: Whether to automatically include all maps or use custom lists.
-- `primaryMaps` and `secondaryMaps`: Lists of maps to use for voting.
-- `useSecondaryMaps`: Whether to include secondary maps in voting (0 = none, 1 = some, 2 = all).
+- `automaticMaps`: Whether to automatically include all maps or use primary and (optionally) secondary lists.
+- `primaryMaps` and `secondaryMaps`: Lists of maps to use for voting. Primary maps are always able to be nominated and randomly selected for map votes. Secondary maps are subject to the settings below.
+- `useSecondaryMaps`: Whether to include secondary maps in voting (0 = none, 1 = secondary maps can be nominated but not randomly selected, 2 = secondary maps can be nominated and randomly selected).
 - `mapBanList`: List of maps that cannot be nominated or voted for.
 
 ### Advanced Settings
@@ -80,6 +107,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - `minimumVoteRatio`: Minimum participation ratio required for a valid vote.
 - `successTimeout` and `failureTimeout`: Cooldown periods after successful or failed votes.
 - `disableRecentlyPlayedMaps`: Time in seconds to avoid repeating recently played maps.
+- `disableRecentMapNomination`: Whether or not a recently played map can be nominated.
 - `skipVoting`: Whether to skip voting once majority is reached.
 - `secondTurnVoting`: Whether to allow second-round voting in case of ties.
 - `changeImmediately`: Whether to change maps immediately when a vote passes.
@@ -91,7 +119,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
 - `voteTime`: Time in seconds for the vote to last.
 - `voteAnnounceTimer`: How often to announce vote progress in seconds.
 - `voteRequiredRatio`: Minimum ratio of players needed to start a vote.
-- `modes_enabled`: List of game modes available for voting.
+- `modes_enabled`: List of game modes available for voting. These can be any of Open, Semi Authentic (broken as of writing this), Duel, Full Authentic, or Legends.
 - `emptyServerMode`: Mode to switch to when the server is empty.
 
 ### Advanced Settings
@@ -109,6 +137,7 @@ This document explains the configuration options for the RTV/RTM plugin for the 
    - `!rtm` or `!rockthemode`: Start an RTM vote.
    - `!nominate <map>`: Nominate a map for the next RTV vote.
    - `!maplist <#>`: Display the server's map list (paginated).
+   - `!nomlist` or `!noml` : Display list of current nominations. 
    - `!search <query>`: Search for maps by name.
    - `!help`: Display help for commands.
 

@@ -1,9 +1,12 @@
 import socket;
+import logging
 import sys;
 import time;
 import lib.shared.timeout as  timeout;
 import lib.shared.buffer as buffer;
 import threading;
+
+Log = logging.getLogger(__name__)
 
 class RCON(object):
     def __init__(self, address, bindAddr, password):
@@ -69,7 +72,7 @@ class RCON(object):
                 try:
                     result += self._sock.recv(count);
                 except socket.timeout:
-                        break;
+                    break;
         self._bytesRead += len(result);
         return result;
     
@@ -129,6 +132,8 @@ class RCON(object):
                     try:
                         self._Send(payload);
                         if not self._ReadResponse(responseSize, timeout):
+                            Log.warn(f'Message with payload {str(payload)} not received after {timeout} seconds, will attempt to resend.')
+                            timeout *= 2;
                             continue;
                         else:
                             result = self._PopUnread();
@@ -178,7 +183,7 @@ class RCON(object):
     def ClientMute(self, player_id : int, minutes : int = 10):
         """ Mutes the client with the given ID for the given number of minutes, or 10 minutes if no duration is given. The number of minutes must be between 1-60, inclusive. """
         if 0 < minutes <= 60:   # rcon mute must be between
-            return self.Request(b"\xff\xff\xff\xffrcon %b mute %i %i" % (self._password, player_id))
+            return self.Request(b"\xff\xff\xff\xffrcon %b mute %i %i" % (self._password, player_id, minutes))
         return None
   
     def ClientUnmute(self, player_id):
@@ -304,13 +309,13 @@ class RCON(object):
         res = res.decode("UTF-8", "ignore");
         return res
     
-    def DumpUser(self, id) -> str:
-        if not type(id) == bytes:
-            id = bytes(str(id), "UTF-8") 
-            res = self.Request(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self._password, id));
-            if res != None and len(res) > 0:
-                res = res.decode("UTF-8", "ignore");
-            return res;
+    def DumpUser(self, user_id) -> str:
+        if not type(user_id) == bytes:
+            user_id = bytes(str(user_id), "UTF-8") 
+        res = self.Request(b"\xff\xff\xff\xffrcon %b dumpuser %b" % (self._password, user_id));
+        if res != None and len(res) > 0:
+            res = res.decode("UTF-8", "ignore");
+        return res;
   
     def _CvarListParser(self, bb : bytes) -> bool:
         return True if bb.decode("UTF-8", "ignore").rfind("total cvars") != -1 else False;
@@ -359,3 +364,31 @@ class RCON(object):
         if not type(msg) == bytes:
             msg = bytes(msg, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b smsay %s" % (self._password, msg));
+
+    def ExecFile(self, filename : str, quiet : bool = False):
+        """
+        Executes a script file with the given filename.
+        If the filename does not have a file extension, .cfg will be added to the end of the filename.
+        The file must be in the /MBII/ directory prior to the server starting. After the file is indexed
+        by the server however, the contents can be changed and changes will be reflected.
+        """
+        if not type(filename) == bytes:
+            filename = bytes(filename, "UTF-8")
+        if quiet:
+            cmd = b'execq'
+        else:
+            cmd = b'exec'
+        return self.Request(b"\xff\xff\xff\xffrcon %b %b %b" % (self._password, cmd, filename))
+
+    def MarkTK(self, player_id : int, time : int):
+        if not type(player_id) == bytes:
+            player_id = bytes(str(player_id), "UTF-8")
+        if not type(time) == bytes:
+            time = bytes(str(time), "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b marktk %b %b" % (self._password, player_id, time))
+
+    def UnmarkTK(self, player_id : int):
+        # unmarktk <client> - Removes TK mark from specified client
+        if not type(player_id) == bytes:
+            player_id = bytes(str(player_id), "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b unmarktk %b" % (self._password, player_id))

@@ -1,6 +1,9 @@
+import logging
 import lib.shared.teams as teams;
 import threading;
+from lib.shared.timeout import Timeout
 
+log = logging.getLogger(__name__)
 
 class Client(object):
     def __init__(self, id : int, name : str, address : str):
@@ -12,6 +15,9 @@ class Client(object):
         self._teamId = teams.TEAM_SPEC;
         self._jaguid = "";
         self._userinfo = {};
+        self._lastNonSpecTeamId = None;
+        self._floodProtectionCooldown = Timeout()
+        self._lastCommand = None
     
     def GetId(self) -> int:
         return self._id;
@@ -30,6 +36,9 @@ class Client(object):
 
     def GetInfo(self) -> dict[str, str]:
         return self._userinfo;
+
+    def GetLastNonSpecTeamId(self) -> int:
+        return self._lastNonSpecTeamId;
 
     def __repr__(self):
         s = f"{self._name} (ID : {str(self._id)}) (Name : {self._name}) (TeamId : {self._teamId})";
@@ -52,16 +61,15 @@ class Client(object):
     mbc - current class
     """
     
-    def Update(self, data : str):
-        data = data.split("\\")
-        for i in range(0, len(data), 2):
-            key = data[i]
-            value = data[i+1]
+    def Update(self, data : dict[str, str]):
+        for key, value in data.items():
             if key == "n" and self._name != value:
                 # logMessage(f"Client {self} has changed their name to {value}")
                 self._name = value
             if key == "t" and (teams.TranslateTeam(int(self._teamId)) != teams.TranslateTeam(int(value)) or self._teamId == None):
-                if teams.TranslateTeam(int(value)) != "s":     # ignore spectator since the game switches your team to spectator at the beginning of each round, messing with voting.
-                    self._teamId = int(value)
-                    # logMessage(f"Client {self} has joined team {self._teamId}")
+                # if teams.TranslateTeam(int(value)) != "s":     # ignore spectator since the game switches your team to spectator at the beginning of each round, messing with voting.
+                self._teamId = int(value)
+                log.info(f"Client {self} has joined team {self._teamId}")
+                if self._teamId != teams.TEAM_SPEC:
+                    self._lastNonSpecTeamId = self._teamId
             self._userinfo[key] = value

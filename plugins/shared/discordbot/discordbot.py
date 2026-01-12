@@ -1,5 +1,7 @@
 import lib.shared.serverdata as serverdata
+import lib.shared.colors as colors
 import threading
+import logging
 import asyncio
 import discord
 import os
@@ -8,11 +10,17 @@ import re
 from dotenv import load_dotenv
 from datetime import datetime
 
+# Initialize the Logger
+Log = logging.getLogger(__name__)
+
 # Global variables
 SERVER_DATA = None
-BIGDATA_LOG = os.path.join("./", 'bigdata.log')
+BIGDATA_LOG = None
 last_position = 0  # Tracks the last read position of the log file
 last_sent_message = ""  # Store the last sent message to prevent re-sending
+bot_thread = None
+shutdown_event = threading.Event()
+log_watcher_task = None
 
 # Define intents to specify what events the bot will listen to
 intents = discord.Intents.default()
@@ -31,9 +39,14 @@ DISCORD_THREAD_ID = None
 ADMIN_ROLE_ID = None
 USE_THREAD = False
 
+class discordBotPlugin(object):
+    def __init__(self, serverData : serverdata.ServerData) -> None:
+        self._serverData : serverdata.ServerData = serverData
+        self._messagePrefix = colors.ColorizeText("[DISC]", "lblue") + ": "
+
 # Load environment variables
 def load_env_variables():
-    global DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, DISCORD_CHANNEL_ID, DISCORD_THREAD_ID, USE_THREAD
+    global DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, DISCORD_CHANNEL_ID, DISCORD_THREAD_ID, USE_THREAD, ADMIN_ROLE_ID
     env_file = os.path.join(os.path.dirname(__file__), "discordbot.env")
     if not os.path.exists(env_file):
         print(f"{env_file} not found. Creating one...")
@@ -66,20 +79,39 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
     print("Initializing discordbot plugin!")
     SERVER_DATA = serverData  # Store server data
 
+    logMode = logging.INFO
+    if serverData.args.debug:
+        logMode = logging.DEBUG
+    if serverData.args.logfile != "":
+        logging.basicConfig(
+        filename=serverData.args.logfile,
+        level=logMode,
+        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+    else:
+        logging.basicConfig(
+        level=logMode,
+        format='%(asctime)s %(levelname)08s %(name)s %(message)s')
+    global BIGDATA_LOG
+    BIGDATA_LOG = serverData.args.logfile
     # Load environment variables
     load_env_variables()
 
     if exports is not None:
         pass  # Export data if needed
 
+    global PluginInstance
+    PluginInstance = discordBotPlugin(serverData)
+
     return True  # Indicate plugin load success
 
 # Called once when the platform starts
 def OnStart():
+    global bot_thread
     if DISCORD_BOT_TOKEN and DISCORD_BOT_TOKEN.lower() != "your_token_here":
-        threading.Thread(target=start_discord_bot_thread, daemon=True).start()
-        threading.Thread(target=watch_bigdata_log, daemon=True).start()
-        print("Discord bot thread and log monitoring started!")
+        # Start Discord bot in a separate thread to avoid blocking the main application
+        bot_thread = threading.Thread(target=start_discord_bot_thread, daemon=True)
+        bot_thread.start()
+        print("Discord bot thread started!")
     else:
         print("Discord bot token is missing. Bot will not start.")
     return True
@@ -90,12 +122,54 @@ async def start_discord_bot():
 
 # Start Discord bot in a separate thread
 def start_discord_bot_thread():
+    # Create a new event loop for this thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(start_discord_bot())
+    # Run the Discord bot until it completes (e.g., disconnects)
+    try:
+        loop.run_until_complete(client.start(DISCORD_BOT_TOKEN))
+    except Exception as e:
+        print(f"Error starting Discord bot: {e}")
+    finally:
+        loop.run_until_complete(client.close())
+        loop.stop()
+        loop.close()
 
-# Monitor the bigdata.log file for new lines
-def watch_bigdata_log():
+def stop_bot_thread():
+    global bot_thread, log_watcher_task
+    if bot_thread and bot_thread.is_alive():
+        Log.info("Signaling Discord bot thread to shut down...")
+        shutdown_event.set()  # Signal the log watcher to stop
+
+        if log_watcher_task:
+            Log.info("Cancelling log watcher task...")
+            # Schedule cancellation on the client's event loop
+            future_cancel = asyncio.run_coroutine_threadsafe(log_watcher_task.cancel(), client.loop)
+            try:
+                future_cancel.result(timeout=1) # Wait briefly for cancellation
+                Log.info("Log watcher task cancelled.")
+            except asyncio.TimeoutError:
+                Log.error("Timed out waiting for log watcher task to cancel.")
+            except Exception as e:
+                Log.error(f"Error during log watcher cancellation: {e}")
+            log_watcher_task = None
+
+        future = asyncio.run_coroutine_threadsafe(client.close(), client.loop)
+        try:
+            future.result(timeout=5)  # Wait for the client to close with a timeout
+        except asyncio.TimeoutError:
+            Log.error("Timed out waiting for bot client to close gracefully.")
+        except Exception as e:
+            Log.error(f"Error during bot shutdown: {e}")
+        bot_thread.join(timeout=5)  # Wait for the thread to finish
+        if bot_thread.is_alive():
+            Log.debug("Warning: Discord bot thread did not terminate.")
+        else:
+            Log.info("Discord bot thread has been shut down.")
+        bot_thread = None
+
+# Asynchronous function to monitor the bigdata.log file for new lines
+async def async_watch_bigdata_log():
     global last_position, last_sent_message
     while True:
         try:
@@ -110,16 +184,25 @@ def watch_bigdata_log():
                 filtered_message = filter_message(message)
 
                 # Only send new lines (i.e., additions to the log)
-                if filtered_message != last_sent_message:
+                if filtered_message and filtered_message != last_sent_message:
                     last_sent_message = filtered_message  # Store the latest message sent
-                    asyncio.run_coroutine_threadsafe(send_to_discord(filtered_message), client.loop)
+                    await send_to_discord(filtered_message)
 
         except FileNotFoundError:
             print(f"{BIGDATA_LOG} not found. Waiting for the file to be created...")
         except Exception as e:
             print(f"Error monitoring log file: {e}")
 
-        time.sleep(1)  # Poll every 1 second
+        await asyncio.sleep(1)  # Poll every 1 second asynchronously
+
+# Event handler for when the bot is ready
+@client.event
+async def on_ready():
+    print(f'Logged in as {client.user} (ID: {client.user.id})')
+    print('------')
+    # Start the asynchronous log watcher as a background task
+    asyncio.create_task(async_watch_bigdata_log())
+    log_watcher_task = asyncio.create_task(async_watch_bigdata_log())
 
 # Function to filter out Discord or HTTP-related lines
 def filter_message(message):
@@ -197,8 +280,8 @@ async def send_part_to_discord(part):
         # Check if the message contains !admin
         if '!admin' in part.lower():
             # If the message has !admin, send it without a code block
-			# Will need svsay message to declare admins are informed. ::!IMPORTANT!::
-			# Will need sleep timer until admin can be called again. ::!IMPORTANT!::
+            # Will need svsay message to declare admins are informed. ::!IMPORTANT!::
+            # Will need sleep timer until admin can be called again. ::!IMPORTANT!::
             message_to_send = f"<@&{ADMIN_ROLE_ID}>\n\n```{part}```"
         else:
             # Send in code block for readability
@@ -229,8 +312,14 @@ def OnLoop():
 
 # Called before the plugin is unloaded by the system
 def OnFinish():
+    stop_bot_thread()
     pass
 
 # Called from the system on some event raising
 def OnEvent(event) -> bool:
     return False
+
+if __name__ == "__main__":
+    print("This is a plugin for the Godfinger Movie Battles II plugin system. Please run one of the start scripts in the start directory to use it. Make sure that this python module's path is included in godfingerCfg!")
+    input("Press Enter to close this message.")
+    exit()

@@ -38,7 +38,7 @@
 # Godfinger contributors:
 # 2cwldys (https://github.com/2cwldys),
 # ACHUTA/Mantlar, (https://github.com/mantlar)
-# ViceDice, (https://github.com/2cwldys)
+# ViceDice, (https://github.com/ViceDice)
 # Wookiee- (https://github.com/Wookiee-)
 #
 # RTV plugin created by ACHUTA
@@ -49,6 +49,7 @@ from enum import Enum, auto
 import json
 import logging
 import os
+import re
 from math import ceil, floor
 from random import sample
 from time import sleep, time
@@ -65,152 +66,131 @@ import lib.shared.colors as colors
 from lib.shared.player import Player
 from lib.shared.timeout import Timeout
 
+Log = logging.getLogger(__name__)
+
 # Global server data instance
 SERVER_DATA = None
 
 # Configuration file paths and defaults
-DEFAULT_CFG_PATH = os.path.join(os.path.dirname(__file__), "rtvConfig.json")
-DEFAULT_CFG = config.Config.fromJSON(DEFAULT_CFG_PATH)
+DEFAULT_CFG_JSON = os.path.join(os.path.dirname(__file__), "rtvConfig.json")
+DEFAULT_CFG_YAML = os.path.join(os.path.dirname(__file__), "rtvConfig.yaml")
+DEFAULT_CFG = None
 
 # Fallback configuration if config file doesn't exist
-CONFIG_FALLBACK = \
-"""{
+CONFIG_FALLBACK = '''{
     "MBIIPath": "your/mbii/path/here",
-    "pluginThemeColor" : "green",
+    "pluginThemeColor": "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
-    "requirePrefix" : false,
-    "kickProtectedNames" : true,
-    "useSayOnly" : false,
-    "floodProtection" :
-    {
-        "enabled" : false,
-        "seconds" : 0
+    "caseSensitiveCommands": false,
+    "requirePrefix": false,
+    "protectedNames": ["admin", "server"],
+    "kickProtectedNames": true,
+    "useSayOnly": false,
+    "showVoteCooldownTime": 5,
+    "maxMapPageSize": 950,
+    "maxSearchPageSize": 950,
+    "rtv": {
+        "enabled": true,
+        "voteTime": 180,
+        "voteAnnounceTimer": 30,
+        "voteRequiredRatio": 0.5,
+        "automaticMaps": true,
+        "primaryMaps": [],
+        "secondaryMaps": [],
+        "useSecondaryMaps": 1,
+        "mapBanList": [
+            "yavin1", "yavin1b", "yavin2", "vjun1", "vjun2", "vjun3",
+            "taspir1", "taspir2", "t1_danger", "t1_fatal", "t1_inter",
+            "t1_rail", "t1_sour", "t1_surprise", "t2_wedge", "t2_trip",
+            "t2_rogue", "t2_rancor", "t2_dpred", "t3_bounty", "t3_byss",
+            "t3_hevil", "t3_rift", "t3_stamp", "kor1", "kor2", "hoth3",
+            "hoth2", "academy1", "academy2", "academy3", "academy4",
+            "academy5", "academy6"
+        ],
+        "mapTypePriority": {
+            "enabled": true,
+            "primary": 2,
+            "secondary": 0,
+            "nochange": 1
+        },
+        "allowNominateCurrentMap": false,
+        "emptyServerMap": {
+            "enabled": true,
+            "map": "mb2_dotf_classicb"
+        },
+        "timeLimit": {
+            "enabled": false,
+            "seconds": 0
+        },
+        "roundLimit": {
+            "enabled": false,
+            "rounds": 0
+        },
+        "minimumVoteRatio": {
+            "enabled": true,
+            "ratio": 0.1
+        },
+        "successTimeout": 30,
+        "failureTimeout": 60,
+        "disableRecentlyPlayedMaps": 1800,
+        "disableRecentMapNomination": true,
+        "skipVoting": true,
+        "secondTurnVoting": true,
+        "changeImmediately": true
     },
-    "rtv" : 
-    {
-        "enabled" : true,
-        "voteTime" : 180,
-        "voteAnnounceTimer" : 30,
-        "voteRequiredRatio" : 0.5,
-        "automaticMaps" : true,
-        "primaryMaps" : 
-        [
-            
-        ],
-        "secondaryMaps" : 
-        [
-            
-        ],
-        "useSecondaryMaps" : 1,
-        "mapBanList" : 
-        [
-            "yavin1",
-            "yavin1b",
-            "yavin2",
-            "vjun1",
-            "vjun2",
-            "vjun3",
-            "taspir1",
-            "taspir2",
-            "t1_danger",
-            "t1_fatal",
-            "t1_inter",
-            "t1_rail",
-            "t1_sour",
-            "t1_surprise",
-            "t2_wedge",
-            "t2_trip",
-            "t2_rogue",
-            "t2_rancor",
-            "t2_dpred",
-            "t3_bounty",
-            "t3_byss",
-            "t3_hevil",
-            "t3_rift",
-            "t3_stamp",
-            "kor1",
-            "kor2",
-            "hoth3",
-            "hoth2",
-            "academy1",
-            "academy2",
-            "academy3",
-            "academy4",
-            "academy5",
-            "academy6"
-        ],
-        "mapTypePriority" : {
-            "enabled" : true,
-            "primary" : 2,
-            "secondary" : 0,
-            "nochange" : 1
+    "rtm": {
+        "enabled": true,
+        "voteTime": 20,
+        "voteAnnounceTimer": 30,
+        "voteRequiredRatio": 0.5,
+        "modes_enabled": ["Open", "Legends", "Duel", "Full Authentic"],
+        "emptyServerMode": {
+            "enabled": false,
+            "mode": "open"
         },
-        "allowNominateCurrentMap" : false,
-        "emptyServerMap" : 
-        {
-            "enabled" : true,
-            "map" : "mb2_dotf_classicb"
+        "timeLimit": {
+            "enabled": false,
+            "seconds": 0
         },
-        "timeLimit" : 
-        {
-            "enabled" : false,
-            "seconds" : 0
+        "roundLimit": {
+            "enabled": false,
+            "rounds": 0
         },
-        "roundLimit" : 
-        {
-            "enabled" : false,
-            "rounds" : 0
+        "minimumVoteRatio": {
+            "enabled": false,
+            "ratio": 0
         },
-        "minimumVoteRatio" :
-        {
-            "enabled" : true,
-            "ratio" : 0.1
-        },
-        "successTimeout" : 30,
-        "failureTimeout" : 60,
-        "disableRecentlyPlayedMaps" : 1800,
-        "skipVoting" : true,
-        "secondTurnVoting" : true,
-        "changeImmediately" : true
-    },
-    "rtm" : 
-    {
-        "enabled" : true,
-        "voteTime" : 20,
-        "voteAnnounceTimer" : 30,
-        "voteRequiredRatio" : 0.5,
-        "modes_enabled" : ["Open", "Legends", "Duel", "Full Authentic"],
-        "emptyServerMode" : 
-        {
-            "enabled" : false,
-            "mode" : "open"
-        },
-        "timeLimit" : 
-        {
-            "enabled" : false,
-            "seconds" : 0
-        },
-        "roundLimit" : 
-        {
-            "enabled" : false,
-            "rounds" : 0
-        },
-        "minimumVoteRatio" :
-        {
-            "enabled" : false,
-            "ratio" : 0
-        },
-        "successTimeout" : 60,
-        "failureTimeout" : 60,
-        "skipVoting" : true,
-        "secondTurnVoting" : true,
-        "changeImmediately" : true
+        "successTimeout": 60,
+        "failureTimeout": 60,
+        "skipVoting": true,
+        "secondTurnVoting": true,
+        "changeImmediately": true
     }
-}
+}'''
 
-"""
+# Try to load YAML config first, fall back to JSON if not found
+try:
+    if os.path.exists(DEFAULT_CFG_YAML):
+        DEFAULT_CFG = config.Config.from_file(DEFAULT_CFG_YAML, CONFIG_FALLBACK)
+        Log.info(f"Loaded configuration from YAML file: {DEFAULT_CFG_YAML}")
+    elif os.path.exists(DEFAULT_CFG_JSON):
+        DEFAULT_CFG = config.Config.from_file(DEFAULT_CFG_JSON, CONFIG_FALLBACK)
+        Log.info(f"Loaded configuration from JSON file: {DEFAULT_CFG_JSON}")
+    else:
+        # If neither file exists, create a default YAML config
+        DEFAULT_CFG = config.Config.FromString(CONFIG_FALLBACK)
+        with open(DEFAULT_CFG_YAML, 'w', encoding='utf-8') as f:
+            import yaml
+            yaml.dump(json.loads(CONFIG_FALLBACK), f, default_flow_style=False, sort_keys=False)
+        Log.warning(f"No config file found. Created default YAML config at: {DEFAULT_CFG_YAML}")
+except Exception as e:
+    Log.error(f"Error loading configuration: {str(e)}")
+    DEFAULT_CFG = config.Config()
+    DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
+    Log.warning("Using default configuration due to error")
 
+# Map game modes to their internal IDs
 # Map game modes to their internal IDs
 MBMODE_ID_MAP = {
     'open' : 0,
@@ -220,15 +200,15 @@ MBMODE_ID_MAP = {
     'legends' : 4
 }
 
-# Create default config if it doesn't exist
-if DEFAULT_CFG == None:
-    DEFAULT_CFG = config.Config()
+# Final check if we have a valid config
+if not hasattr(DEFAULT_CFG, 'cfg'):
+    Log.error("Failed to initialize configuration. Using default settings.")
     DEFAULT_CFG.cfg = json.loads(CONFIG_FALLBACK)
+    Log.error(f"Could not open config file at {os.path.dirname(__file__) + 'rtvConfig.json, ensure the file is a valid JSON file in the correct file path.'}")
     with open(DEFAULT_CFG_PATH, "wt") as f:
         f.write(CONFIG_FALLBACK)
 
 # Initialize logger
-Log = logging.getLogger(__name__)
 
 class MapPriorityType(Enum):
     """Enumeration for map priority types"""
@@ -272,13 +252,15 @@ class MapContainer(object):
     def __init__(self, mapArray : list[Map], pluginInstance):
         self._mapCount = 0
         self._mapDict = {}
+        self._pages = []
+        self.plugin : RTV = pluginInstance
         
         # Get configuration from plugin instance
-        primaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["primaryMaps"]]
-        secondaryMapList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["secondaryMaps"]]
-        mapBanList = [x.lower() for x in pluginInstance._config.cfg["rtv"]["mapBanList"]]
-        useSecondaryMaps = pluginInstance._config.cfg["rtv"]["useSecondaryMaps"]
-        automaticMaps = pluginInstance._config.cfg["rtv"]["automaticMaps"]
+        primaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["primaryMaps"]]
+        secondaryMapList = [x.lower() for x in self.plugin._config.cfg["rtv"]["secondaryMaps"]]
+        mapBanList = [x.lower() for x in self.plugin._config.cfg["rtv"]["mapBanList"]]
+        useSecondaryMaps = self.plugin._config.cfg["rtv"]["useSecondaryMaps"]
+        automaticMaps = self.plugin._config.cfg["rtv"]["automaticMaps"]
         
         # Process maps based on configuration
         if automaticMaps:
@@ -303,6 +285,7 @@ class MapContainer(object):
                 del self._mapDict[m]
         
         self._mapCount = len(self._mapDict.keys())
+        self._CreatePages()
     
     def GetAllMaps(self) -> list[Map]:
         """Get all available maps"""
@@ -342,6 +325,25 @@ class MapContainer(object):
             if m.lower() == name_lower:
                 return self._mapDict[m]
         return None
+
+    def _CreatePages(self) -> None:
+        """Generate cached pages for map list"""
+        pages = []
+        pageStr = ""
+        for map in self._mapDict.values():
+            if len(pageStr) < self.plugin._config.cfg["maxMapPageSize"]:
+                pageStr += map.GetMapName() + ", "
+            else:
+                pageStr = pageStr[:-2]
+                pages.append(pageStr)
+                pageStr = map.GetMapName() + ", "
+        if len(pageStr) > 2:
+            pages.append(pageStr[:-2])
+        self._pages = pages
+    
+    def GetPageCount(self) -> int:
+        """Get total number of pages"""
+        return len(self._pages)
 
 class RTVVote(object):
     """Base class for handling voting systems (RTV and RTM)"""
@@ -395,16 +397,6 @@ class RTVVote(object):
                 countMax = len(self._playerVotes[i])
             elif len(self._playerVotes[i]) == countMax:
                 winners.append(i)
-        
-        # Handle second turn voting if enabled
-        if PluginInstance._config.cfg[voteType]["secondTurnVoting"] == True and \
-           len(winners) == 1 and \
-           len(self._playerVotes[winners[0]]) <= (self.GetVoterCount() // 2):
-            sortedByVote = list(self._playerVotes)
-            sortedByVote.sort(key = lambda a : len(self._playerVotes[a]))
-            sortedByVote.reverse()  # list is initially sorted with lowest values first
-            winners.append(sortedByVote[1])
-        
         return [self._voteOptions[x - 1] for x in winners] if countMax > 0 else []
 
     def GetVoterCount(self):
@@ -417,13 +409,18 @@ class RTMVote(RTVVote):
     def __init__(self, voteOptions, voteTime=DEFAULT_CFG.cfg["rtm"]["voteTime"], announceCount=1):
         super().__init__(voteOptions, voteTime, announceCount)
 
+class RTVPlayer(player.Player):
+    """ Specialized player class for RTV/RTM, implements RTV/RTM specific player variables  """
+    def __init__(self, cl: client.Client):
+        super().__init__(cl)
+
 class RTV(object):
     """Main class implementing Rock the Vote (RTV) and Rock the Mode (RTM) functionality"""
     def __init__(self, serverData : serverdata.ServerData):
         # Configuration setup
-        self._config : config.Config = DEFAULT_CFG        
+        self._config : config.Config = DEFAULT_CFG
         self._themeColor = self._config.cfg["pluginThemeColor"]
-        self._players : dict[player.Player] = {}
+        self._players : dict[int, RTVPlayer] = {}
         self._serverData : serverdata.ServerData = serverData
         
         # RTV state tracking
@@ -442,7 +439,7 @@ class RTV(object):
             {
                 # Global commands
                 teams.TEAM_GLOBAL : {
-                    ("rtv", "rock the vote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
+                    ("rtv", "rockthevote") : ("!<rtv | rock the vote> - vote to start the next Map vote", self.HandleRTV),
                     ("rtm", "rockthemode") : ("!rtm - vote to start the next RTM vote", self.HandleRTM),
                     ("unrtm", "unrockthemode") : ("!unrtm - revoke your vote to start the next RTM vote", self.HandleUnRTM),
                     ("unrtv", "unrockthevote") : ("!<unrtv | unrockthevote> - cancel your vote to start the next Map vote", self.HandleUnRTV),
@@ -450,8 +447,8 @@ class RTV(object):
                     ("nom", "nominate", "mapnom") : ("!nominate <map> - nominates a map for the next round of voting", self.HandleMapNom),
                     ("nomlist", "nominationlist", "nominatelist", "noml") : ("!nomlist - displays a list of nominations for the next map", self.HandleNomList),
                     ("search", "mapsearch") : ("!search <query> - searches for the given query phrase in the map list", self.HandleSearch),
-                    ('help', "cmds") : ("!help - display help about a given command, or all commands if no command is given", self.HandleHelp),
-                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote)  # handle decimal votes
+                    ("1", "2", "3", "4", "5", "6") : ("", self.HandleDecimalVote),  # handle decimal votes
+                    ("showvote", "showrtv") : ("!showvote - shows the current vote stats if a vote is active", self.HandleShowVote)
                 },
                 # Team-specific commands (only vote commands for other teams)
                 teams.TEAM_EVIL : {
@@ -479,22 +476,30 @@ class RTV(object):
         self._wantsToRTM = []
         self._rtvCooldown = Timeout()
         self._rtmCooldown = Timeout()
-        self._rtvRecentMaps : list[tuple(Map, Timeout)] = []
+        self._rtvRecentMaps : list[tuple[str, Timeout]] = []
         self._rtvToSwitch = None
         self._rtmToSwitch = None
         self._roundTimer = 0
+        self._announceCooldown = Timeout()
         
         # Configure say method based on settings
         if self._config.cfg["useSayOnly"] == True:
             self.SvSay = self.Say
 
-    def Say(self, saystr):
-        """Send message to all players"""
-        return self._serverData.interface.Say(self._messagePrefix + saystr)
+    def Say(self, saystr : str, usePrefix : bool = True):
+        """Send console message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.Say(prefix + saystr)
 
-    def SvSay(self, saystr):
-        """Send server message to all players"""
-        return self._serverData.interface.SvSay(self._messagePrefix + saystr)
+    def SvSay(self, saystr : str, usePrefix : bool = True):
+        """Send chat message to all players"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvSay(prefix + saystr)
+    
+    def SvTell(self, pid: int, saystr : str, usePrefix : bool = True):
+        """Send chat message to one player given their ID"""
+        prefix = self._messagePrefix if usePrefix else ""
+        return self._serverData.interface.SvTell(pid, prefix + saystr)
 
     def _getAllPlayers(self):
         """Get all connected players"""
@@ -538,88 +543,191 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         voteType = "rtm" if type(self._currentVote) == RTMVote else "rtv"
         
-        # Clean up vote tracking
+        self._CleanupVoteTracking(votesInProgress)
+        
+        if not self._CheckVoteParticipationThreshold(voteType):
+            return None
+        
+        winners = self._DetermineWinners(voteType)
+        
+        if len(winners) == 1:
+            self._HandleSingleWinner(winners[0], voteType)
+        elif len(winners) > 1:
+            self._HandleTiebreaker(winners, voteType)
+        else:
+            self._HandleNoVotes(voteType)
+
+    def _CleanupVoteTracking(self, votesInProgress):
+        """Clean up vote tracking state"""
         if votesInProgress == None:
             self._serverData.SetServerVar("votesInProgress", [])
         elif "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
+
+    def _CheckVoteParticipationThreshold(self, voteType: str) -> bool:
+        """Check if minimum vote participation threshold was met"""
+        if not self._config.cfg[voteType]["minimumVoteRatio"]["enabled"]:
+            return True
         
-        # Check vote participation threshold
-        if self._config.cfg[voteType]["minimumVoteRatio"]["enabled"] and \
-           len(self._serverData.API.GetAllClients()) > 0 and \
-           (self._currentVote.GetVoterCount() / len(self._serverData.API.GetAllClients())) < \
-           self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]:
-            self.SvSay(f"Vote participation threshold was not met! (Needed {self._config.cfg[voteType]['minimumVoteRatio']['ratio'] * 100} percent)")
+        totalClients = len(self._serverData.API.GetAllClients())
+        if totalClients == 0:
+            return True
+        
+        participationRatio = self._currentVote.GetVoterCount() / totalClients
+        requiredRatio = self._config.cfg[voteType]["minimumVoteRatio"]["ratio"]
+        
+        if participationRatio < requiredRatio:
+            self.SvSay(f"Vote participation threshold was not met! (Needed {requiredRatio * 100} percent)")
             self._currentVote = None
-            # Set appropriate cooldown
-            if type(self._currentVote) == RTMVote:
-                self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
-            else:
-                self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
-            return None
+            self._SetFailureCooldown(voteType)
+            return False
         
-        # Determine winner(s)
+        return True
+
+    def _DetermineWinners(self, voteType: str) -> list:
+        """Determine vote winner(s) with tie resolution"""
         winners = self._currentVote.GetWinners()
         
-        # Apply map priority system for RTV votes
-        if voteType == "rtv" and not self._config.cfg["rtv"]["automaticMaps"] and \
-           self._config.cfg["rtv"]["mapTypePriority"]["enabled"]:
-            priorityMap = {
-                MapPriorityType.MAPTYPE_NOCHANGE : self._config.cfg["rtv"]["mapTypePriority"]["nochange"],
-                MapPriorityType.MAPTYPE_PRIMARY : self._config.cfg["rtv"]["mapTypePriority"]["primary"],
-                MapPriorityType.MAPTYPE_SECONDARY : self._config.cfg["rtv"]["mapTypePriority"]["secondary"],
-            }
-            maxPrio = max(winners, key=lambda a : priorityMap[a.GetPriority()]).GetPriority()
-            winners = [winner for winner in winners if priorityMap[winner.GetPriority()] == priorityMap[maxPrio]]
+        if self._ShouldTriggerSecondTurnVoting(voteType, winners):
+            winners = self._AddSecondPlaceToWinners(winners)
         
-        # Handle vote results
-        if len(winners) == 1:
-            winner = winners[0]
-            if winner.GetMapName() != "Don't Change":
-                if type(self._currentVote) == RTMVote:
-                    # Handle RTM result
-                    if self._config.cfg["rtm"]["changeImmediately"] == True:
-                        self._SwitchRTM(winner)
-                    else:
-                        self._rtmToSwitch = winner
-                        self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
-                    self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
-                else:
-                    # Handle RTV result
-                    t = Timeout()
-                    t.Set(self._config.cfg["rtv"]["disableRecentlyPlayedMaps"])
-                    self._rtvRecentMaps.append((winner.GetMapName(), t))
-                    if self._config.cfg["rtv"]["changeImmediately"] == True:
-                        self._SwitchRTV(winner)
-                    else:
-                        self._rtvToSwitch = winner
-                        self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} next round!")
-                    self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
-            else:
-                # Handle "Don't Change" result
-                if type(self._currentVote) == RTMVote:
-                    self.SvSay(f"Voted to not change mode.")
-                    self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
-                else:
-                    self.SvSay(f"Voted to not change map.")
-                    self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
-            self._currentVote = None
-        elif len(winners) > 1:
-            # Handle tie - start tiebreaker vote
-            voteOptions = [winner for winner in winners]
-            if type(self._currentVote) == RTMVote:
-                self._StartRTMVote(voteOptions)
-            else:
-                self._StartRTVVote(voteOptions)
-        elif len(winners) == 0:
-            # Handle no votes cast
-            self.SvSay("Vote ended with no voters, keeping everything the same!")
-            if type(self._currentVote) == RTMVote:
-                self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
-            else:
-                self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
-            self._currentVote = None
+        if self._ShouldApplyMapPriority(voteType, winners):
+            winners = self._ApplyMapPriorityFiltering(winners)
+        
+        return winners
+
+    def _ShouldTriggerSecondTurnVoting(self, voteType: str, winners: list) -> bool:
+        """Check if second turn voting should be triggered"""
+        if not self._config.cfg[voteType]["secondTurnVoting"]:
+            return False
+        
+        if len(winners) != 1:
+            return False
+        
+        winnerVotes = len(self._currentVote._playerVotes[self._currentVote.GetOptions().index(winners[0]) + 1])
+        totalVotes = self._currentVote.GetVoterCount()
+        
+        return winnerVotes < (totalVotes // 2)
+
+    def _AddSecondPlaceToWinners(self, winners: list) -> list:
+        """Add second place option to winners for runoff vote"""
+        sortedByVote = list(self._currentVote._playerVotes)
+        sortedByVote.sort(key=lambda a: len(self._currentVote._playerVotes[a]), reverse=True)
+        
+        if len(sortedByVote) > 1:
+            secondPlaceOption = self._currentVote.GetOptions()[sortedByVote[1] - 1]
+            secondPlaceVotes = len(self._currentVote._playerVotes[sortedByVote[1]])
+            
+            if secondPlaceOption not in winners and secondPlaceVotes > 0:
+                winners.append(secondPlaceOption)
+        
+        return winners
+
+    def _ShouldApplyMapPriority(self, voteType: str, winners: list) -> bool:
+        """Check if map priority system should be applied"""
+        return (voteType == "rtv" and 
+                not self._config.cfg["rtv"]["automaticMaps"] and
+                self._config.cfg["rtv"]["mapTypePriority"]["enabled"] and 
+                len(winners) > 1)
+
+    def _ApplyMapPriorityFiltering(self, winners: list) -> list:
+        """Filter winners based on map priority system"""
+        priorityMap = {
+            MapPriorityType.MAPTYPE_NOCHANGE: self._config.cfg["rtv"]["mapTypePriority"]["nochange"],
+            MapPriorityType.MAPTYPE_PRIMARY: self._config.cfg["rtv"]["mapTypePriority"]["primary"],
+            MapPriorityType.MAPTYPE_SECONDARY: self._config.cfg["rtv"]["mapTypePriority"]["secondary"],
+        }
+        
+        maxPriority = max(winners, key=lambda a: priorityMap[a.GetPriority()]).GetPriority()
+        maxPriorityValue = priorityMap[maxPriority]
+        
+        winnersWithMaxPriority = [w for w in winners if priorityMap[w.GetPriority()] == maxPriorityValue]
+        
+        maxVotes = max(len(self._currentVote._playerVotes[winners.index(w) + 1]) for w in winnersWithMaxPriority)
+        
+        return [w for w in winnersWithMaxPriority if len(self._currentVote._playerVotes[winners.index(w) + 1]) == maxVotes]
+
+    def _HandleSingleWinner(self, winner, voteType: str):
+        """Handle vote with single winner"""
+        if winner.GetMapName() == "Don't Change":
+            self._HandleDontChange(voteType)
+        else:
+            self._HandleWinnerChange(winner, voteType)
+        
+        self._currentVote = None
+
+    def _HandleDontChange(self, voteType: str):
+        """Handle 'Don't Change' vote result"""
+        changeType = "mode" if voteType == "rtm" else "map"
+        self.SvSay(f"Voted to not change {changeType}.")
+        self._SetSuccessCooldown(voteType)
+
+    def _HandleWinnerChange(self, winner, voteType: str):
+        """Handle vote winner that requires change"""
+        if voteType == "rtm":
+            self._HandleRTMWinner(winner)
+        else:
+            self._HandleRTVWinner(winner)
+        
+        self._SetSuccessCooldown(voteType)
+
+    def _HandleRTMWinner(self, winner):
+        """Handle RTM vote winner"""
+        winner_index = self._currentVote.GetOptions().index(winner)
+        winner_votes = len(self._currentVote._playerVotes[winner_index + 1])
+        total_votes = self._currentVote.GetVoterCount()
+        percentage = 0
+        if total_votes > 0:
+            percentage = round((winner_votes / total_votes) * 100)
+
+        if self._config.cfg["rtm"]["changeImmediately"]:
+            self._SwitchRTM(winner)
+        else:
+            self._rtmToSwitch = winner
+            self.SvSay(f"Vote complete! Changing mode to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} with {percentage} percent of the votes next round!")
+
+    def _HandleRTVWinner(self, winner):
+        """Handle RTV vote winner"""
+        winner_index = self._currentVote.GetOptions().index(winner)
+        winner_votes = len(self._currentVote._playerVotes[winner_index + 1])
+        total_votes = self._currentVote.GetVoterCount()
+        percentage = 0
+        if total_votes > 0:
+            percentage = round((winner_votes / total_votes) * 100)
+
+        if self._config.cfg["rtv"]["changeImmediately"]:
+            self._SwitchRTV(winner)
+        else:
+            self._rtvToSwitch = winner
+            self.SvSay(f"Vote complete! Changing map to {colors.ColorizeText(winner.GetMapName(), self._themeColor)} with {percentage} percent of the votes next round!")
+
+    def _HandleTiebreaker(self, winners: list, voteType: str):
+        """Handle tie - start tiebreaker vote"""
+        if voteType == "rtm":
+            self._StartRTMVote(winners)
+        else:
+            self._StartRTVVote(winners)
+
+    def _HandleNoVotes(self, voteType: str):
+        """Handle vote with no participants"""
+        self.SvSay("Vote ended with no voters, keeping everything the same!")
+        self._SetFailureCooldown(voteType)
+        self._currentVote = None
+
+    def _SetSuccessCooldown(self, voteType: str):
+        """Set cooldown after successful vote"""
+        if voteType == "rtm":
+            self._rtmCooldown.Set(self._config.cfg["rtm"]["successTimeout"])
+        else:
+            self._rtvCooldown.Set(self._config.cfg["rtv"]["successTimeout"])
+
+    def _SetFailureCooldown(self, voteType: str):
+        """Set cooldown after failed vote"""
+        if voteType == "rtm":
+            self._rtmCooldown.Set(self._config.cfg["rtm"]["failureTimeout"])
+        else:
+            self._rtvCooldown.Set(self._config.cfg["rtv"]["failureTimeout"])
 
     def _SwitchRTM(self, winner : Map, doSleep=True):
         """Switch game mode to winner of RTM vote"""
@@ -637,11 +745,43 @@ class RTV(object):
         self.SvSay(f"Switching map to {colors.ColorizeText(mapToChange, self._themeColor)}!")
         if doSleep:
             sleep(1)
+        
+        # Get purchased teams from banking plugin
+        teamsToChange1 = self._serverData.GetServerVar("team1_purchased_teams")
+        teamsToChange2 = self._serverData.GetServerVar("team2_purchased_teams")
+        if teamsToChange1 != None and len(teamsToChange1) > 0:
+            # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
+            team_names = []
+            for t in teamsToChange1:
+                if hasattr(t, "name"):
+                    team_names.append(t.name)
+                else:
+                    team_names.append(str(t))
+            teamsToChange1 = ' '.join(team_names)
+            self._serverData.interface.SetTeam1("LEG_Good " + teamsToChange1)
+            self._serverData.SetServerVar("team1_purchased_teams", None)
+        else:
+            self._serverData.interface.SetTeam1("LEG_Good")
+        if teamsToChange2 != None and len(teamsToChange2) > 0:
+            # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
+            team_names = []
+            for t in teamsToChange2:
+                if hasattr(t, "name"):
+                    team_names.append(t.name)
+                else:
+                    team_names.append(str(t))
+            teamsToChange2 = ' '.join(team_names)
+            self._serverData.interface.SetTeam2("LEG_Evil " + teamsToChange2)
+            self._serverData.SetServerVar("team2_purchased_teams", None)
+        else:
+            self._serverData.interface.SetTeam2("LEG_Evil")
         self._serverData.interface.MapReload(mapToChange)
     
-    def HandleChatCommand(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+    def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
         """Route chat command to appropriate handler"""
         command = cmdArgs[0]
+        if self._config.cfg["caseSensitiveCommands"] == False:
+            command = command.lower()
         for c in self._commandList[teamId]:
             if command in c:
                 return self._commandList[teamId][c][1](player, teamId, cmdArgs)
@@ -667,9 +807,9 @@ class RTV(object):
             # Process RTV request
             if not eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.append(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 wants to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             
             # Check if threshold reached to start vote
             if len(self._wantsToRTV) >= ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio']):
@@ -690,17 +830,16 @@ class RTV(object):
                 blacklist.extend([x.GetMapName() for x in self._mapContainer.GetAllMaps() if x.GetPriority() == MapPriorityType.MAPTYPE_SECONDARY])
             if not self._config.cfg["rtv"]["allowNominateCurrentMap"]:
                 blacklist.append(self._mapName.lower())
+
+            # Filter out nominations to prevent duplicates
+            blacklist.extend([n.GetMap().GetMapName().lower() for n in self._nominations])
                 
             # Add nominated maps
             for nom in self._nominations:
                 voteChoices.append(nom.GetMap())
                 
             # Get random maps to fill options
-            choices = self._mapContainer.GetRandomMaps(5 - len(self._nominations), blacklist=blacklist)
-            
-            # Filter out nominations to prevent duplicates
-            nomination_names = {n.GetMap().GetMapName().lower() for n in self._nominations}
-            choices = [m for m in choices if m.GetMapName().lower() not in nomination_names]
+            choices = self._mapContainer.GetRandomMaps(5 - len(voteChoices), blacklist=blacklist)
             
             # Clear nominations and build final list
             self._nominations.clear()
@@ -768,9 +907,9 @@ class RTV(object):
             # Process RTM request
             if not eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.append(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 wants to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already wants to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             
             # Check if threshold reached to start vote
             if len(self._wantsToRTM) >= ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio']):
@@ -789,9 +928,9 @@ class RTV(object):
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0) and not self._rtvToSwitch and not self._rtmToSwitch:
             if eventPlayerId in self._wantsToRTM:
                 self._wantsToRTM.remove(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already didn't want to RTM! ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to {colors.ColorizeText('Rock the Mode!', self._themeColor)} ({len(self._wantsToRTM)}/{ceil(len(self._players) * self._config.cfg['rtm']['voteRequiredRatio'])})")
         return capture
         
 
@@ -808,9 +947,9 @@ class RTV(object):
             # Process revocation
             if eventPlayerId in self._wantsToRTV:
                 self._wantsToRTV.remove(eventPlayerId)
-                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 no longer wants to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
             else:
-                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to RTV! ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
+                self.SvSay(f"{eventPlayer.GetName()}^7 already doesn't want to {colors.ColorizeText('Rock the Vote!', self._themeColor)} ({len(self._wantsToRTV)}/{ceil(len(self._players) * self._config.cfg['rtv']['voteRequiredRatio'])})")
         return capture
 
     def HandleMapNom(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -827,19 +966,32 @@ class RTV(object):
             mapToNom = cmdArgs[1]
             playerHasNomination = eventPlayer in [x.GetPlayer() for x in self._nominations]
             
-            # Validate nomination
-            if self._mapContainer.FindMapWithName(mapToNom) != None and \
-               len(self._nominations) < 5 and \
-               not self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations] and \
-               (self._config.cfg["rtv"]["allowNominateCurrentMap"] == False or \
-                (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom != self._mapName)):
-               
-                mapObj = self._mapContainer.FindMapWithName(mapToNom)
+            # Find the map object
+            mapObj = self._mapContainer.FindMapWithName(mapToNom)
+            
+            # Check each validation condition separately for clearer error reporting
+            if mapObj == None:
+                failReason = f"map {colors.ColorizeText(mapToNom, self._themeColor)} was not found"
+            elif len(self._nominations) >= 5 and not playerHasNomination:
+                failReason = "nomination list full"
+            elif mapObj in [x.GetMap() for x in self._nominations]:
+                failReason = f"map {colors.ColorizeText(mapToNom, self._themeColor)} already nominated"
+            elif self._config.cfg["rtv"]["allowNominateCurrentMap"] == False and mapToNom.lower() == self._mapName.lower():
+                failReason = "server does not allow nomination of current map"
+            elif mapToNom.lower() in [x[0].lower() for x in self._rtvRecentMaps] and self._config.cfg["rtv"]["disableRecentMapNomination"] == True:
+                timeRemaining = [x[1].LeftDHMS() for x in self._rtvRecentMaps if x[0].lower() == mapToNom.lower()][0]
+                failReason = f"cannot nominate recently played map for {colors.ColorizeText(timeRemaining, self._themeColor)}"
+            else:
+                # All validations passed - process the nomination
+                failReason = None
+                
                 # Update existing nomination
                 if playerHasNomination:
                     for i in self._nominations:
                         if i.GetPlayer() == eventPlayer:
                             self._nominations.remove(i)
+                            break
+                
                 # Add new nomination
                 self._nominations.append(RTVNomination(eventPlayer, mapObj))
                 
@@ -848,56 +1000,41 @@ class RTV(object):
                     self.SvSay(f"Player {eventPlayer.GetName()}^7 changed their nomination to {colors.ColorizeText(mapToNom, self._themeColor)}!")
                 else:
                     self.SvSay(f"Player {eventPlayer.GetName()}^7 nominated {colors.ColorizeText(mapToNom, self._themeColor)} for RTV!")
-            else:
-                # Handle invalid nomination
-                if not self._mapContainer.FindMapWithName(mapToNom):
-                    failReason = "map was not found"
-                elif len(self._nominations) >= 5:
-                    failReason = "nomination list full"
-                elif self._mapContainer.FindMapWithName(mapToNom) in [x.GetMap() for x in self._nominations]:
-                    failReason = "map already nominated"
-                elif (self._config.cfg["rtv"]["allowNominateCurrentMap"] == True and mapToNom == self._mapName):
-                    failReason = "server does not allow nomination of current map"
-                else:
-                    failReason = "unknown reason"
+            
+            # Handle validation failure
+            if failReason != None:
                 self.Say(f"Map could not be nominated: {failReason}")
+        elif len(cmdArgs) == 1:
+            # Show usage message
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!nominate <mapname>', self._themeColor)}")
         return capture
 
     def HandleMaplist(self, player : player.Player, teamId : int, cmdArgs : list[str]):
         """Handle !maplist command - show available maps"""
         capture = False
-        eventPlayer = player
-        eventPlayerId = eventPlayer.GetId()
-        currentVote = self._currentVote
-        votesInProgress = self._serverData.GetServerVar("votesInProgress")
-        
-        # Process command if valid
-        if len(cmdArgs) == 2:
+        if len(cmdArgs) == 1:
+            # Show usage message with total pages
+            num_pages = self._mapContainer.GetPageCount()
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!maplist <page>', self._themeColor)}, valid pages {colors.ColorizeText('1-' + str(num_pages), self._themeColor)}")
             capture = True
-            # Build paginated map list
-            pages = []
-            pageStr = ""
-            for map in self._mapContainer.GetAllMaps():
-                if len(pageStr) < 950:
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
-                else:
-                    pageStr = pageStr[:-2]
-                    pages.append(pageStr)
-                    pageStr = ""
-                    pageStr += map.GetMapName()
-                    pageStr += ', '
-            pages.append(pageStr[:-2])
-            
-            # Show requested page
-            if cmdArgs[1].isdecimal():
-                pageIndex = int(cmdArgs[1])
-                if 1 <= pageIndex <= len(pages):
-                    self.Say(pages[pageIndex - 1])
-                else:
-                    self.Say(f"Index out of range! (1-{len(pages)})")
+        elif len(cmdArgs) == 2:
+            capture = True
+            if cmdArgs[1].lower() == "all":
+                # Batch execute all pages
+                batchCmds = [f"say {self._messagePrefix}{x}" for x in self._mapContainer._pages]
+                self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
             else:
-                self.Say(f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+                # Get page from cached pages
+                try:
+                    page_index = int(cmdArgs[1]) - 1
+                    if page_index < 0:
+                        raise ValueError
+                    if page_index >= len(self._mapContainer._pages):
+                        self.SvTell(player.GetId(), f"Index out of range! (1-{len(self._mapContainer._pages)})")
+                    else:
+                        self.Say(self._mapContainer._pages[page_index])
+                except (ValueError, IndexError):
+                    self.SvTell(player.GetId(), f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -920,7 +1057,7 @@ class RTV(object):
                         mapName = colors.HighlightSubstr(mapName, index, index + len(searchTerm), self._themeColor)
                     
                     # Add to results page
-                    if len(mapStr) + len(mapName) < 950:
+                    if len(mapStr) + len(mapName) < self._config.cfg["maxSearchPageSize"]:
                         mapStr += mapName
                         mapStr += ', '
                     else:
@@ -935,7 +1072,7 @@ class RTV(object):
             
             # Display results
             if len(mapPages) == 0:
-                self._serverData.interface.SvTell(player.GetId(), f"{self._messagePrefix}Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
+                self.SvTell(player.GetId(), f"Search {colors.ColorizeText(searchQuery, self._themeColor)} returned no results.")
             elif len(mapPages) == 1:
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
@@ -943,6 +1080,8 @@ class RTV(object):
                 batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
                 batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
+        else:
+            self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!search <searchterm1> [searchterm2] [...]', self._themeColor)}")
         return capture
 
     def HandleDecimalVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
@@ -970,22 +1109,15 @@ class RTV(object):
             self.Say("No map nominations to display.")
         return capture
 
-    # only included if not already defined in another plugin
-    def HandleHelp(self, player : player.Player, teamId : int, cmdArgs : list[str]):
-        capture = True
-        commandAliasList = self._serverData.GetServerVar("registeredCommands")
-        if len(cmdArgs) > 1:
-            for i in commandAliasList:
-                if cmdArgs[1] == i[0]:
-                    saystr = i[1]
-                    self.Say(saystr)
-                    return capture
-            # couldn't find command
-            self.Say(f"Couldn't find chat command {colors.ColorizeText(cmdArgs[1], self._themeColor)}")
-        else:
-            saystr = ', '.join([x[0] for x in commandAliasList])
-            self.Say(colors.ColorizeText("(Say !help <command> for help on a specific command): ", self._themeColor) + saystr)
-        return capture
+    def HandleShowVote(self, player : player.Player, teamId : int, cmdArgs : list[str]) -> bool:
+        """ Handle show vote command """
+        if not self._announceCooldown.IsSet():
+            self._announceCooldown.Set(self._config.cfg["showVoteCooldownTime"])
+            if self._currentVote != None:
+                self._AnnounceVote()
+            else:
+                self.Say(f"No vote to display. Type {colors.ColorizeText('!rtv', self._themeColor)} in chat to {colors.ColorizeText('Rock the Vote', self._themeColor)}!")
+
         
     def OnChatMessage(self, eventClient : client.Client, eventMessage : str, eventTeamID : int):
         """Handle incoming chat messages and route commands"""
@@ -993,7 +1125,7 @@ class RTV(object):
             Log.debug(f"Received chat message from client {eventClient.GetId()}")
             commandPrefix = self._config.cfg["RTVPrefix"]
             capture = False
-            eventPlayer : player.Player = self._players[eventClient.GetId()]
+            eventPlayer : RTVPlayer = self._players[eventClient.GetId()]
             eventPlayerId = eventPlayer.GetId()
             
             if eventPlayer != None:
@@ -1012,7 +1144,7 @@ class RTV(object):
     
     def OnClientConnect(self, eventClient : client.Client):
         """Handle new client connection"""
-        newPlayer = Player(eventClient)
+        newPlayer = RTVPlayer(eventClient)
         self._OnNewPlayer(newPlayer)
         return False
 
@@ -1027,8 +1159,20 @@ class RTV(object):
         """Handle client disconnection"""
         if reason != godfingerEvent.ClientDisconnectEvent.REASON_SERVER_SHUTDOWN:
             dcPlayerId = eventClient.GetId()
+            dcPlayer = self._players[dcPlayerId]
             if dcPlayerId in self._players:
+                if dcPlayerId in self._wantsToRTV:
+                    self._wantsToRTV.remove(dcPlayerId)
+                if dcPlayerId in self._wantsToRTM:
+                    self._wantsToRTM.remove(dcPlayerId)
+                for nom in self._nominations:
+                    if nom.GetPlayer().GetId() == dcPlayerId:
+                        self._nominations.remove(nom)
                 del self._players[dcPlayerId]
+                if self._currentVote != None:
+                    for i in self._currentVote._playerVotes:
+                        if dcPlayerId in self._currentVote._playerVotes[i]:
+                            self._currentVote._playerVotes[i].remove(dcPlayerId)
             else:
                 Log.warning(f"Player ID {dcPlayerId} does not exist in RTV players but there was an attempt to remove it")
         return False
@@ -1041,6 +1185,17 @@ class RTV(object):
         if self._currentVote != None:
             print("last player dc'ed, killing current vote")
             self._currentVote = None
+        
+        votesInProgress = self._serverData.GetServerVar("votesInProgress")
+        if votesInProgress != None and "RTV" in votesInProgress:
+            votesInProgress.remove("RTV")
+            self._serverData.SetServerVar("votesInProgress", votesInProgress)
+
+        # Reset siege teams
+        self._serverData.SetServerVar("team1_purchased_teams", None)
+        self._serverData.SetServerVar("team2_purchased_teams", None)
+        self._serverData.interface.SetTeam1("LEG_Good")
+        self._serverData.interface.SetTeam2("LEG_Evil")
         if doMap and doMode:
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]], self._config.cfg["rtv"]["emptyServerMap"]["map"])
         elif doMap:
@@ -1049,9 +1204,11 @@ class RTV(object):
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]])
         return False
 
-    def OnClientChange(self, eventClient, eventData):
-        """Handle client changes (not implemented)"""
-        return False
+    def OnClientChange(self, eventClient : client.Client, eventData : dict):
+        """Handle client changes"""
+        if self._config.cfg["kickProtectedNames"] == True:
+            kickClientIfProtectedName(eventClient)
+
 
     def OnServerInit(self, data):
         """Handle server initialization (round start)"""
@@ -1098,6 +1255,11 @@ class RTV(object):
         if votesInProgress != None and "RTV" in votesInProgress:
             votesInProgress.remove("RTV")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
+        # Add old map to recently played list when transitioning
+        if oldMapName and oldMapName != mapName:
+            t = Timeout()
+            t.Set(self._config.cfg["rtv"]["disableRecentlyPlayedMaps"])
+            self._rtvRecentMaps.append((oldMapName, t))
         # Update current map
         if mapName != self._mapName:
             self._mapName = mapName
@@ -1111,7 +1273,7 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-            self.SvSay("Smod forced RTV vote")
+            self.SvSay(f"Smod {colors.ColorizeText(str(smodId), self._themeColor)} forced RTV vote")
             self._StartRTVVote()
         return True
 
@@ -1121,7 +1283,7 @@ class RTV(object):
         votesInProgress = self._serverData.GetServerVar("votesInProgress")
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
-            self.SvSay("Smod forced RTM vote")
+            self.SvSay(f"Smod {colors.ColorizeText(str(smodId), self._themeColor)} forced RTM vote")
             self._StartRTMVote()
         return True
 
@@ -1132,7 +1294,7 @@ class RTV(object):
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._config.cfg["rtv"]["enabled"] and self._rtvCooldown.IsSet():
-                self.SvSay("SMOD reset the cooldown for RTV!")
+                self.SvSay(f"SMOD {colors.ColorizeText(str(smodId), self._themeColor)} reset the cooldown for RTV!")
                 self._rtvCooldown.Finish()
             elif not self._config.cfg["rtv"]["enabled"]:
                 self._serverData.interface.SmSay(self._messagePrefix + "RTV is not enabled.")
@@ -1147,7 +1309,7 @@ class RTV(object):
         # Check if RTV can be forced
         if not currentVote and (votesInProgress == None or len(votesInProgress) == 0):
             if self._config.cfg["rtm"]["enabled"] and self._rtmCooldown.IsSet():
-                self.SvSay("SMOD reset the cooldown for RTM!")
+                self.SvSay(f"SMOD {colors.ColorizeText(str(smodId), self._themeColor)} reset the cooldown for RTM!")
                 self._rtmCooldown.Finish()
             elif not self._config.cfg["rtm"]["enabled"]:
                 self._serverData.interface.SmSay(self._messagePrefix + "RTM is not enabled.")
@@ -1169,7 +1331,7 @@ class RTV(object):
         """Initialize plugin with current players"""
         allClients = self._serverData.API.GetAllClients()
         for cl in allClients:
-            newPlayer = player.Player(cl)
+            newPlayer = RTVPlayer(cl)
             self._OnNewPlayer(newPlayer)
         return True
 
@@ -1182,10 +1344,10 @@ class RTV(object):
 class RTVNomination(object):
     """Represents a player's map nomination"""
     def __init__(self, player, map):
-        self._player = player
-        self._map = map
+        self._player : RTVPlayer = player
+        self._map : Map = map
 
-    def GetPlayer(self) -> player.Player:
+    def GetPlayer(self) -> RTVPlayer:
         """Get nominating player"""
         return self._player
 
@@ -1210,17 +1372,21 @@ def OnStart():
     if not PluginInstance.Start():
         return False
     
-    # Kick protected names if enabled
+    # Kick protected names if enabled TODO this should probably be made its own plugin at some point
     if PluginInstance._config.cfg["kickProtectedNames"] == True:
         for i in PluginInstance._serverData.API.GetAllClients():
-            nameStripped = colors.StripColorCodes(i.GetName().lower())
-            if nameStripped == "admin" or nameStripped == "server":
-                PluginInstance._serverData.interface.ClientKick(i.GetId())
+            kickClientIfProtectedName(i)
     
     # Report startup time
     loadTime = time() - startTime
-    PluginInstance._serverData.interface.Say(PluginInstance._messagePrefix + f"RTV started in {loadTime:.2f} seconds!")
-    return True  # indicate plugin start success
+    PluginInstance.Say(f"RTV started in {loadTime:.2f} seconds!")
+    return True 
+
+def kickClientIfProtectedName(client : client.Client):
+    nameStripped = colors.StripColorCodes(client.GetName().lower())
+    nameStripped = re.sub(r":|-|\.|,|;|=|\/|\\|\||`|~|\"|'|[|]|(|)|_", "", nameStripped)
+    if nameStripped in [x.lower() for x in PluginInstance._config.cfg["protectedNames"]]:
+        PluginInstance._serverData.interface.ClientKick(client.GetId()) # indicate plugin start success
 
 # Called each loop tick from the system
 def OnLoop():
@@ -1258,13 +1424,20 @@ def OnInitialize(serverData : serverdata.ServerData, exports=None):
     if exports != None:
         exports.Add("StartRTVVote", API_StartRTVVote)
     
+    # Register SMOD commands
+    new_smod_commands = []
+    r_smod_commands = serverData.GetServerVar("registeredSmodCommands")
+    if r_smod_commands:
+        new_smod_commands.extend(r_smod_commands)
+    
+    for cmd in PluginInstance._smodCommandList:
+        for alias in cmd:
+            new_smod_commands.append((alias, PluginInstance._smodCommandList[cmd][0]))
+    SERVER_DATA.SetServerVar("registeredSmodCommands", new_smod_commands)
+
     # Register commands with server
     newVal = []
-    # Check for existing help command from another plugin before using this plugin's
     rCommands = PluginInstance._serverData.GetServerVar("registeredCommands")
-    if rCommands != None and 'help' in [x for x, _ in rCommands]:
-        del PluginInstance._commandList[teams.TEAM_GLOBAL][('help', "cmds")]
-
     if rCommands != None:
         newVal.extend(rCommands)
     for cmd in PluginInstance._commandList[teams.TEAM_GLOBAL]:
@@ -1317,13 +1490,36 @@ def OnEvent(event) -> bool:
 # Helper function to get all map names from currently installed PK3 files located in MBII directory and base directory next to MBII
 def GetAllMaps() -> list[Map]:
     """Scan PK3 files in MBII directories to discover available maps"""
-    mbiiDir = DEFAULT_CFG.cfg["MBIIPath"] + "\\"
+    # Start by assuming the MBII directory is not found
+    mbiiDir = os.path.abspath(DEFAULT_CFG.cfg["MBIIPath"])
+    if not os.path.exists(mbiiDir):
+        # Try to find the MBII directory relatively (this is now the primary method)
+        Log.info("Attempting to find MBII directory relative to the current working directory...")
+        searchDir = os.getcwd()
+        while True:
+            if os.path.exists(os.path.join(searchDir, "MBII")):
+                mbiiDir = os.path.join(searchDir, "MBII")
+                Log.info(f"SUCCESS! Found MBII directory at {mbiiDir}.")
+                break
+            else:
+                oldDir = searchDir
+                searchDir = os.path.dirname(searchDir)
+                if oldDir == searchDir:
+                    # We've hit the top without finding the directory
+                    Log.error("FAILURE. No MBII directory found through relative search.")
+                    break
+
+    # Check if a path was successfully found
+    if mbiiDir is None:
+        Log.error("Cannot proceed as the MBII directory could not be located.")
+        return []
+
     mapList = []
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]; # base comes next so it wont override MBII dir contents if files match
-    for dir in dirsToProcess:
-        for filename in os.listdir(dir):
+    for sub_dir in dirsToProcess:
+        for filename in os.listdir(sub_dir):
             if filename.endswith(".pk3"):
-                with ZipFile(dir + "\\" + filename) as file:
+                with ZipFile(os.path.join(sub_dir, filename)) as file:
                     zipNameList = file.namelist()
                     for name in zipNameList:
                         # Process BSP files as map objects
@@ -1333,3 +1529,30 @@ def GetAllMaps() -> list[Map]:
                             newMap = Map(name, path)
                             mapList.append(newMap)
     return mapList
+
+
+if __name__ == "__main__":
+    print("This is a plugin for the Godfinger Movie Battles II plugin system. Please run one of the start scripts in the start directory to use it. Make sure that this python module's path is included in godfingerCfg!")
+    input("Press Enter to close this message.")
+    exit()
+
+TEST_OBJ = [
+    RTVNomination(None, Map("mb2_deathstar", 'fake/path')),
+    RTVNomination(None, Map("mb2_commtower", 'fake/path')),
+    RTVNomination(None, Map("mb2_dotf", 'fake/path')),
+    RTVNomination(None, Map("mb2_cmp_dust2", 'fake/path'))
+]
+
+TEST_OBJ_2 = {
+    1 : [],
+    2 : [0],
+    3 : [1,2],
+    4 : [3,4,5,6],
+    5 : [7,8],
+    6 : []
+}
+
+TEST_OBJ[0]._map.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)
+TEST_OBJ[1]._map.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)
+TEST_OBJ[2]._map.SetPriority(MapPriorityType.MAPTYPE_SECONDARY)
+TEST_OBJ[3]._map.SetPriority(MapPriorityType.MAPTYPE_PRIMARY)
