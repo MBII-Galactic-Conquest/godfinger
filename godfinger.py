@@ -251,7 +251,7 @@ class MBIIServer:
                     self._config.cfg["watchdog"]["serverStartCommand"] = os.path.join(os.getcwd(), "start", "win", "bin", "autostart_win.py")
                 else:
                     # Use autostart script which only starts MB2 server, not Godfinger
-                    self._config.cfg["watchdog"]["serverStartCommand"] = os.path.join(os.getcwd(), "start", "unix", "bin", "autostart_unix.py")
+                    self._config.cfg["watchdog"]["serverStartCommand"] = os.path.join(os.getcwd(), "start", "linux_macOS", "bin", "autostart_linux_macOS.py")
                 Log.debug(f"Set default watchdog command: {self._config.cfg['watchdog']['serverStartCommand']}")
 
         if "paths" in self._config.cfg:
