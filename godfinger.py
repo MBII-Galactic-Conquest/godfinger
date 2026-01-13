@@ -884,12 +884,6 @@ class MBIIServer:
                 except ValueError:
                     continue
 
-                # Status format: cl score ping name address rate
-                # Example: "0     0   50 2cwldys ^7                   24.125.203.253:29070 50000"
-                # After split: ['0', '0', '50', '2cwldys', '^7', '24.125.203.253:29070', '50000']
-                # Name starts at index 3 and continues until we hit an IP address (contains ':')
-                # BUT we need to filter out color code tokens like '^7', '^1', etc.
-
                 nameStartIdx = 3
                 nameEndIdx = nameStartIdx
 
