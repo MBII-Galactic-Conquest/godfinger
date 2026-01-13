@@ -27,7 +27,13 @@ CONFIG_FALLBACK = \
     "privateMessage": "^1Please change your username to play on this server.^7 Your username is blocked.",
     "marktkDuration": 60,
     "muteDuration": 60,
-    "detectedWords": ["padawan"]
+    "detectedWords": ["padawan"],
+    "nameChangeAbuse": {
+        "enabled": true,
+        "maxChanges": 3,
+        "timeWindow": 60,
+        "tempbanRounds": 5
+    }
 }
 """
 global AntiPadawanConfig
@@ -59,6 +65,14 @@ class AntiPadawan():
         # Format: { "player_ip": { "marktk": {...}, "mute": {...} } }
         # Each entry: { "expires": timestamp, "duration": minutes, "admin_name": str, "admin_id": str }
         self._admin_tracking = {}
+
+        # Deduplication cache for name changes (prevents double-firing from ONNAMECHANGE + CLIENTCHANGED)
+        # Format: { "player_ip": {"old_name": str, "new_name": str, "timestamp": float} }
+        self._recent_name_changes = {}
+
+        # Track repeated name change abuse (switching between blocked/allowed names)
+        # Format: { "player_ip": {"changes": [timestamps], "warned": bool, "tempbanned": bool} }
+        self._name_change_abuse = {}
 
         # Smod command list - maps command aliases to (help_text, handler_function)
         self._smodCommandList = {
@@ -122,8 +136,58 @@ class AntiPadawan():
             new_name = client.GetName()
             old_name = data["name"]
 
+            # Deduplication: Check if we recently processed this exact name change
+            current_time = time.time()
+            if player_ip in self._recent_name_changes:
+                cached = self._recent_name_changes[player_ip]
+                # If same name change within 1 second, it's a duplicate event
+                if (cached["old_name"] == old_name and
+                    cached["new_name"] == new_name and
+                    current_time - cached["timestamp"] < 1.0):
+                    return False  # Skip duplicate
+
+            # Cache this name change
+            self._recent_name_changes[player_ip] = {
+                "old_name": old_name,
+                "new_name": new_name,
+                "timestamp": current_time
+            }
+
             # Check if NEW name is blocked
             if self._IsPadawanName(client):
+                # Track name change abuse (repeated switching TO blocked names)
+                abuse_cfg = self.config.cfg.get("nameChangeAbuse", {})
+                if abuse_cfg.get("enabled", True):
+                    max_changes = abuse_cfg.get("maxChanges", 3)
+                    time_window = abuse_cfg.get("timeWindow", 60)
+                    tempban_rounds = abuse_cfg.get("tempbanRounds", 5)
+
+                    # Initialize abuse tracking for this IP if needed
+                    if player_ip not in self._name_change_abuse:
+                        self._name_change_abuse[player_ip] = {
+                            "changes": [],
+                            "warned": False,
+                            "tempbanned": False
+                        }
+
+                    # Clean up old timestamps outside the time window
+                    abuse_data = self._name_change_abuse[player_ip]
+                    abuse_data["changes"] = [ts for ts in abuse_data["changes"] if current_time - ts < time_window]
+
+                    # Add this change to blocked name
+                    abuse_data["changes"].append(current_time)
+
+                    # Check if threshold exceeded
+                    if len(abuse_data["changes"]) >= max_changes and not abuse_data["tempbanned"]:
+                        Log.info(f"Player {new_name} (IP: {player_ip}) changed to blocked name {len(abuse_data['changes'])} times in {time_window}s - tempbanning for {tempban_rounds} rounds")
+                        try:
+                            self._serverData.interface.Tempban(new_name, tempban_rounds)
+                            abuse_data["tempbanned"] = True
+                            # Also send a message before they get kicked
+                            self._serverData.interface.SvSay(f"{self._messagePrefix}^1{new_name}^7 has been temporarily banned for {tempban_rounds} rounds for name change abuse")
+                        except Exception as e:
+                            Log.error(f"Failed to tempban player {new_name}: {e}")
+                        return False  # Don't apply normal penalties, they're getting tempbanned
                 # Player changed TO a blocked name while in-game
                 # Apply penalties immediately (they're already in-game)
                 Log.info(f"Player changed name to blocked name '{new_name}' (IP: {player_ip}) - applying penalties immediately")
@@ -181,13 +245,54 @@ class AntiPadawan():
                     self._ApplyAction3Penalties(player_id, new_name, player_ip, delay_seconds=0.5)
 
             # If player changed FROM blocked name to allowed name while in-game:
-            # DO NOT remove penalties here - they must disconnect and rejoin to clear penalties
-            # This prevents the exploit where players use name changes to clear admin-applied marks
+            # Remove penalties if this was plugin-applied (not admin-applied)
             elif player_ip in self._tracking:
-                Log.info(f"Player '{old_name}' changed name to '{new_name}' - penalties remain until disconnect/rejoin")
-                # Update tracking with new name
-                self._tracking[player_ip]["lastSeenName"] = new_name
-                self._SaveTracking()
+                # Check if they changed to an allowed name
+                if not self._IsPadawanName(client):
+                    Log.info(f"Player '{old_name}' changed name to allowed name '{new_name}' - removing plugin penalties")
+
+                    # Only remove penalties if they were plugin-applied (not admin-applied)
+                    # Check if there are any admin-applied penalties for this IP
+                    has_admin_penalties = player_ip in self._admin_tracking
+
+                    if not has_admin_penalties:
+                        # Safe to remove - these were plugin penalties
+                        action = self.config.cfg["action"]
+
+                        if action == 0:
+                            # Remove MarkTK
+                            try:
+                                self._serverData.interface.UnmarkTK(player_id)
+                                Log.info(f"Removed TK mark for {new_name} (ID: {player_id})")
+                            except Exception as e:
+                                Log.error(f"Failed to unmark TK for player {player_id}: {e}")
+
+                        elif action == 3:
+                            # Remove MarkTK and Mute
+                            try:
+                                self._serverData.interface.UnmarkTK(player_id)
+                                Log.info(f"Removed TK mark for {new_name} (ID: {player_id})")
+                            except Exception as e:
+                                Log.error(f"Failed to unmark TK for player {player_id}: {e}")
+
+                            try:
+                                self._serverData.interface.Unmute(player_id)
+                                Log.info(f"Unmuted {new_name} (ID: {player_id})")
+                            except Exception as e:
+                                Log.error(f"Failed to unmute player {player_id}: {e}")
+
+                        # Remove from tracking
+                        del self._tracking[player_ip]
+                        self._SaveTracking()
+                    else:
+                        Log.info(f"Player '{old_name}' changed to allowed name but has admin penalties - keeping penalties")
+                        # Update tracking with new name
+                        self._tracking[player_ip]["lastSeenName"] = new_name
+                        self._SaveTracking()
+                else:
+                    # Still a blocked name, just update tracking
+                    self._tracking[player_ip]["lastSeenName"] = new_name
+                    self._SaveTracking()
         except Exception as e:
             Log.error(f"Error in OnClientChanged: {e}")
             return False
@@ -830,6 +935,12 @@ def OnEvent(event) -> bool:
         if event.isStartup:
             return False  # Ignore startup messages
         else:
+            return PluginInstance.OnClientChanged(event.client, event.data)
+    elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_ONNAMECHANGE:
+        if event.isStartup:
+            return False  # Ignore startup messages
+        else:
+            # Use the same handler - it already has name change logic
             return PluginInstance.OnClientChanged(event.client, event.data)
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMSAY:
         if event.isStartup:

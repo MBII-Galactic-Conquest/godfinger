@@ -282,7 +282,12 @@ class RconInterface(AServerInterface):
         if self.IsOpened():
             return self._rcon.ClientKick(pid)
         return None
-    
+
+    def Tempban(self, name : str, rounds : int) -> str:
+        if self.IsOpened():
+            return self._rcon.Tempban(name, rounds)
+        return None
+
     def SetCvar(self, cvarName : str, value : str) -> str:
         if self.IsOpened():
             return self._rcon.SetCvar(cvarName, value)
@@ -849,7 +854,14 @@ class PtyInterface(AServerInterface):
             proc = PtyInterface.EchoProcessor(cmdStr)
             return self.ExecuteCommand(cmdStr, proc)
         return None
-    
+
+    def Tempban(self, name : str, rounds : int) -> str:
+        if self.IsOpened():
+            cmdStr = "tempban \"%s\" %i" % (name, rounds)
+            proc = PtyInterface.EchoProcessor(cmdStr)
+            return self.ExecuteCommand(cmdStr, proc)
+        return None
+
     def SetCvar(self, cvarName : str, value : str) -> str:
         if self.IsOpened():
             cmdStr = "%s %s" % (cvarName, value)
@@ -968,7 +980,24 @@ class PtyInterface(AServerInterface):
                             input = ""
                         for line in inputLines:
                             line = self._re_ansi_escape.sub("", line)
+
+                            # CRITICAL: Always capture @@@PLRENAME broadcasts regardless of mode
+                            # These broadcasts indicate immediate name changes and must not be consumed by command processors
+                            isPlRename = line.startswith("broadcast:") and "@@@PLRENAME" in line
+
+                            # DEBUG: Log ALL broadcast messages to verify PTY is capturing them
+                            if line.startswith("broadcast:"):
+                                Log.info(f"[PTY BROADCAST DEBUG] Mode={self._mode}, Line={line}")
+
+                            if isPlRename:
+                                Log.info(f"[PTY PLRENAME DEBUG] Detected @@@PLRENAME in mode {self._mode}")
+
                             if self._mode == PtyInterface.MODE_COMMAND:
+                                # In command mode, force @@@PLRENAME to message queue even if command processor would consume it
+                                if isPlRename:
+                                    Log.info("[Server] : \"%s\"" % line)
+                                    self._workingMessageQueue.put(logMessage.LogMessage(line))
+
                                 pr = self._currentCommandProc.ParseLine(line)
                                 if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_OK):
                                     self._currentCommandProc = None

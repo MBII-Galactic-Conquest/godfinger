@@ -204,6 +204,10 @@ class RCON(object):
     def ClientKick(self, player_id):
         return self.Request(b"\xff\xff\xff\xffrcon %b clientkick %i" % (self._password, player_id))
 
+    def Tempban(self, player_name, rounds):
+        name = bytes(player_name, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b tempban \"%b\" %i" % (self._password, name, rounds))
+
     def Echo(self, msg):
         msg = bytes(msg, "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b echo %b" % (self._password, msg))

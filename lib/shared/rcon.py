@@ -186,7 +186,11 @@ class Rcon(object):
 
   def clientkick(self, player_id):
     return self._Send(b"\xff\xff\xff\xffrcon %b clientkick %i" % (self.rcon_pwd, player_id))
-  
+
+  def tempban(self, player_name, rounds):
+    name = bytes(player_name, "UTF-8")
+    return self._Send(b"\xff\xff\xff\xffrcon %b tempban \"%b\" %i" % (self.rcon_pwd, name, rounds))
+
   # untested
   def clientban(self, player_ip):
     return self._Send(b"\xff\xff\xff\xffrcon %b addip %s" % (self.rcon_pwd, player_ip))

@@ -227,6 +227,9 @@ class MBIIServer:
         self._primarySvInterface = None # NEW: Primary interface for status/commands
         self._gatheringExitData = False
         self._exitLogMessages = []
+        # Name change polling for Windows (PTY doesn't capture broadcast messages)
+        self._nameCheckInterval = 2.0  # Check every 2 seconds
+        self._lastNameCheck = 0
 
         startTime = time.time()
         self._status = MBIIServer.STATUS_INIT
@@ -637,6 +640,12 @@ class MBIIServer:
                 message = messages.get()
                 self._ParseMessage(message)
 
+        # Periodic name change detection (for Windows where PTY doesn't capture broadcasts)
+        currentTime = time.time()
+        if currentTime - self._lastNameCheck >= self._nameCheckInterval:
+            self._lastNameCheck = currentTime
+            self._CheckNameChanges()
+
         self._pluginManager.Loop()
 
     def _ParseMessage(self, message : logMessage.LogMessage):
@@ -667,6 +676,12 @@ class MBIIServer:
             elif line == "wd_restarted":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_RESTARTED,None))
                 self._HandleWatchdogEvent("restarted")
+            return
+
+        # Check for broadcast name change messages
+        if line.startswith("broadcast:") and "@@@PLRENAME" in line:
+            Log.info(f"[NAMECHANGE DEBUG] Detected broadcast message with @@@PLRENAME, calling OnBroadcastNameChange")
+            self.OnBroadcastNameChange(message)
             return
 
         lineParse = line.split()
@@ -815,8 +830,16 @@ class MBIIServer:
 
                     if "name" in vars:
                         if cl.GetName() != vars["name"]:
-                            changedOld["name"] = cl.GetName()
-                            cl._name = vars["name"]
+                            oldName = cl.GetName()
+                            newName = vars["name"]
+                            changedOld["name"] = oldName
+                            cl._name = newName
+
+                            # Fire ONNAMECHANGE event for immediate name change detection
+                            self._pluginManager.Event(godfingerEvent.NameChangeEvent(
+                                cl, oldName, newName,
+                                isStartup=logMessage.isStartup
+                            ))
 
                     if "ja_guid" in vars:
                         if cl._jaguid != vars["ja_guid"]:
@@ -832,6 +855,168 @@ class MBIIServer:
         # Only call PlayerEvent if cl was successfully retrieved
         if cl != None:
             self._pluginManager.Event( godfingerEvent.PlayerEvent(cl, {"text":textified}, isStartup = logMessage.isStartup))
+
+    def _CheckNameChanges(self):
+        """Periodically check for name changes using status command"""
+        try:
+            # Get current player status from server
+            statusResponse = self._primarySvInterface.Status()
+            if not statusResponse:
+                return
+
+            # Parse status response for player info
+            # Status format: "num score ping name            lastmsg address               qport rate"
+            # Example: "  0    0   17 ^2Player^7           0 192.168.1.100:27961  12345 25000"
+
+            lines = statusResponse.strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith('map:') or line.startswith('num score'):
+                    continue
+
+                # Parse status line
+                parts = line.split()
+                if len(parts) < 6:
+                    continue
+
+                try:
+                    clientNum = int(parts[0])
+                except ValueError:
+                    continue
+
+                # Status format: cl score ping name address rate
+                # Example: "0     0   50 2cwldys ^7                   24.125.203.253:29070 50000"
+                # After split: ['0', '0', '50', '2cwldys', '^7', '24.125.203.253:29070', '50000']
+                # Name starts at index 3 and continues until we hit an IP address (contains ':')
+                # BUT we need to filter out color code tokens like '^7', '^1', etc.
+
+                nameStartIdx = 3
+                nameEndIdx = nameStartIdx
+
+                # Find where name ends (before IP address which contains ':')
+                for i in range(nameStartIdx, len(parts)):
+                    if ':' in parts[i]:  # This is the IP:port, name ends here
+                        nameEndIdx = i
+                        break
+
+                if nameEndIdx <= nameStartIdx:
+                    continue
+
+                # Extract name parts, filtering out standalone color codes
+                nameParts = []
+                for part in parts[nameStartIdx:nameEndIdx]:
+                    # Skip standalone color codes (e.g., '^7', '^1', '^2')
+                    if part.startswith('^') and len(part) == 2:
+                        continue
+                    nameParts.append(part)
+
+                currentName = ' '.join(nameParts)
+
+                # Get client from client manager
+                cl = self._clientManager.GetClientById(clientNum)
+                if cl is None:
+                    continue
+
+                # Check if name changed
+                oldName = cl.GetName()
+                if oldName != currentName:
+                    Log.info(f"Name change detected for client {clientNum}: '{oldName}' -> '{currentName}'")
+
+                    # Update client name
+                    cl._name = currentName
+
+                    # Fire ONNAMECHANGE event
+                    self._pluginManager.Event(godfingerEvent.NameChangeEvent(
+                        cl, oldName, currentName,
+                        isStartup=False
+                    ))
+
+                    # Also fire CLIENTCHANGED event for backward compatibility
+                    self._pluginManager.Event(godfingerEvent.ClientChangedEvent(
+                        cl, {"name": oldName},
+                        isStartup=False
+                    ))
+
+        except Exception as e:
+            Log.error(f"Error in _CheckNameChanges: {e}")
+            import traceback
+            Log.error(traceback.format_exc())
+
+    def OnBroadcastNameChange(self, logMessage):
+        """Parse broadcast: print \"<oldname> @@@PLRENAME <newname>\" messages"""
+        try:
+            line = logMessage.content
+            Log.info(f"[NAMECHANGE DEBUG] Processing line: {line}")
+
+            # Expected format: broadcast: print "<oldname> @@@PLRENAME <newname>\n"
+            if "broadcast:" not in line or "@@@PLRENAME" not in line:
+                Log.info(f"[NAMECHANGE DEBUG] Line doesn't contain broadcast: or @@@PLRENAME")
+                return
+
+            # Extract the message content after "broadcast: print \""
+            start_idx = line.find('broadcast: print "')
+            if start_idx == -1:
+                Log.warning(f"[NAMECHANGE DEBUG] Could not find 'broadcast: print \"' in line")
+                return
+
+            # Get content between quotes
+            start_idx += len('broadcast: print "')
+            end_idx = line.find('"', start_idx)
+            if end_idx == -1:
+                Log.warning(f"[NAMECHANGE DEBUG] Could not find closing quote")
+                return
+
+            content = line[start_idx:end_idx]
+            Log.info(f"[NAMECHANGE DEBUG] Extracted content: {content}")
+
+            # Parse: <oldname> @@@PLRENAME <newname>
+            parts = content.split(" @@@PLRENAME ")
+            if len(parts) != 2:
+                Log.warning(f"Failed to parse PLRENAME broadcast: {content}")
+                return
+
+            old_name_raw = parts[0].strip()
+            new_name_raw = parts[1].strip()
+            Log.info(f"[NAMECHANGE DEBUG] Parsed: old='{old_name_raw}' new='{new_name_raw}'")
+
+            # Find client by old name (need to match against current client list)
+            # Note: Names may have color codes, so we need to strip and compare
+            target_client = None
+            Log.info(f"[NAMECHANGE DEBUG] Searching for client with old name '{old_name_raw}'")
+            Log.info(f"[NAMECHANGE DEBUG] Current clients: {[cl.GetName() for cl in self._clientManager.GetAllClients()]}")
+
+            for cl in self._clientManager.GetAllClients():
+                if cl.GetName() == old_name_raw or colors.StripColorCodes(cl.GetName()) == colors.StripColorCodes(old_name_raw):
+                    target_client = cl
+                    Log.info(f"[NAMECHANGE DEBUG] Found matching client: {cl.GetName()} (ID: {cl.GetId()})")
+                    break
+
+            if not target_client:
+                Log.warning(f"[NAMECHANGE DEBUG] Could not find client with old name '{old_name_raw}' for name change")
+                return
+
+            # Update client name
+            Log.info(f"[NAMECHANGE DEBUG] Updating client name from '{target_client._name}' to '{new_name_raw}'")
+            target_client._name = new_name_raw
+
+            # Fire ONNAMECHANGE event (immediate detection)
+            Log.info(f"[NAMECHANGE DEBUG] Firing NameChangeEvent")
+            self._pluginManager.Event(godfingerEvent.NameChangeEvent(
+                target_client, old_name_raw, new_name_raw,
+                isStartup=logMessage.isStartup
+            ))
+
+            # Also fire CLIENTCHANGED event for backward compatibility
+            Log.info(f"[NAMECHANGE DEBUG] Firing ClientChangedEvent")
+            self._pluginManager.Event(godfingerEvent.ClientChangedEvent(
+                target_client, {"name": old_name_raw},
+                isStartup=logMessage.isStartup
+            ))
+
+            Log.info(f"[NAMECHANGE DEBUG] Name change detected via broadcast: '{old_name_raw}' -> '{new_name_raw}'")
+
+        except Exception as e:
+            Log.error(f"Error parsing broadcast name change: {e}")
 
     def HandleChatHelp(self, senderClient, teamId, cmdArgs):
         """Handle !help command for regular chat"""
