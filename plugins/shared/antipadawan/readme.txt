@@ -13,6 +13,9 @@ FEATURES:
 - 4 action modes (0-3) with different enforcement levels
 - Always sends private message to detected players
 - IP-based penalty tracking (automatically removes penalties when player changes to allowed name)
+- Real-time name change detection via polling (detects name changes within 2 seconds)
+- Automatic penalty removal when changing to allowed names
+- Name change abuse detection (tempbans repeat offenders)
 - Master enable/disable switch
 - No database needed
 - Self-contained (no external dependencies)
@@ -36,7 +39,13 @@ CONFIGURATION (antipadawanCfg.json):
     "privateMessage": "^1Please change your username to play on this server.^7 Your username is blocked.",
     "marktkDuration": 60,
     "muteDuration": 10,
-    "detectedWords": ["padawan", "noob"]
+    "detectedWords": ["padawan", "noob"],
+    "nameChangeAbuse": {
+        "enabled": true,
+        "maxChanges": 3,
+        "timeWindow": 60,
+        "tempbanRounds": 5
+    }
 }
 
 PARAMETERS:
@@ -49,6 +58,11 @@ PARAMETERS:
 - "marktkDuration" (int): Duration in minutes for MarkTK (actions 0 and 3)
 - "muteDuration" (int): Duration in minutes for mute (action 3 only)
 - "detectedWords" (list): List of words to detect in player names (supports legacy "detectedWord" string)
+- "nameChangeAbuse" (object): Configuration for name change abuse detection and tempban
+  - "enabled" (bool): Enable/disable name change abuse detection (default: true)
+  - "maxChanges" (int): Number of changes to blocked names before tempban (default: 3)
+  - "timeWindow" (int): Time window in seconds to count name changes (default: 60)
+  - "tempbanRounds" (int): Number of rounds to tempban repeat offenders (default: 5)
 
 ACTION MODES:
 
@@ -124,6 +138,70 @@ When silentMode is enabled (set to true):
 - Plugin runs completely silently, only executing RCON commands
 - All logging still occurs normally in the Godfinger logs
 - Best for: Stealth enforcement where you don't want players to know they're being tracked
+
+REAL-TIME NAME CHANGE DETECTION:
+The plugin monitors player name changes in real-time using a polling mechanism:
+- Checks player names every 2 seconds via the 'status' command
+- Detects name changes immediately (not dependent on spawn/team change events)
+- Automatically applies penalties when player changes TO a blocked name
+- Automatically removes penalties when player changes TO an allowed name
+- Works on both Windows (PTY) and Linux (RCON) interfaces
+- Only removes plugin-applied penalties (preserves admin-applied marks/mutes)
+
+NAME CHANGE FLOW:
+1. Player joins as "GoodName" → No penalties
+2. Player changes to "Padawan" (in-game, 2 second detection)
+   → Plugin detects change within 2 seconds
+   → Applies MarkTK/Mute penalties (based on action mode)
+   → Sends private message
+   → Tracks as name change #1
+3. Player changes to "GoodName2" (in-game, 2 second detection)
+   → Plugin detects change within 2 seconds
+   → Removes MarkTK/Mute penalties (if no admin marks)
+   → Not counted as abuse (only changing TO blocked names counts)
+4. Player changes to "Padawan" again
+   → Applies penalties again
+   → Tracks as name change #2
+5. Player changes to "GoodName3"
+   → Removes penalties
+6. Player changes to "Padawan" third time
+   → Tracked as name change #3
+   → TEMPBANNED for 5 rounds (configurable)
+   → Player is kicked and cannot rejoin for 5 rounds
+
+NAME CHANGE ABUSE PREVENTION:
+To prevent players from exploiting the system by repeatedly changing between blocked/allowed names:
+- Plugin tracks how many times a player changes TO a blocked name
+- Only changes TO blocked names are counted (changing to allowed names is not counted)
+- Tracking is based on IP address and time window (default: 60 seconds)
+- After maxChanges (default: 3) within timeWindow, player is tempbanned
+- Tempban duration is configurable (default: 5 rounds)
+- Server announces the tempban publicly
+- Tempban uses MB2's built-in 'tempban' command (prevents rejoin for N rounds)
+
+ABUSE DETECTION CONFIG:
+{
+    "nameChangeAbuse": {
+        "enabled": true,           // Enable/disable abuse detection
+        "maxChanges": 3,            // 3 changes to blocked names = tempban
+        "timeWindow": 60,           // Count changes within 60 seconds
+        "tempbanRounds": 5          // Tempban for 5 rounds
+    }
+}
+
+ABUSE DETECTION EXAMPLES:
+Example 1: Player changes 2 times within 60 seconds
+  - "GoodName" → "Padawan" (change #1) → "GoodName" → "Padawan" (change #2)
+  - Result: Penalties applied/removed, no tempban (under threshold)
+
+Example 2: Player changes 3 times within 60 seconds
+  - "GoodName" → "Padawan" (#1) → "GoodName" → "Padawan" (#2) → "GoodName" → "Padawan" (#3)
+  - Result: TEMPBANNED for 5 rounds on the 3rd change
+
+Example 3: Player changes slowly over 2 minutes
+  - "GoodName" → "Padawan" (0:00, #1) → "GoodName" (0:30) → "Padawan" (1:30, #2)
+  - At 1:30, the change from 0:00 is outside the 60s window (expired)
+  - Only 1 recent change counted, no tempban
 
 PENALTY TRACKING (Actions 0 and 3):
 For actions that apply penalties but allow continued play (MarkTK or MarkTK+Mute):
