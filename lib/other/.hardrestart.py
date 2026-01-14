@@ -356,14 +356,14 @@ def launch_quickstart_linux_macOS(app_root_dir):
 if __name__ == "__main__":
     log_info("--- hardrestart.py: Script Started ---")
     log_info(f"Current working directory of hardrestart.py: {os.getcwd()}")
-    
+
     godfinger_root_dir = get_godfinger_app_root_dir()
 
     # 1. Terminate the mbiided process
     mbiided_name = MBIIDED_PROCESS_NAME_WIN if sys.platform.startswith('win') else MBIIDED_PROCESS_NAME_LINUX
     log_info(f"\nPhase 1: Attempting to terminate mbiided process ({mbiided_name})...")
-    
-    mbiided_terminated = terminate_target_process(mbiided_name) 
+
+    mbiided_terminated = terminate_target_process(mbiided_name)
     if mbiided_terminated:
         log_info("Waiting for mbiided process to fully exit...")
         wait_for_process_to_exit(mbiided_name)

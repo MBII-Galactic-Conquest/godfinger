@@ -409,6 +409,11 @@ class MBIIServer:
             if not watchdog_config.get("enabled", False):
                 return
 
+            # Check if watchdog is temporarily disabled for hard restart
+            if self._serverData.GetServerVar("_watchdog_disabled_for_hard_restart"):
+                Log.debug(f"Watchdog: Ignoring event '{event_type}' - disabled for hard restart")
+                return
+
             server_name = self._config.cfg["serverFileName"]
 
             if event_type == "unavailable":
