@@ -44,9 +44,9 @@ CONFIGURATION (automodCfg.json)
     "enabled": true,
     "prohibitedWords": [
         "badword",
-        "spam",
-        "offensive"
+        "badword2"
     ],
+    "prohibitedWordsFile": "",
     "threshold": 3,
     "action": 0,
     "muteDuration": 5,
