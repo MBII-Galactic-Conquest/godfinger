@@ -899,6 +899,17 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
         Log.error("Anti-Padawan plugin failed to initialize")
         return False
 
+    # Register SMOD commands (so they appear in !help)
+    newVal = []
+    rCommands = SERVER_DATA.GetServerVar("registeredSmodCommands")
+    if rCommands != None:
+        newVal.extend(rCommands)
+    for cmd in PluginInstance._smodCommandList:
+        for alias in cmd:
+            if not alias.isdecimal():
+                newVal.append((alias, PluginInstance._smodCommandList[cmd][0]))
+    SERVER_DATA.SetServerVar("registeredSmodCommands", newVal)
+
     return True  # indicate plugin load success
 
 
