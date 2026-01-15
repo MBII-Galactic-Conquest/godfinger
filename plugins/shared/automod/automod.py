@@ -264,18 +264,21 @@ class AutomodPlugin:
             # Log violation to persistent storage
             self._LogViolation(player_ip, player_name, message, matched_words, current_count, None)
 
-            # Send private message (if not silent)
-            if not self.config.get("silentMode", False):
-                private_msg = self.config.get("privateMessage", "You have been flagged.")
-                self._serverData.interface.SvTell(player_id, self._messagePrefix + private_msg)
-
             # Check if threshold reached
             threshold = self.config.get("threshold", 3)
+            will_be_punished = False
+
             if current_count >= threshold:
                 # Check if we've already punished at this count
                 if current_count not in self._session_violations[player_ip]["punished_at_counts"]:
+                    will_be_punished = True
                     self._ApplyPunishment(client, current_count, matched_words, message)
                     self._session_violations[player_ip]["punished_at_counts"].append(current_count)
+
+            # Send private warning message ONLY if not being punished (if not silent)
+            if not self.config.get("silentMode", False) and not will_be_punished:
+                private_msg = self.config.get("privateMessage", "You have been flagged.")
+                self._serverData.interface.SvTell(player_id, self._messagePrefix + private_msg)
 
         except Exception as e:
             Log.error(f"Error in OnMessage: {e}")
