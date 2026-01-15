@@ -645,7 +645,8 @@ class MBIIServer:
                 message = messages.get()
                 self._ParseMessage(message)
 
-        # Periodic name change detection (for Windows where PTY doesn't capture broadcasts)
+        # Periodic name change detection (fallback for when broadcast capture isn't available)
+        # Works on both Windows and Unix as a backup to immediate broadcast detection
         currentTime = time.time()
         if currentTime - self._lastNameCheck >= self._nameCheckInterval:
             self._lastNameCheck = currentTime
@@ -683,8 +684,8 @@ class MBIIServer:
                 self._HandleWatchdogEvent("restarted")
             return
 
-        # Check for broadcast name change messages
-        if line.startswith("broadcast:") and "@@@PLRENAME" in line:
+        # Check for broadcast name change messages (Windows PTY only)
+        if IsWindows and line.startswith("broadcast:") and "@@@PLRENAME" in line:
             Log.info(f"[NAMECHANGE DEBUG] Detected broadcast message with @@@PLRENAME, calling OnBroadcastNameChange")
             self.OnBroadcastNameChange(message)
             return

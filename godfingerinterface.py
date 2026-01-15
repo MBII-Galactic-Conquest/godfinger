@@ -195,7 +195,7 @@ class AServerInterface(IServerInterface):
 
 
 class RconInterface(AServerInterface):
-    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.x86.exe"):
+    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.i386" if IsUnix else "mbiided.x86.exe"):
         super().__init__()
         self._logReaderLock = threading.Lock()
         self._logReaderThreadControl = threadcontrol.ThreadControl()
@@ -205,7 +205,7 @@ class RconInterface(AServerInterface):
         self._logPath = logPath
         self._rcon = remoteconsole.RCON((ipAddress, port), bindAddr, password)
         self._testRetrospect = testRetrospect
-    
+
         self._wdObserver = observer.Observer(self._OnWDEvent)
         self._watchdog = pswd.ProcessWatchdog(procName)
         self._watchdog.Subscribe(self._wdObserver)
