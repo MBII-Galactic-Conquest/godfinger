@@ -22,6 +22,7 @@ import re
 import json
 import logging
 from datetime import datetime
+from time import time
 
 import godfingerEvent
 import lib.shared.serverdata as serverdata
@@ -335,7 +336,14 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
 
 def OnStart() -> bool:
     """Called after plugin initialization"""
-    return PluginInstance.Start()
+    startTime = time()
+    result = PluginInstance.Start()
+    if result:
+        loadTime = time() - startTime
+        PluginInstance._serverData.interface.SvSay(
+            PluginInstance._messagePrefix + f"Bouncer started in {loadTime:.2f} seconds!"
+        )
+    return result
 
 
 def OnLoop():

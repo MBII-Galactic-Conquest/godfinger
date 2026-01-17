@@ -162,6 +162,29 @@ SMOD ADMIN COMMANDS
   - State persists until toggled again or server restart
   - Initial state is determined by "enabled" in config
 
+!whitelistmuteip <player|IP>
+  Description: Add a player's name (or direct IP) to the protected list
+  Permissions: SMOD only
+  Usage: /smod smsay !whitelistmuteip PlayerName
+         /smod smsay !whitelistmuteip 192.168.1.100
+  Notes:
+  - Accepts either a player name or an IP address directly
+  - If player name: looks up the player and adds their current IP
+  - If IP address: adds the IP directly to the list
+  - Creates protectedIPs.txt if it doesn't exist
+  - Protected players cannot be votemuted
+
+!rmwhitelistmuteip <player|IP>
+  Description: Remove a player's name (or direct IP) from the protected list
+  Permissions: SMOD only
+  Usage: /smod smsay !rmwhitelistmuteip PlayerName
+         /smod smsay !rmwhitelistmuteip 192.168.1.100
+  Notes:
+  - Accepts either a player name or an IP address directly
+  - If player name: looks up the player and removes their current IP
+  - If IP address: removes the IP directly from the list
+  - Only removes if IP exists in the list
+
 These commands will appear in the SMOD help menu when you type:
   /smod smsay !help
 

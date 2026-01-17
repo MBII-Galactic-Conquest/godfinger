@@ -474,7 +474,14 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
 
 def OnStart() -> bool:
     """Called after plugin initialization"""
-    return PluginInstance.Start()
+    startTime = time.time()
+    result = PluginInstance.Start()
+    if result:
+        loadTime = time.time() - startTime
+        PluginInstance._serverData.interface.SvSay(
+            PluginInstance._messagePrefix + f"AutoMod started in {loadTime:.2f} seconds!"
+        )
+    return result
 
 
 def OnLoop():
