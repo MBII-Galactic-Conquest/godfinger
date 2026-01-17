@@ -31,15 +31,15 @@ REQUIREMENTS
 
 ** IMPORTANT: ANTI-CHEAT SETTING **
 -----------------------------------
-This plugin REQUIRES g_anticheat to be set to 1 on your server. If g_anticheat
+This plugin REQUIRES g_anticheat to be set to 0 on your server. If g_anticheat
 is set to 0, the fake clients will be kicked immediately upon connecting.
 
-The plugin automatically sets "g_anticheat 1" when it starts. However, if you
+The plugin automatically sets "g_anticheat 0" when it starts. However, if you
 have this setting configured elsewhere (server.cfg, command line, etc.) make
-sure it is set to 1, not 0.
+sure it is set to 0, not 1.
 
 If fake clients keep getting kicked immediately, check your server configuration
-for any setting that might be overriding g_anticheat back to 0.
+for any setting that might be overriding g_anticheat back to 1.
 
 ** IMPORTANT: TOGGLE AUTOCLIENT.CFG **
 -----------------------------------
