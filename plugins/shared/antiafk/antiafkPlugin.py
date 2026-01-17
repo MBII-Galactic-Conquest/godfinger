@@ -94,15 +94,24 @@ class AntiAFKPlugin:
                 Log.error(f"Failed to create default config: {e}")
             return DEFAULT_CONFIG
     
+    def _is_localhost(self, client_ip: str) -> bool:
+        """Check if IP is localhost"""
+        ip = client_ip.split(':')[0] if ':' in client_ip else client_ip
+        return ip == "127.0.0.1" or ip.startswith("127.")
+
     def _is_exempt(self, player_client: client.Client) -> bool:
         """Check if player is exempt from AFK kicks"""
         ja_guid = player_client._jaguid
         player_id = player_client.GetId()
-        
+
+        # Check if this is a locally hosted client - always exempt
+        if self._is_localhost(player_client.GetIp()):
+            return True
+
         # Check ja_guid exemption
         if ja_guid in self._config["exemptJAGuids"]:
             return True
-        
+
         # Check SMOD exemption
         if self._config.get("exemptSmodUsers", True):
             if player_id in self._players:
@@ -110,7 +119,7 @@ class AntiAFKPlugin:
                 if afk_player.IsSmodLoggedIn():
                     Log.debug(f"Player {player_client.GetName()} (ID: {player_id}) exempt - logged into SMOD")
                     return True
-        
+
         return False
     
     def _should_enforce_afk(self) -> bool:
