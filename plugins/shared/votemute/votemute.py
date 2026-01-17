@@ -10,6 +10,8 @@ SMOD Commands:
     !overridevotemute 1 - Force vote to pass (admin override)
     !overridevotemute 2 - Force vote to fail (admin override)
     !togglevotemute - Enable/disable votemute
+    !whitelistmuteip <player|IP> - Add IP to protected list
+    !rmwhitelistmuteip <player|IP> - Remove IP from protected list
 
 Non-voters count as NO votes.
 Majority threshold is configurable.
@@ -95,6 +97,8 @@ class VotemutePlugin:
         self._smodCommandList = {
             tuple(["overridevotemute", "ovm"]): ("!overridevotemute <1|2> - Override active votemute (1=pass, 2=fail)", self.HandleOverrideVote),
             tuple(["togglevotemute", "tvm"]): ("!togglevotemute - Enable/disable votemute", self.HandleToggleVote),
+            tuple(["whitelistmuteip"]): ("!whitelistmuteip <player|IP> - Add IP to protected list", self.HandleWhitelistIP),
+            tuple(["rmwhitelistmuteip"]): ("!rmwhitelistmuteip <player|IP> - Remove IP from protected list", self.HandleRemoveWhitelistIP),
         }
 
     def SvSay(self, message: str):
@@ -172,6 +176,82 @@ class VotemutePlugin:
 
         return protected_ips
 
+    def _GetProtectedIPsFilePath(self) -> str:
+        """Get the path to protected IPs file, creating it if necessary"""
+        filename = self.config.cfg.get("protectedIPsFile", "")
+
+        # If no file configured, use default protectedIPs.txt
+        if not filename:
+            filename = "protectedIPs.txt"
+
+        # Determine full path
+        if os.path.isabs(filename):
+            file_path = filename
+        else:
+            file_path = os.path.join(os.path.dirname(__file__), filename)
+
+        # Create file if it doesn't exist
+        if not os.path.exists(file_path):
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write("# VoteMute Protected IPs\n")
+                    f.write("# Add one IP per line. Lines starting with # are comments.\n")
+                Log.info(f"Created protected IPs file: {file_path}")
+            except Exception as e:
+                Log.error(f"Error creating protected IPs file: {e}")
+                return None
+
+        return file_path
+
+    def _AddIPToWhitelist(self, ip: str) -> tuple:
+        """Add an IP to the protected IPs file. Returns (success, message)"""
+        file_path = self._GetProtectedIPsFilePath()
+        if not file_path:
+            return (False, "Could not access protected IPs file")
+
+        # Check if IP already exists
+        if ip in self._protectedIPs:
+            return (False, f"IP {ip} is already in the protected list")
+
+        try:
+            with open(file_path, 'a', encoding='utf-8') as f:
+                f.write(f"{ip}\n")
+            self._protectedIPs.add(ip)
+            Log.info(f"Added IP {ip} to protected list")
+            return (True, f"IP {ip} added to protected list")
+        except Exception as e:
+            Log.error(f"Error adding IP to whitelist: {e}")
+            return (False, f"Error adding IP: {e}")
+
+    def _RemoveIPFromWhitelist(self, ip: str) -> tuple:
+        """Remove an IP from the protected IPs file. Returns (success, message)"""
+        file_path = self._GetProtectedIPsFilePath()
+        if not file_path:
+            return (False, "Could not access protected IPs file")
+
+        # Check if IP exists
+        if ip not in self._protectedIPs:
+            return (False, f"IP {ip} is not in the protected list")
+
+        try:
+            # Read all lines
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            # Write back without the IP
+            with open(file_path, 'w', encoding='utf-8') as f:
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped != ip:
+                        f.write(line)
+
+            self._protectedIPs.discard(ip)
+            Log.info(f"Removed IP {ip} from protected list")
+            return (True, f"IP {ip} removed from protected list")
+        except Exception as e:
+            Log.error(f"Error removing IP from whitelist: {e}")
+            return (False, f"Error removing IP: {e}")
+
     def _FindPlayerByName(self, name_query: str) -> client.Client:
         """Find a player by name (partial match, case-insensitive)"""
         name_lower = name_query.lower()
@@ -188,11 +268,11 @@ class VotemutePlugin:
         # Check if target is a logged-in SMOD
         if self.config.cfg.get("protectSmods", True):
             if target_ip in self._smodIPs:
-                return (True, "This player is a server admin and cannot be votemuted")
+                return (True, "This player is a server admin and cannot be votemuted.")
 
         # Check if target IP is in protected list (loaded from external file)
         if target_ip in self._protectedIPs:
-            return (True, "This player is protected and cannot be votemuted")
+            return (True, "This player is protected and cannot be votemuted.")
 
         return (False, None)
 
@@ -393,6 +473,92 @@ class VotemutePlugin:
 
         return True
 
+    def _IsValidIP(self, text: str) -> bool:
+        """Check if text looks like an IP address"""
+        parts = text.split('.')
+        if len(parts) != 4:
+            return False
+        try:
+            for part in parts:
+                num = int(part)
+                if num < 0 or num > 255:
+                    return False
+            return True
+        except ValueError:
+            return False
+
+    def HandleWhitelistIP(self, playerName: str, smodID: int, adminIP: str, cmdArgs: list) -> bool:
+        """SMOD command to add a player's IP to the protected list"""
+        if len(cmdArgs) < 2:
+            self._serverData.interface.SmSay(self._messagePrefix + "Usage: !whitelistmuteip <player|IP>")
+            return True
+
+        input_value = " ".join(cmdArgs[1:])
+
+        # Check if input is an IP address
+        if self._IsValidIP(input_value):
+            target_ip = input_value
+            success, message = self._AddIPToWhitelist(target_ip)
+            if success:
+                self._serverData.interface.SmSay(self._messagePrefix + f"^7{target_ip} added to protected list")
+                Log.info(f"SMOD {smodID} added IP {target_ip} to votemute whitelist")
+            else:
+                self._serverData.interface.SmSay(self._messagePrefix + message)
+        else:
+            # Try to find player by name
+            target = self._FindPlayerByName(input_value)
+            if target is None:
+                self._serverData.interface.SmSay(self._messagePrefix + f"Player '{input_value}' not found")
+                return True
+
+            target_ip = target.GetIp()
+            target_name_clean = colors.StripColorCodes(target.GetName())
+
+            success, message = self._AddIPToWhitelist(target_ip)
+            if success:
+                self._serverData.interface.SmSay(self._messagePrefix + f"^7{target_name_clean}'s IP added to protected list")
+                Log.info(f"SMOD {smodID} added {target_name_clean} ({target_ip}) to votemute whitelist")
+            else:
+                self._serverData.interface.SmSay(self._messagePrefix + message)
+
+        return True
+
+    def HandleRemoveWhitelistIP(self, playerName: str, smodID: int, adminIP: str, cmdArgs: list) -> bool:
+        """SMOD command to remove a player's IP from the protected list"""
+        if len(cmdArgs) < 2:
+            self._serverData.interface.SmSay(self._messagePrefix + "Usage: !rmwhitelistmuteip <player|IP>")
+            return True
+
+        input_value = " ".join(cmdArgs[1:])
+
+        # Check if input is an IP address
+        if self._IsValidIP(input_value):
+            target_ip = input_value
+            success, message = self._RemoveIPFromWhitelist(target_ip)
+            if success:
+                self._serverData.interface.SmSay(self._messagePrefix + f"^7{target_ip} removed from protected list")
+                Log.info(f"SMOD {smodID} removed IP {target_ip} from votemute whitelist")
+            else:
+                self._serverData.interface.SmSay(self._messagePrefix + message)
+        else:
+            # Try to find player by name
+            target = self._FindPlayerByName(input_value)
+            if target is None:
+                self._serverData.interface.SmSay(self._messagePrefix + f"Player '{input_value}' not found")
+                return True
+
+            target_ip = target.GetIp()
+            target_name_clean = colors.StripColorCodes(target.GetName())
+
+            success, message = self._RemoveIPFromWhitelist(target_ip)
+            if success:
+                self._serverData.interface.SmSay(self._messagePrefix + f"^7{target_name_clean}'s IP removed from protected list")
+                Log.info(f"SMOD {smodID} removed {target_name_clean} ({target_ip}) from votemute whitelist")
+            else:
+                self._serverData.interface.SmSay(self._messagePrefix + message)
+
+        return True
+
     def HandleSmodCommand(self, playerName: str, smodID: int, adminIP: str, cmdArgs: list) -> bool:
         """Dispatch SMOD commands"""
         command = cmdArgs[0]
@@ -590,7 +756,12 @@ def OnInitialize(serverData: serverdata.ServerData, exports=None) -> bool:
 
 def OnStart() -> bool:
     """Called after plugin initialization"""
-    return PluginInstance.Start()
+    startTime = time()
+    result = PluginInstance.Start()
+    if result:
+        loadTime = time() - startTime
+        PluginInstance.SvSay(f"VoteMute started in {loadTime:.2f} seconds!")
+    return result
 
 
 def OnLoop():

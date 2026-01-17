@@ -7,6 +7,7 @@ from lib.shared.player import Player
 import logging
 import json
 import os
+from time import time
 
 Log = logging.getLogger(__name__)
 
@@ -391,10 +392,16 @@ def OnLoop():
 def OnStart():
     """Start the plugin"""
     global PluginInstance
-    
+    startTime = time()
+
     if not PluginInstance.Start():
         Log.error("Failed to start Anti-AFK Plugin")
         return False
+
+    loadTime = time() - startTime
+    PluginInstance._serverData.interface.SvSay(
+        PluginInstance._messagePrefix + f"Anti-AFK started in {loadTime:.2f} seconds!"
+    )
     return True
 
 
