@@ -23,6 +23,7 @@ __pycache__/*
 
 !docker/godfinger-egg.json
 !start/autostart.cfg
+!start/autoclient.cfg
 !data/extralives.json
 
 godfingerCfg.json
