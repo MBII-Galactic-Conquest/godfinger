@@ -36,6 +36,14 @@ gtConfig.json
 ignored/*
 venv/*
 
+# Plugin-specific files containing IPs
+plugins/shared/votekick/protectedIPs.txt
+plugins/shared/votekick/protectedIPs.ini
+plugins/shared/votekick/protectedIPs.cfg
+plugins/shared/votemute/protectedIPs.txt
+plugins/shared/votemute/protectedIPs.ini
+plugins/shared/votemute/protectedIPs.cfg
+
 /logs/*
 aishit.md
 test_unicode_name.py

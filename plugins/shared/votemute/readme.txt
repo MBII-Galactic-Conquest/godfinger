@@ -17,10 +17,12 @@ FEATURES:
 - Configurable vote duration (timeout)
 - Configurable mute punishment (minutes)
 - Configurable cooldown between votes
-- SMOD admin override command (!overridevote)
+- SMOD admin override command (!overridevotemute)
 - Vote conflict prevention (won't overlap with RTV or VoteKick)
 - Silent mode for stealth enforcement
 - Vote cancels if target disconnects
+- SMOD protection (logged-in SMODs cannot be votemuted)
+- IP whitelist protection (configurable list of protected IPs)
 
 ==============================================================================
 INSTALLATION
@@ -50,7 +52,9 @@ CONFIGURATION (votemuteCfg.json)
     "muteDuration": 15,
     "voteCooldown": 120,
     "silentMode": false,
-    "messagePrefix": "^5[VoteMute]^7: "
+    "messagePrefix": "^5[VoteMute]^7: ",
+    "protectSmods": true,
+    "protectedIPsFile": "protectedIPs.txt"
 }
 
 PARAMETERS:
@@ -94,6 +98,22 @@ messagePrefix (string):
   Prefix for server messages (supports MB2 color codes)
   Default: "^5[VoteMute]^7: "
 
+protectSmods (bool):
+  If true: Logged-in SMODs cannot be votemuted
+  If false: SMODs can be votemuted like any other player
+  Default: true
+
+protectedIPsFile (string):
+  Path to a text file containing protected IP addresses (one per line)
+  Players connecting from these IPs are immune to votemute
+  Supports both absolute paths and relative paths (relative to plugin directory)
+  Lines starting with # are treated as comments
+  Example file contents:
+    # Admin IPs
+    192.168.1.100
+    10.0.0.50
+  Default: "protectedIPs.txt"
+
 ==============================================================================
 PLAYER COMMANDS
 ==============================================================================
@@ -104,6 +124,8 @@ PLAYER COMMANDS
   Notes:
   - Player name is case-insensitive and supports partial matching
   - Cannot votemute yourself
+  - Cannot votemute logged-in SMODs (if protectSmods is true)
+  - Cannot votemute players with protected IPs (if in protectedIPs list)
   - Cannot start if another vote is in progress (RTV, VoteKick, etc.)
   - Cannot start if votemute is on cooldown
 
@@ -219,6 +241,8 @@ VOTE NOT STARTING:
 - Check if another vote is in progress (RTV, VoteKick)
 - Check if votemute is on cooldown
 - Verify player name matches (partial match required)
+- Check if target is a logged-in SMOD (protected by default)
+- Check if target IP is in protectedIPs list
 
 VOTES NOT COUNTING:
 - Ensure players are typing !1 or !2 (not 1 or 2 without !)
@@ -239,12 +263,15 @@ TECHNICAL DETAILS
 FILES:
 - votemute.py: Main plugin code
 - votemuteCfg.json: Configuration (auto-created, gitignored)
+- protectedIPs.txt: List of protected IP addresses (create manually if needed)
 - readme.txt: This documentation
 
 EVENTS HANDLED:
 - GODFINGER_EVENT_TYPE_MESSAGE: Chat commands (!votemute, !1, !2)
-- GODFINGER_EVENT_TYPE_SMSAY: SMOD commands (!overridevote)
+- GODFINGER_EVENT_TYPE_SMSAY: SMOD commands (!overridevotemute, !togglevotemute)
 - GODFINGER_EVENT_TYPE_CLIENTDISCONNECT: Cancel vote if target leaves
+- GODFINGER_EVENT_TYPE_SMOD_LOGIN: Track SMOD logins for protection
+- GODFINGER_EVENT_TYPE_SMOD_COMMAND: Detect SMOD logout to remove protection
 
 SERVER VARIABLES:
 - votesInProgress: Array tracking active votes (shared with RTV, VoteKick)

@@ -41,7 +41,9 @@ CONFIG_FALLBACK = """{
     "tempbanRounds": 3,
     "voteCooldown": 120,
     "silentMode": false,
-    "messagePrefix": "^1[VoteKick]^7: "
+    "messagePrefix": "^1[VoteKick]^7: ",
+    "protectSmods": true,
+    "protectedIPsFile": ""
 }"""
 
 VotekickConfig = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
@@ -82,6 +84,12 @@ class VotekickPlugin:
 
         # Runtime enabled state (can be toggled by SMOD)
         self._runtimeEnabled = self.config.cfg.get("enabled", True)
+
+        # Track logged-in SMOD IPs
+        self._smodIPs = set()
+
+        # Load protected IPs from external file
+        self._protectedIPs = self._LoadProtectedIPs()
 
         # SMOD command registration
         self._smodCommandList = {
@@ -129,6 +137,41 @@ class VotekickPlugin:
             votesInProgress.remove("VoteKick")
             self._serverData.SetServerVar("votesInProgress", votesInProgress)
 
+    def _LoadProtectedIPs(self) -> set:
+        """Load protected IPs from external file"""
+        protected_ips = set()
+        filename = self.config.cfg.get("protectedIPsFile", "")
+
+        if not filename:
+            return protected_ips
+
+        try:
+            # Support both absolute and relative paths
+            if os.path.isabs(filename):
+                file_path = filename
+            else:
+                # Relative to plugin directory
+                file_path = os.path.join(os.path.dirname(__file__), filename)
+
+            if not os.path.exists(file_path):
+                Log.debug(f"Protected IPs file not found: {file_path}")
+                return protected_ips
+
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    # Strip whitespace and skip empty lines and comments
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        protected_ips.add(line)
+
+            if protected_ips:
+                Log.info(f"Loaded {len(protected_ips)} protected IPs from {filename}")
+
+        except Exception as e:
+            Log.error(f"Error loading protected IPs file: {e}")
+
+        return protected_ips
+
     def _FindPlayerByName(self, name_query: str) -> client.Client:
         """Find a player by name (partial match, case-insensitive)"""
         name_lower = name_query.lower()
@@ -137,6 +180,21 @@ class VotekickPlugin:
             if name_lower == client_name or name_lower in client_name:
                 return cl
         return None
+
+    def _IsProtected(self, target: client.Client) -> tuple:
+        """Check if target is protected from votekick. Returns (is_protected, reason)"""
+        target_ip = target.GetIp()
+
+        # Check if target is a logged-in SMOD
+        if self.config.cfg.get("protectSmods", True):
+            if target_ip in self._smodIPs:
+                return (True, "This player is a server admin and cannot be votekicked")
+
+        # Check if target IP is in protected list (loaded from external file)
+        if target_ip in self._protectedIPs:
+            return (True, "This player is protected and cannot be votekicked")
+
+        return (False, None)
 
     def _StartVote(self, initiator: client.Client, target: client.Client):
         """Start a votekick against target"""
@@ -249,6 +307,12 @@ class VotekickPlugin:
         # Cannot vote against self
         if target.GetId() == eventClient.GetId():
             self.SvTell(eventClient.GetId(), "You cannot start a votekick against yourself")
+            return True
+
+        # Check if target is protected (SMOD or whitelisted IP)
+        is_protected, reason = self._IsProtected(target)
+        if is_protected:
+            self.SvTell(eventClient.GetId(), reason)
             return True
 
         self._StartVote(eventClient, target)
@@ -366,7 +430,13 @@ class VotekickPlugin:
         return False
 
     def OnClientDisconnect(self, eventClient: client.Client, reason: int) -> bool:
-        """Handle client disconnect - cancel vote if target leaves"""
+        """Handle client disconnect - cancel vote if target leaves, remove SMOD status"""
+        # Remove SMOD status when player disconnects
+        client_ip = eventClient.GetIp()
+        if client_ip in self._smodIPs:
+            self._smodIPs.discard(client_ip)
+            Log.debug(f"SMOD IP {client_ip} removed on disconnect")
+
         if self._activeVote is None:
             return False
 
@@ -374,6 +444,38 @@ class VotekickPlugin:
             target_name = colors.StripColorCodes(self._activeVote["target_name"])
             self.SvSay(f"Vote to kick {target_name}^7 cancelled - player disconnected")
             self._EndVote(apply_cooldown=False)
+
+        return False
+
+    def OnSmodLogin(self, playerName: str, smodID: int, adminIP: str) -> bool:
+        """Handle SMOD login - track SMOD IPs for protection"""
+        if self.config.cfg.get("protectSmods", True):
+            # Strip port from IP if present
+            ip_only = adminIP.split(":")[0] if ":" in adminIP else adminIP
+            self._smodIPs.add(ip_only)
+            Log.debug(f"SMOD login tracked: {playerName} ({ip_only})")
+        return False
+
+    def OnSmodCommand(self, data: dict) -> bool:
+        """Handle SMOD command events - detect logout to remove SMOD protection"""
+        if not self.config.cfg.get("protectSmods", True):
+            return False
+
+        command = data.get("command", "")
+        smod_ip = data.get("smod_ip", "")
+
+        # Check if this is a logout command
+        if command and "logout" in command.lower() and smod_ip:
+            # Strip port from IP if present
+            ip_only = smod_ip.split(":")[0] if ":" in smod_ip else smod_ip
+
+            # Check both with and without port
+            if smod_ip in self._smodIPs:
+                self._smodIPs.discard(smod_ip)
+                Log.debug(f"SMOD logout detected, IP removed: {smod_ip}")
+            elif ip_only in self._smodIPs:
+                self._smodIPs.discard(ip_only)
+                Log.debug(f"SMOD logout detected, IP removed: {ip_only}")
 
         return False
 
@@ -514,6 +616,12 @@ def OnEvent(event) -> bool:
 
         elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
             return PluginInstance.OnClientDisconnect(event.client, event.reason)
+
+        elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMOD_LOGIN:
+            return PluginInstance.OnSmodLogin(event.playerName, event.smodID, event.adminIP)
+
+        elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SMOD_COMMAND:
+            return PluginInstance.OnSmodCommand(event.data)
 
     except Exception as e:
         Log.error(f"Error in OnEvent: {e}")
