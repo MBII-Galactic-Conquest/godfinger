@@ -3,12 +3,15 @@ version: "3.8"
 services:
   godfinger:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile
     container_name: godfinger_server
     volumes:
-      - ../../dockerize:/app/jediacademy/
+      # Mount Jedi Academy base installation
+      - ../../dockerize:/app/jediacademy
+      # Mount godfinger source code
       - ..:/app/jediacademy/gamedata/godfinger
+      # Mount persistent config storage (overlays specific config files)
       - ../../configstore_godfinger:/app/jediacademy/gamedata/godfinger
     ports:
       - "29070:29070/udp"
