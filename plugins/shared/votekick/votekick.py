@@ -291,6 +291,14 @@ class VotekickPlugin:
 
     def _StartVote(self, initiator: client.Client, target: client.Client):
         """Start a votekick against target"""
+        target_name_clean = colors.StripColorCodes(target.GetName())
+        initiator_name = colors.StripColorCodes(initiator.GetName())
+        total_players = self._GetRealPlayerCount()
+        eligible_voters = total_players - 1  # Target cannot vote on their own votekick
+        votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
+        minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
+        minimum_voters_needed = ceil(eligible_voters * minimum_participation)
+
         self._activeVote = {
             "target_id": target.GetId(),
             "target_name": target.GetName(),
@@ -298,15 +306,12 @@ class VotekickPlugin:
             "initiator_id": initiator.GetId(),
             "votes_yes": [initiator.GetId()],
             "votes_no": [],
-            "start_time": time()
+            "start_time": time(),
+            "votes_needed": votes_needed,
+            "minimum_voters_needed": minimum_voters_needed,
+            "eligible_voters_at_start": eligible_voters
         }
         self._RegisterVote()
-
-        target_name_clean = colors.StripColorCodes(target.GetName())
-        initiator_name = colors.StripColorCodes(initiator.GetName())
-        total_players = self._GetRealPlayerCount()
-        eligible_voters = total_players - 1  # Target cannot vote on their own votekick
-        votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
 
         self.SvSay(f"{initiator_name}^7 started a vote to ^1KICK^7 {target_name_clean}^7. Type ^2!1^7 for YES, ^1!2^7 for NO. (1/{votes_needed} needed)")
         Log.info(f"VoteKick started by {initiator_name} against {target_name_clean}")
@@ -333,14 +338,11 @@ class VotekickPlugin:
         if self._activeVote is None:
             return "pending"
 
-        total_players = self._GetRealPlayerCount()
-        eligible_voters = total_players - 1  # Target cannot vote
         yes_count = len(self._activeVote["votes_yes"])
         no_count = len(self._activeVote["votes_no"])
         total_voters = yes_count + no_count
-        votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
-        minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
-        minimum_voters_needed = ceil(eligible_voters * minimum_participation)
+        votes_needed = self._activeVote["votes_needed"]
+        minimum_voters_needed = self._activeVote["minimum_voters_needed"]
         vote_duration = self.config.cfg.get("voteDuration", 60)
         time_expired = time() - self._activeVote["start_time"] >= vote_duration
 
@@ -423,10 +425,8 @@ class VotekickPlugin:
 
         self._HandleVote(eventClient.GetId(), True)
 
-        total_players = self._GetRealPlayerCount()
-        eligible_voters = total_players - 1  # Target cannot vote
         yes_count = len(self._activeVote["votes_yes"])
-        votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
+        votes_needed = self._activeVote["votes_needed"]
 
         # Announce progress
         target_name = colors.StripColorCodes(self._activeVote["target_name"])
@@ -682,9 +682,7 @@ class VotekickPlugin:
         elif result == "fail":
             target_name = colors.StripColorCodes(self._activeVote["target_name"])
             yes_count = len(self._activeVote["votes_yes"])
-            total_players = self._GetRealPlayerCount()
-            eligible_voters = total_players - 1  # Target cannot vote
-            votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
+            votes_needed = self._activeVote["votes_needed"]
             self.SvSay(f"Vote to kick {target_name}^7 ^1FAILED^7 ({yes_count}/{votes_needed})")
             self._EndVote()
         elif result == "insufficient":
@@ -692,10 +690,7 @@ class VotekickPlugin:
             yes_count = len(self._activeVote["votes_yes"])
             no_count = len(self._activeVote["votes_no"])
             total_voters = yes_count + no_count
-            total_players = self._GetRealPlayerCount()
-            eligible_voters = total_players - 1  # Target cannot vote
-            minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
-            minimum_voters_needed = ceil(eligible_voters * minimum_participation)
+            minimum_voters_needed = self._activeVote["minimum_voters_needed"]
             self.SvSay(f"Vote to kick {target_name}^7 ^1FAILED^7 - not enough participation ({total_voters}/{minimum_voters_needed} needed)")
             self._EndVote()
 
