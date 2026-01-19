@@ -202,6 +202,7 @@ class BouncerPlugin:
             if not self.config.cfg.get("silentMode", False):
                 private_msg = self.config.cfg.get("privateMessage", "Welcome to the server!")
                 self._serverData.interface.SvTell(player_id, self._messagePrefix + private_msg)
+                self._serverData.interface.SvTell(player_id, self._messagePrefix + "This is a one-time authentication and will not occur again.")
 
         except Exception as e:
             Log.error(f"Error applying punishment to {player_name}: {e}")
