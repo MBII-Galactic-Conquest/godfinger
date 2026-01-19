@@ -252,6 +252,19 @@ class VotemutePlugin:
             Log.error(f"Error removing IP from whitelist: {e}")
             return (False, f"Error removing IP: {e}")
 
+    def _IsLocalhost(self, client_ip: str) -> bool:
+        """Check if IP is localhost"""
+        ip = client_ip.split(':')[0] if ':' in client_ip else client_ip
+        return ip == "127.0.0.1" or ip.startswith("127.")
+
+    def _GetRealPlayerCount(self) -> int:
+        """Get count of real players (excluding localhost/fake clients)"""
+        count = 0
+        for cl in self._serverData.API.GetAllClients():
+            if not self._IsLocalhost(cl.GetIp()):
+                count += 1
+        return count
+
     def _FindPlayerByName(self, name_query: str) -> client.Client:
         """Find a player by name (partial match, case-insensitive)"""
         name_lower = name_query.lower()
@@ -290,7 +303,7 @@ class VotemutePlugin:
 
         target_name_clean = colors.StripColorCodes(target.GetName())
         initiator_name = colors.StripColorCodes(initiator.GetName())
-        total_players = len(self._serverData.API.GetAllClients())
+        total_players = self._GetRealPlayerCount()
         eligible_voters = total_players - 1  # Target cannot vote on their own votemute
         votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
 
@@ -319,7 +332,7 @@ class VotemutePlugin:
         if self._activeVote is None:
             return "pending"
 
-        total_players = len(self._serverData.API.GetAllClients())
+        total_players = self._GetRealPlayerCount()
         eligible_voters = total_players - 1  # Target cannot vote
         yes_count = len(self._activeVote["votes_yes"])
         no_count = len(self._activeVote["votes_no"])
@@ -409,7 +422,7 @@ class VotemutePlugin:
 
         self._HandleVote(eventClient.GetId(), True)
 
-        total_players = len(self._serverData.API.GetAllClients())
+        total_players = self._GetRealPlayerCount()
         eligible_voters = total_players - 1  # Target cannot vote
         yes_count = len(self._activeVote["votes_yes"])
         votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
@@ -669,7 +682,7 @@ class VotemutePlugin:
         elif result == "fail":
             target_name = colors.StripColorCodes(self._activeVote["target_name"])
             yes_count = len(self._activeVote["votes_yes"])
-            total_players = len(self._serverData.API.GetAllClients())
+            total_players = self._GetRealPlayerCount()
             eligible_voters = total_players - 1  # Target cannot vote
             votes_needed = ceil(eligible_voters * self.config.cfg.get("majorityThreshold", 0.75))
             self.SvSay(f"Vote to mute {target_name}^7 ^1FAILED^7 ({yes_count}/{votes_needed})")
@@ -679,7 +692,7 @@ class VotemutePlugin:
             yes_count = len(self._activeVote["votes_yes"])
             no_count = len(self._activeVote["votes_no"])
             total_voters = yes_count + no_count
-            total_players = len(self._serverData.API.GetAllClients())
+            total_players = self._GetRealPlayerCount()
             eligible_voters = total_players - 1  # Target cannot vote
             minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
             minimum_voters_needed = ceil(eligible_voters * minimum_participation)
