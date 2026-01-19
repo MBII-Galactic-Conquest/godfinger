@@ -172,7 +172,15 @@ def OnInitialize(serverData : serverdata.ServerData, exports = None) -> bool:
 # Called once when platform starts, after platform is done with loading internal data and preparing
 def OnStart():
     global PluginInstance;
-    return PluginInstance.Start();
+    from time import time
+    startTime = time()
+    result = PluginInstance.Start()
+    if result:
+        loadTime = time() - startTime
+        PluginInstance._serverData.interface.SvSay(
+            PluginInstance._messagePrefix + f"VPN Monitor started in {loadTime:.2f} seconds!"
+        )
+    return result
 
 # Called each loop tick from the system, TODO? maybe add a return timeout for next call
 def OnLoop():
