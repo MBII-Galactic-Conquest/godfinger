@@ -84,6 +84,11 @@ class AntiPadawan():
             tuple(["kickpadawans"]): ("!kickpadawans - Kick all players with blocked names", self.HandleKickPadawans)
         }
 
+    def _IsLocalhost(self, client_ip: str) -> bool:
+        """Check if IP is localhost"""
+        ip = client_ip.split(':')[0] if ':' in client_ip else client_ip
+        return ip == "127.0.0.1" or ip.startswith("127.")
+
     def Start(self) -> bool:
         """Check all existing players on startup"""
         if not self.config.cfg["enabled"]:
@@ -91,6 +96,9 @@ class AntiPadawan():
 
         allClients = self._serverData.API.GetAllClients()
         for cl in allClients:
+            # Skip localhost clients
+            if self._IsLocalhost(cl.GetIp()):
+                continue
             if self._IsPadawanName(cl):
                 Log.info(f"Detected padawan name on startup: {cl.GetName()} (ID: {cl.GetId()})")
                 self._HandlePadawan(cl)
@@ -110,6 +118,10 @@ class AntiPadawan():
             if not self.config.cfg["enabled"]:
                 return False
 
+            # Skip localhost clients
+            if self._IsLocalhost(client.GetIp()):
+                return False
+
             # Check if player has padawan in name
             if self._IsPadawanName(client):
                 Log.info(f"Detected padawan name: {client.GetName()} (ID: {client.GetId()})")
@@ -125,6 +137,10 @@ class AntiPadawan():
         try:
             # Check if plugin is enabled
             if not self.config.cfg["enabled"]:
+                return False
+
+            # Skip localhost clients
+            if self._IsLocalhost(client.GetIp()):
                 return False
 
             # Check if name was changed
@@ -304,6 +320,10 @@ class AntiPadawan():
         try:
             # Check if plugin is enabled
             if not self.config.cfg["enabled"]:
+                return False
+
+            # Skip localhost clients
+            if self._IsLocalhost(client.GetIp()):
                 return False
 
             player_ip = client.GetIp()

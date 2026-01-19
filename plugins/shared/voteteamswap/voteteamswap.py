@@ -160,20 +160,26 @@ class VoteteamswapPlugin:
 
     def _StartVote(self, initiator: client.Client, target_value: str):
         """Start a vote to change g_teamSwap"""
+        total_players = self._GetRealPlayerCount()
+        votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
+        minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
+        minimum_voters_needed = ceil(total_players * minimum_participation)
+
         self._activeVote = {
             "initiator_id": initiator.GetId(),
             "initiator_name": initiator.GetName(),
             "votes_yes": [initiator.GetId()],
             "votes_no": [],
             "start_time": time(),
-            "target_value": target_value
+            "target_value": target_value,
+            "votes_needed": votes_needed,
+            "minimum_voters_needed": minimum_voters_needed,
+            "total_players_at_start": total_players
         }
         self._RegisterVote()
 
         initiator_name = colors.StripColorCodes(initiator.GetName())
         action = "^2ENABLE" if target_value == "1" else "^1DISABLE"
-        total_players = self._GetRealPlayerCount()
-        votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
 
         self.SvSay(f"{initiator_name}^7 started a vote to {action}^7 team swap. Type ^2!1^7 for YES, ^1!2^7 for NO. (1/{votes_needed} needed)")
         Log.info(f"VoteTeamSwap started by {initiator_name} to set g_teamSwap={target_value}")
@@ -200,13 +206,11 @@ class VoteteamswapPlugin:
         if self._activeVote is None:
             return "pending"
 
-        total_players = self._GetRealPlayerCount()
         yes_count = len(self._activeVote["votes_yes"])
         no_count = len(self._activeVote["votes_no"])
         total_voters = yes_count + no_count
-        votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
-        minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
-        minimum_voters_needed = ceil(total_players * minimum_participation)
+        votes_needed = self._activeVote["votes_needed"]
+        minimum_voters_needed = self._activeVote["minimum_voters_needed"]
         vote_duration = self.config.cfg.get("voteDuration", 60)
         time_expired = time() - self._activeVote["start_time"] >= vote_duration
 
@@ -264,9 +268,8 @@ class VoteteamswapPlugin:
 
         self._HandleVote(eventClient.GetId(), True)
 
-        total_players = self._GetRealPlayerCount()
         yes_count = len(self._activeVote["votes_yes"])
-        votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
+        votes_needed = self._activeVote["votes_needed"]
 
         # Announce progress
         action = "enable" if self._activeVote["target_value"] == "1" else "disable"
@@ -381,17 +384,14 @@ class VoteteamswapPlugin:
             self._EndVote()
         elif result == "fail":
             yes_count = len(self._activeVote["votes_yes"])
-            total_players = self._GetRealPlayerCount()
-            votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
+            votes_needed = self._activeVote["votes_needed"]
             self.SvSay(f"Vote to {action} team swap ^1FAILED^7 ({yes_count}/{votes_needed})")
             self._EndVote()
         elif result == "insufficient":
             yes_count = len(self._activeVote["votes_yes"])
             no_count = len(self._activeVote["votes_no"])
             total_voters = yes_count + no_count
-            total_players = self._GetRealPlayerCount()
-            minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
-            minimum_voters_needed = ceil(total_players * minimum_participation)
+            minimum_voters_needed = self._activeVote["minimum_voters_needed"]
             self.SvSay(f"Vote to {action} team swap ^1FAILED^7 - not enough participation ({total_voters}/{minimum_voters_needed} needed)")
             self._EndVote()
 

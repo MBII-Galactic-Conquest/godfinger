@@ -44,7 +44,7 @@ CONFIG_FALLBACK = """{
     "muteDuration": 15,
     "silentMode": false,
     "messagePrefix": "^3[Bouncer]^7: ",
-    "privateMessage": "Welcome to the server!"
+    "privateMessage": "This is a one-time authentication and will not occur again."
 }"""
 
 BouncerConfig = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
