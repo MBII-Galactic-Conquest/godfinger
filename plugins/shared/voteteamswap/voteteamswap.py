@@ -115,6 +115,19 @@ class VoteteamswapPlugin:
             Log.error(f"Error getting g_teamSwap: {e}")
         return "0"  # Default to off if unknown
 
+    def _IsLocalhost(self, client_ip: str) -> bool:
+        """Check if IP is localhost"""
+        ip = client_ip.split(':')[0] if ':' in client_ip else client_ip
+        return ip == "127.0.0.1" or ip.startswith("127.")
+
+    def _GetRealPlayerCount(self) -> int:
+        """Get count of real players (excluding localhost/fake clients)"""
+        count = 0
+        for cl in self._serverData.API.GetAllClients():
+            if not self._IsLocalhost(cl.GetIp()):
+                count += 1
+        return count
+
     def _CanStartVote(self) -> tuple:
         """Check if a vote can be started. Returns (can_start, reason)"""
         if not self._runtimeEnabled:
@@ -159,7 +172,7 @@ class VoteteamswapPlugin:
 
         initiator_name = colors.StripColorCodes(initiator.GetName())
         action = "^2ENABLE" if target_value == "1" else "^1DISABLE"
-        total_players = len(self._serverData.API.GetAllClients())
+        total_players = self._GetRealPlayerCount()
         votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
 
         self.SvSay(f"{initiator_name}^7 started a vote to {action}^7 team swap. Type ^2!1^7 for YES, ^1!2^7 for NO. (1/{votes_needed} needed)")
@@ -187,7 +200,7 @@ class VoteteamswapPlugin:
         if self._activeVote is None:
             return "pending"
 
-        total_players = len(self._serverData.API.GetAllClients())
+        total_players = self._GetRealPlayerCount()
         yes_count = len(self._activeVote["votes_yes"])
         no_count = len(self._activeVote["votes_no"])
         total_voters = yes_count + no_count
@@ -251,7 +264,7 @@ class VoteteamswapPlugin:
 
         self._HandleVote(eventClient.GetId(), True)
 
-        total_players = len(self._serverData.API.GetAllClients())
+        total_players = self._GetRealPlayerCount()
         yes_count = len(self._activeVote["votes_yes"])
         votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
 
@@ -368,7 +381,7 @@ class VoteteamswapPlugin:
             self._EndVote()
         elif result == "fail":
             yes_count = len(self._activeVote["votes_yes"])
-            total_players = len(self._serverData.API.GetAllClients())
+            total_players = self._GetRealPlayerCount()
             votes_needed = ceil(total_players * self.config.cfg.get("majorityThreshold", 0.75))
             self.SvSay(f"Vote to {action} team swap ^1FAILED^7 ({yes_count}/{votes_needed})")
             self._EndVote()
@@ -376,7 +389,7 @@ class VoteteamswapPlugin:
             yes_count = len(self._activeVote["votes_yes"])
             no_count = len(self._activeVote["votes_no"])
             total_voters = yes_count + no_count
-            total_players = len(self._serverData.API.GetAllClients())
+            total_players = self._GetRealPlayerCount()
             minimum_participation = self.config.cfg.get("minimumParticipation", 0.5)
             minimum_voters_needed = ceil(total_players * minimum_participation)
             self.SvSay(f"Vote to {action} team swap ^1FAILED^7 - not enough participation ({total_voters}/{minimum_voters_needed} needed)")
