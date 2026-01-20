@@ -26,7 +26,7 @@ REQUIREMENTS
 1. Windows operating system
 2. MBII game client (mbii.x86.exe) accessible on the same machine
 3. Dedicated server (mbiided.x86.exe) must be running
-4. g_anticheat must be set to 1 (plugin sets this automatically)
+4. g_anticheat must be set to 0 (plugin sets this automatically)
 
 
 ** IMPORTANT: ANTI-CHEAT SETTING **
