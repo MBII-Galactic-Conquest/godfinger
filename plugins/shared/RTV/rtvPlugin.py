@@ -90,6 +90,8 @@ CONFIG_FALLBACK = '''{
     "showVoteCooldownTime": 5,
     "maxMapPageSize": 950,
     "maxSearchPageSize": 950,
+    "defaultTeam1": "LEG_Good",
+    "defaultTeam2": "LEG_Evil",
     "rtv": {
         "enabled": true,
         "voteTime": 180,
@@ -758,10 +760,10 @@ class RTV(object):
                 else:
                     team_names.append(str(t))
             teamsToChange1 = ' '.join(team_names)
-            self._serverData.interface.SetTeam1("LEG_Good " + teamsToChange1)
+            self._serverData.interface.SetTeam1(self._config.cfg.get("defaultTeam1", "LEG_Good") + " " + teamsToChange1)
             self._serverData.SetServerVar("team1_purchased_teams", None)
         else:
-            self._serverData.interface.SetTeam1("LEG_Good")
+            self._serverData.interface.SetTeam1(self._config.cfg.get("defaultTeam1", "LEG_Good"))
         if teamsToChange2 != None and len(teamsToChange2) > 0:
             # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
             team_names = []
@@ -771,10 +773,10 @@ class RTV(object):
                 else:
                     team_names.append(str(t))
             teamsToChange2 = ' '.join(team_names)
-            self._serverData.interface.SetTeam2("LEG_Evil " + teamsToChange2)
+            self._serverData.interface.SetTeam2(self._config.cfg.get("defaultTeam2", "LEG_Evil") + " " + teamsToChange2)
             self._serverData.SetServerVar("team2_purchased_teams", None)
         else:
-            self._serverData.interface.SetTeam2("LEG_Evil")
+            self._serverData.interface.SetTeam2(self._config.cfg.get("defaultTeam2", "LEG_Evil"))
         self._serverData.interface.MapReload(mapToChange)
     
     def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
@@ -1194,8 +1196,8 @@ class RTV(object):
         # Reset siege teams
         self._serverData.SetServerVar("team1_purchased_teams", None)
         self._serverData.SetServerVar("team2_purchased_teams", None)
-        self._serverData.interface.SetTeam1("LEG_Good")
-        self._serverData.interface.SetTeam2("LEG_Evil")
+        self._serverData.interface.SetTeam1(self._config.cfg.get("defaultTeam1", "LEG_Good"))
+        self._serverData.interface.SetTeam2(self._config.cfg.get("defaultTeam2", "LEG_Evil"))
         if doMap and doMode:
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]], self._config.cfg["rtv"]["emptyServerMap"]["map"])
         elif doMap:
