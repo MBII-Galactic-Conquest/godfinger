@@ -141,6 +141,21 @@ class IServerInterface():
     def MarkTK(self, player_id : int, time : int) -> str:
         return
 
+
+    # !!! CUSTOM SERVER BUILD COMMANDS !!!
+    # THESE WILL NOT WORK WITH STANDARD OPENJK SERVER BUILD
+    def SvPrint(self, msg : str, target = "all") -> str:
+        return
+
+    def SvPrintCon(self, msg : str, target = "all") -> str:
+        return
+
+    def SvCenterPrint(self, msg : str, len : int = 1) -> str:
+        return
+
+    def ClientCenterPrint(self, pid : int, msg : str, len : int = 1) -> str:
+        return
+
     def UnmarkTK(self, player_id : int) -> str:
         return
 
@@ -382,6 +397,28 @@ class RconInterface(AServerInterface):
         if self.IsOpened():
             return self._rcon.MarkTK(player_id, time)
         return None
+
+
+    # !!! CUSTOM SERVER BUILD COMMANDS !!!
+    # THESE WILL NOT WORK WITH STANDARD OPENJK SERVER BUILD
+    def SvPrint(self, msg : str, target : str = "all") -> str:
+        if self.IsOpened():
+            return self._rcon.SvPrint(msg, target)
+        return None
+
+    def SvPrintCon(self, msg : str, target : str = "all") -> str:
+        if self.IsOpened():
+            return self._rcon.SvPrintCon(msg, target)
+        return None
+
+    def SvCenterPrint(self, msg : str, len : int = 1) -> str:
+        if self.IsOpened():
+            return self._rcon.SvCenterPrint(msg, len)
+        return None
+
+    def ClientCenterPrint(self, pid : int, msg : str, len : int = 1) -> str:
+        if self.IsOpened():
+            return self._rcon.ClientCenterPrint(pid, msg, len)
 
     def UnmarkTK(self, player_id : int) -> str:
         if self.IsOpened():
