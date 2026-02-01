@@ -20,6 +20,7 @@ GODFINGER_EVENT_TYPE_SERVER_EMPTY       = 16 # A server empty signal, fired befo
 GODFINGER_EVENT_TYPE_SMOD_COMMAND       = 17 # An event that fires if any smod command other than smsay is recorded
 GODFINGER_EVENT_TYPE_SMOD_LOGIN         = 18 # An event that fires if any successful smod login command is recorded
 GODFINGER_EVENT_TYPE_OBJECTIVE          = 19 # An event that fires if any objective is completed
+GODFINGER_EVENT_TYPE_ONNAMECHANGE       = 20 # NameChangeEvent - fires immediately on name change via broadcast message
 
 GODFINGER_EVENT_TYPE_WD_UNAVAILABLE     = 1000 # watchdog raised event, game process is not active, happens only upon startup of GF
 GODFINGER_EVENT_TYPE_WD_EXISTING        = 1001 # watchdog raised event, game process is exiting upon GF startup
@@ -122,3 +123,11 @@ class ObjectiveEvent(Event):
     def __init__(self, cl : client.Client, data : dict, isStartup = False):
         self.client = cl
         super().__init__(GODFINGER_EVENT_TYPE_OBJECTIVE, data, isStartup)
+
+class NameChangeEvent(Event):
+    """Event fired immediately when a player changes their name via broadcast message"""
+    def __init__(self, cl : client.Client, oldName : str, newName : str, isStartup = False):
+        self.client = cl
+        self.oldName = oldName
+        self.newName = newName
+        super().__init__(GODFINGER_EVENT_TYPE_ONNAMECHANGE, {"name": oldName}, isStartup)

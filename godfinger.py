@@ -70,6 +70,8 @@ import lib.shared.colors as colors
 import cvar
 import godfingerinterface
 import lib.shared.timeout as timeout
+import lib.shared.pswd as pswd
+import lib.shared.observer as observer
 
 INVALID_ID = -1
 USERINFO_LEN = len("userinfo: ")
@@ -85,6 +87,11 @@ CONFIG_FALLBACK = \
     "serverFileName":"mbiided.x86.exe",
     "logicDelay":0.016,
     "restartOnCrash": false,
+    "watchdog": {
+        "enabled": false,
+        "restartServer": false,
+        "serverStartCommand": ""
+    },
     "floodProtection": {
         "enabled": false,
         "soft": false,
@@ -220,6 +227,9 @@ class MBIIServer:
         self._primarySvInterface = None # NEW: Primary interface for status/commands
         self._gatheringExitData = False
         self._exitLogMessages = []
+        # Name change polling for Windows (PTY doesn't capture broadcast messages)
+        self._nameCheckInterval = 2.0  # Check every 2 seconds
+        self._lastNameCheck = 0
 
         startTime = time.time()
         self._status = MBIIServer.STATUS_INIT
@@ -235,6 +245,17 @@ class MBIIServer:
             Log.error("Godfinger config validation failed.")
             self._status = MBIIServer.STATUS_CONFIG_ERROR
             return
+
+        # Set default watchdog command based on platform if not specified
+        if "watchdog" in self._config.cfg:
+            if not self._config.cfg["watchdog"].get("serverStartCommand", ""):
+                if IsWindows:
+                    # Use autostart script which only starts MB2 server, not Godfinger
+                    self._config.cfg["watchdog"]["serverStartCommand"] = os.path.join(os.getcwd(), "start", "win", "bin", "autostart_win.py")
+                else:
+                    # Use autostart script which only starts MB2 server, not Godfinger
+                    self._config.cfg["watchdog"]["serverStartCommand"] = os.path.join(os.getcwd(), "start", "linux_macOS", "bin", "autostart_linux_macOS.py")
+                Log.debug(f"Set default watchdog command: {self._config.cfg['watchdog']['serverStartCommand']}")
 
         if "paths" in self._config.cfg:
             for path in self._config.cfg["paths"]:
@@ -373,8 +394,82 @@ class MBIIServer:
         self._restartTimeout = timeout.Timeout()
         self.restartOnCrash = self._config.cfg["restartOnCrash"]
 
+        # Log watchdog configuration
+        if self._config.cfg.get("watchdog", {}).get("enabled", False):
+            Log.info(f"Watchdog restart enabled for MB2 server process '{self._config.cfg['serverFileName']}'")
 
         Log.info("The Godfinger initialized in %.2f seconds!\n" %(time.time() - startTime))
+
+    def _HandleWatchdogEvent(self, event_type):
+        """Handle watchdog events from the RconInterface watchdog"""
+        try:
+            watchdog_config = self._config.cfg.get("watchdog", {})
+
+            # Only process events if watchdog is enabled
+            if not watchdog_config.get("enabled", False):
+                return
+
+            # Check if watchdog is temporarily disabled for hard restart
+            if self._serverData.GetServerVar("_watchdog_disabled_for_hard_restart"):
+                Log.debug(f"Watchdog: Ignoring event '{event_type}' - disabled for hard restart")
+                return
+
+            server_name = self._config.cfg["serverFileName"]
+
+            if event_type == "unavailable":
+                Log.warning(f"Watchdog: MB2 server process '{server_name}' is not running")
+            elif event_type == "existing":
+                Log.info(f"Watchdog: MB2 server process '{server_name}' is running")
+            elif event_type == "died":
+                Log.error(f"Watchdog: MB2 server process '{server_name}' has died!")
+
+                # Attempt to restart server if configured
+                if watchdog_config.get("restartServer", False):
+                    restart_cmd_path = watchdog_config.get("serverStartCommand", "")
+
+                    if not restart_cmd_path:
+                        Log.error(f"Watchdog: serverStartCommand is not configured")
+                        return
+
+                    # Check if script exists
+                    if not os.path.exists(restart_cmd_path):
+                        Log.error(f"Watchdog: Start script not found at {restart_cmd_path}")
+                        return
+
+                    Log.info(f"Watchdog: Attempting to restart MB2 server with: {restart_cmd_path}")
+                    try:
+                        # Use current working directory for scripts
+                        working_dir = os.getcwd()
+
+                        # Determine if this is a Python script or executable
+                        is_python_script = restart_cmd_path.endswith('.py')
+
+                        if is_python_script:
+                            # Execute Python script with the same Python interpreter
+                            if IsWindows:
+                                # Windows: Run python script in detached process
+                                subprocess.Popen([sys.executable, restart_cmd_path], cwd=working_dir, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                            else:
+                                # Unix: Run python script in background
+                                subprocess.Popen([sys.executable, restart_cmd_path], cwd=working_dir, stdin=None, stdout=None, stderr=None, close_fds=True, start_new_session=True)
+                        else:
+                            # Execute batch/shell script
+                            if IsWindows:
+                                restart_cmd = f'start "" "{restart_cmd_path}"'
+                                subprocess.Popen(restart_cmd, shell=True, cwd=working_dir, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+                            else:
+                                restart_cmd = f'nohup "{restart_cmd_path}" > /dev/null 2>&1 &'
+                                subprocess.Popen(restart_cmd, shell=True, cwd=working_dir, stdin=None, stdout=None, stderr=None, close_fds=True, start_new_session=True)
+
+                        Log.info("Watchdog: MB2 server restart command executed successfully")
+                    except Exception as e:
+                        Log.error(f"Watchdog: Failed to restart MB2 server: {e}")
+            elif event_type == "started":
+                Log.info(f"Watchdog: MB2 server process '{server_name}' has started")
+            elif event_type == "restarted":
+                Log.info(f"Watchdog: MB2 server process '{server_name}' has been restarted")
+        except Exception as e:
+            Log.error(f"Error in watchdog event handler: {e}")
 
     def Finish(self,):
         # Ensure that finish is called only once; if _isFinished is already set, skip cleanup.
@@ -550,6 +645,13 @@ class MBIIServer:
                 message = messages.get()
                 self._ParseMessage(message)
 
+        # Periodic name change detection (fallback for when broadcast capture isn't available)
+        # Works on both Windows and Unix as a backup to immediate broadcast detection
+        currentTime = time.time()
+        if currentTime - self._lastNameCheck >= self._nameCheckInterval:
+            self._lastNameCheck = currentTime
+            self._CheckNameChanges()
+
         self._pluginManager.Loop()
 
     def _ParseMessage(self, message : logMessage.LogMessage):
@@ -567,14 +669,25 @@ class MBIIServer:
         if line.startswith("wd_"):
             if line == "wd_unavailable":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_UNAVAILABLE,None))
+                self._HandleWatchdogEvent("unavailable")
             elif line == "wd_existing":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_EXISTING,None))
+                self._HandleWatchdogEvent("existing")
             elif line == "wd_started":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_STARTED,None))
+                self._HandleWatchdogEvent("started")
             elif line == "wd_died":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_DIED,None))
+                self._HandleWatchdogEvent("died")
             elif line == "wd_restarted":
                 self._pluginManager.Event(godfingerEvent.Event(godfingerEvent.GODFINGER_EVENT_TYPE_WD_RESTARTED,None))
+                self._HandleWatchdogEvent("restarted")
+            return
+
+        # Check for broadcast name change messages (Windows PTY only)
+        if IsWindows and line.startswith("broadcast:") and "@@@PLRENAME" in line:
+            Log.info(f"[NAMECHANGE DEBUG] Detected broadcast message with @@@PLRENAME, calling OnBroadcastNameChange")
+            self.OnBroadcastNameChange(message)
             return
 
         lineParse = line.split()
@@ -723,8 +836,16 @@ class MBIIServer:
 
                     if "name" in vars:
                         if cl.GetName() != vars["name"]:
-                            changedOld["name"] = cl.GetName()
-                            cl._name = vars["name"]
+                            oldName = cl.GetName()
+                            newName = vars["name"]
+                            changedOld["name"] = oldName
+                            cl._name = newName
+
+                            # Fire ONNAMECHANGE event for immediate name change detection
+                            self._pluginManager.Event(godfingerEvent.NameChangeEvent(
+                                cl, oldName, newName,
+                                isStartup=logMessage.isStartup
+                            ))
 
                     if "ja_guid" in vars:
                         if cl._jaguid != vars["ja_guid"]:
@@ -740,6 +861,162 @@ class MBIIServer:
         # Only call PlayerEvent if cl was successfully retrieved
         if cl != None:
             self._pluginManager.Event( godfingerEvent.PlayerEvent(cl, {"text":textified}, isStartup = logMessage.isStartup))
+
+    def _CheckNameChanges(self):
+        """Periodically check for name changes using status command"""
+        try:
+            # Get current player status from server
+            statusResponse = self._primarySvInterface.Status()
+            if not statusResponse:
+                return
+
+            # Parse status response for player info
+            # Status format: "num score ping name            lastmsg address               qport rate"
+            # Example: "  0    0   17 ^2Player^7           0 192.168.1.100:27961  12345 25000"
+
+            lines = statusResponse.strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith('map:') or line.startswith('num score'):
+                    continue
+
+                # Parse status line
+                parts = line.split()
+                if len(parts) < 6:
+                    continue
+
+                try:
+                    clientNum = int(parts[0])
+                except ValueError:
+                    continue
+
+                nameStartIdx = 3
+                nameEndIdx = nameStartIdx
+
+                # Find where name ends (before IP address which contains ':')
+                for i in range(nameStartIdx, len(parts)):
+                    if ':' in parts[i]:  # This is the IP:port, name ends here
+                        nameEndIdx = i
+                        break
+
+                if nameEndIdx <= nameStartIdx:
+                    continue
+
+                # Extract name parts, filtering out standalone color codes
+                nameParts = []
+                for part in parts[nameStartIdx:nameEndIdx]:
+                    # Skip standalone color codes (e.g., '^7', '^1', '^2')
+                    if part.startswith('^') and len(part) == 2:
+                        continue
+                    nameParts.append(part)
+
+                currentName = ' '.join(nameParts)
+
+                # Get client from client manager
+                cl = self._clientManager.GetClientById(clientNum)
+                if cl is None:
+                    continue
+
+                # Check if name changed
+                oldName = cl.GetName()
+                if oldName != currentName:
+                    Log.info(f"Name change detected for client {clientNum}: '{oldName}' -> '{currentName}'")
+
+                    # Update client name
+                    cl._name = currentName
+
+                    # Fire ONNAMECHANGE event
+                    self._pluginManager.Event(godfingerEvent.NameChangeEvent(
+                        cl, oldName, currentName,
+                        isStartup=False
+                    ))
+
+                    # Also fire CLIENTCHANGED event for backward compatibility
+                    self._pluginManager.Event(godfingerEvent.ClientChangedEvent(
+                        cl, {"name": oldName},
+                        isStartup=False
+                    ))
+
+        except Exception as e:
+            Log.error(f"Error in _CheckNameChanges: {e}")
+            import traceback
+            Log.error(traceback.format_exc())
+
+    def OnBroadcastNameChange(self, logMessage):
+        """Parse broadcast: print \"<oldname> @@@PLRENAME <newname>\" messages"""
+        try:
+            line = logMessage.content
+            Log.info(f"[NAMECHANGE DEBUG] Processing line: {line}")
+
+            # Expected format: broadcast: print "<oldname> @@@PLRENAME <newname>\n"
+            if "broadcast:" not in line or "@@@PLRENAME" not in line:
+                Log.info(f"[NAMECHANGE DEBUG] Line doesn't contain broadcast: or @@@PLRENAME")
+                return
+
+            # Extract the message content after "broadcast: print \""
+            start_idx = line.find('broadcast: print "')
+            if start_idx == -1:
+                Log.warning(f"[NAMECHANGE DEBUG] Could not find 'broadcast: print \"' in line")
+                return
+
+            # Get content between quotes
+            start_idx += len('broadcast: print "')
+            end_idx = line.find('"', start_idx)
+            if end_idx == -1:
+                Log.warning(f"[NAMECHANGE DEBUG] Could not find closing quote")
+                return
+
+            content = line[start_idx:end_idx]
+            Log.info(f"[NAMECHANGE DEBUG] Extracted content: {content}")
+
+            # Parse: <oldname> @@@PLRENAME <newname>
+            parts = content.split(" @@@PLRENAME ")
+            if len(parts) != 2:
+                Log.warning(f"Failed to parse PLRENAME broadcast: {content}")
+                return
+
+            old_name_raw = parts[0].strip()
+            new_name_raw = parts[1].strip()
+            Log.info(f"[NAMECHANGE DEBUG] Parsed: old='{old_name_raw}' new='{new_name_raw}'")
+
+            # Find client by old name (need to match against current client list)
+            # Note: Names may have color codes, so we need to strip and compare
+            target_client = None
+            Log.info(f"[NAMECHANGE DEBUG] Searching for client with old name '{old_name_raw}'")
+            Log.info(f"[NAMECHANGE DEBUG] Current clients: {[cl.GetName() for cl in self._clientManager.GetAllClients()]}")
+
+            for cl in self._clientManager.GetAllClients():
+                if cl.GetName() == old_name_raw or colors.StripColorCodes(cl.GetName()) == colors.StripColorCodes(old_name_raw):
+                    target_client = cl
+                    Log.info(f"[NAMECHANGE DEBUG] Found matching client: {cl.GetName()} (ID: {cl.GetId()})")
+                    break
+
+            if not target_client:
+                Log.warning(f"[NAMECHANGE DEBUG] Could not find client with old name '{old_name_raw}' for name change")
+                return
+
+            # Update client name
+            Log.info(f"[NAMECHANGE DEBUG] Updating client name from '{target_client._name}' to '{new_name_raw}'")
+            target_client._name = new_name_raw
+
+            # Fire ONNAMECHANGE event (immediate detection)
+            Log.info(f"[NAMECHANGE DEBUG] Firing NameChangeEvent")
+            self._pluginManager.Event(godfingerEvent.NameChangeEvent(
+                target_client, old_name_raw, new_name_raw,
+                isStartup=logMessage.isStartup
+            ))
+
+            # Also fire CLIENTCHANGED event for backward compatibility
+            Log.info(f"[NAMECHANGE DEBUG] Firing ClientChangedEvent")
+            self._pluginManager.Event(godfingerEvent.ClientChangedEvent(
+                target_client, {"name": old_name_raw},
+                isStartup=logMessage.isStartup
+            ))
+
+            Log.info(f"[NAMECHANGE DEBUG] Name change detected via broadcast: '{old_name_raw}' -> '{new_name_raw}'")
+
+        except Exception as e:
+            Log.error(f"Error parsing broadcast name change: {e}")
 
     def HandleChatHelp(self, senderClient, teamId, cmdArgs):
         """Handle !help command for regular chat"""

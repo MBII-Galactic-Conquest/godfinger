@@ -60,7 +60,7 @@ class IServerInterface():
     def MbMode(self, mode : int, mapToChange : str = None) -> str:
         return "Not implemented"
     
-    def ClientMute(self, pid : int) -> str:
+    def ClientMute(self, pid : int, minutes : int = 10) -> str:
         return "Not implemented"
     
     def ClientUnmute(self, pid : int) -> str:
@@ -141,6 +141,7 @@ class IServerInterface():
     def MarkTK(self, player_id : int, time : int) -> str:
         return
 
+
     # !!! CUSTOM SERVER BUILD COMMANDS !!!
     # THESE WILL NOT WORK WITH STANDARD OPENJK SERVER BUILD
     def SvPrint(self, msg : str, target = "all") -> str:
@@ -153,6 +154,9 @@ class IServerInterface():
         return
 
     def ClientCenterPrint(self, pid : int, msg : str, len : int = 1) -> str:
+        return
+
+    def UnmarkTK(self, player_id : int) -> str:
         return
 
 class AServerInterface(IServerInterface):
@@ -206,7 +210,7 @@ class AServerInterface(IServerInterface):
 
 
 class RconInterface(AServerInterface):
-    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.x86.exe"):
+    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.i386" if IsUnix else "mbiided.x86.exe"):
         super().__init__()
         self._logReaderLock = threading.Lock()
         self._logReaderThreadControl = threadcontrol.ThreadControl()
@@ -216,7 +220,7 @@ class RconInterface(AServerInterface):
         self._logPath = logPath
         self._rcon = remoteconsole.RCON((ipAddress, port), bindAddr, password)
         self._testRetrospect = testRetrospect
-    
+
         self._wdObserver = observer.Observer(self._OnWDEvent)
         self._watchdog = pswd.ProcessWatchdog(procName)
         self._watchdog.Subscribe(self._wdObserver)
@@ -269,9 +273,9 @@ class RconInterface(AServerInterface):
             return self._rcon.MbMode(mode, mapToChange)
         return None
     
-    def ClientMute(self, pid : int) -> str:
+    def ClientMute(self, pid : int, minutes : int = 10) -> str:
         if self.IsOpened():
-            return self._rcon.ClientMute(pid)
+            return self._rcon.ClientMute(pid, minutes)
         return None
     
     def ClientUnmute(self, pid : int) -> str:
@@ -293,7 +297,12 @@ class RconInterface(AServerInterface):
         if self.IsOpened():
             return self._rcon.ClientKick(pid)
         return None
-    
+
+    def Tempban(self, name : str, rounds : int) -> str:
+        if self.IsOpened():
+            return self._rcon.Tempban(name, rounds)
+        return None
+
     def SetCvar(self, cvarName : str, value : str) -> str:
         if self.IsOpened():
             return self._rcon.SetCvar(cvarName, value)
@@ -389,6 +398,7 @@ class RconInterface(AServerInterface):
             return self._rcon.MarkTK(player_id, time)
         return None
 
+
     # !!! CUSTOM SERVER BUILD COMMANDS !!!
     # THESE WILL NOT WORK WITH STANDARD OPENJK SERVER BUILD
     def SvPrint(self, msg : str, target : str = "all") -> str:
@@ -409,6 +419,10 @@ class RconInterface(AServerInterface):
     def ClientCenterPrint(self, pid : int, msg : str, len : int = 1) -> str:
         if self.IsOpened():
             return self._rcon.ClientCenterPrint(pid, msg, len)
+
+    def UnmarkTK(self, player_id : int) -> str:
+        if self.IsOpened():
+            return self._rcon.UnmarkTK(player_id)
         return None
 
     def ParseLogThreadHandler(self, control, sleepTime):
@@ -843,9 +857,9 @@ class PtyInterface(AServerInterface):
             return self.ExecuteCommand(cmdStr, proc)
         return None
     
-    def ClientMute(self, pid : int) -> str:
+    def ClientMute(self, pid : int, minutes : int = 10) -> str:
         if self.IsOpened():
-            cmdStr = "mute %i" % (pid)
+            cmdStr = "mute %i %i" % (pid, minutes)
             proc = PtyInterface.EchoProcessor(cmdStr)
             return self.ExecuteCommand(cmdStr, proc)
         return None
@@ -877,7 +891,14 @@ class PtyInterface(AServerInterface):
             proc = PtyInterface.EchoProcessor(cmdStr)
             return self.ExecuteCommand(cmdStr, proc)
         return None
-    
+
+    def Tempban(self, name : str, rounds : int) -> str:
+        if self.IsOpened():
+            cmdStr = "tempban \"%s\" %i" % (name, rounds)
+            proc = PtyInterface.EchoProcessor(cmdStr)
+            return self.ExecuteCommand(cmdStr, proc)
+        return None
+
     def SetCvar(self, cvarName : str, value : str) -> str:
         if self.IsOpened():
             cmdStr = "%s %s" % (cvarName, value)
@@ -996,7 +1017,24 @@ class PtyInterface(AServerInterface):
                             input = ""
                         for line in inputLines:
                             line = self._re_ansi_escape.sub("", line)
+
+                            # CRITICAL: Always capture @@@PLRENAME broadcasts regardless of mode
+                            # These broadcasts indicate immediate name changes and must not be consumed by command processors
+                            isPlRename = line.startswith("broadcast:") and "@@@PLRENAME" in line
+
+                            # DEBUG: Log ALL broadcast messages to verify PTY is capturing them
+                            if line.startswith("broadcast:"):
+                                Log.info(f"[PTY BROADCAST DEBUG] Mode={self._mode}, Line={line}")
+
+                            if isPlRename:
+                                Log.info(f"[PTY PLRENAME DEBUG] Detected @@@PLRENAME in mode {self._mode}")
+
                             if self._mode == PtyInterface.MODE_COMMAND:
+                                # In command mode, force @@@PLRENAME to message queue even if command processor would consume it
+                                if isPlRename:
+                                    Log.info("[Server] : \"%s\"" % line)
+                                    self._workingMessageQueue.put(logMessage.LogMessage(line))
+
                                 pr = self._currentCommandProc.ParseLine(line)
                                 if util.IsFlag(pr, PtyInterface.CMD_RESULT_FLAG_OK):
                                     self._currentCommandProc = None

@@ -15,6 +15,13 @@ if %errorlevel% neq 0 (
 
 echo Python version is acceptable (3.12.0 or newer)
 
+REM Kill any orphaned mbii.x86.exe processes if autoclient.cfg contains 1
+findstr /B /C:"1" ..\autoclient.cfg >nul 2>&1
+if %errorlevel%==0 (
+    echo Killing orphaned mbii.x86.exe processes...
+    start /wait powershell -WindowStyle Normal -Command "Stop-Process -Name 'mbii.x86' -Force -ErrorAction SilentlyContinue"
+)
+
 REM Navigate to bin for autostarting
 cd bin
 

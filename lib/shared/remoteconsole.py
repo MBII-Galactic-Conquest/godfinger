@@ -183,7 +183,7 @@ class RCON(object):
     def ClientMute(self, player_id : int, minutes : int = 10):
         """ Mutes the client with the given ID for the given number of minutes, or 10 minutes if no duration is given. The number of minutes must be between 1-60, inclusive. """
         if 0 < minutes <= 60:   # rcon mute must be between
-            return self.Request(b"\xff\xff\xff\xffrcon %b mute %i %i" % (self._password, player_id))
+            return self.Request(b"\xff\xff\xff\xffrcon %b mute %i %i" % (self._password, player_id, minutes))
         return None
   
     def ClientUnmute(self, player_id):
@@ -204,6 +204,10 @@ class RCON(object):
 
     def ClientKick(self, player_id):
         return self.Request(b"\xff\xff\xff\xffrcon %b clientkick %i" % (self._password, player_id))
+
+    def Tempban(self, player_name, rounds):
+        name = bytes(player_name, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b tempban \"%b\" %i" % (self._password, name, rounds))
 
     def Echo(self, msg):
         msg = bytes(msg, "UTF-8")
@@ -428,3 +432,9 @@ class RCON(object):
         if not type(len) == int:
             len = int(len)
         return self.Request(b"\xff\xff\xff\xffrcon %b svtcp %i %b %i" % (self._password, pid, msg, len))
+      
+    def UnmarkTK(self, player_id : int):
+        # unmarktk <client> - Removes TK mark from specified client
+        if not type(player_id) == bytes:
+            player_id = bytes(str(player_id), "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b unmarktk %b" % (self._password, player_id))

@@ -707,12 +707,18 @@ def ForceUpdate(self, hard_update_override):
         MANUALLY_UPDATED = False
 
     if hard_update_override == 1:
+        # Disable watchdog temporarily to prevent interference with manual hard restart
+        self._serverData.SetServerVar("_watchdog_disabled_for_hard_restart", True)
+        Log.info("Watchdog temporarily disabled for manual hard restart")
+
         if execute_hard_restart(rwd):
             Log.info("Manual server restart launched. Exiting current Godfinger & MBIIdedicated server process.")
             self._hardUpdateSetting = 0
             sys.exit(0)
         else:
             Log.error("Manual server restart was not possible.")
+            # Re-enable watchdog if restart failed
+            self._serverData.UnsetServerVar("_watchdog_disabled_for_hard_restart")
             sys.exit(1)
     else:
         PluginInstance._serverData.API.Restart(timeoutSeconds)
