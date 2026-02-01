@@ -396,3 +396,35 @@ class RCON(object):
         if not type(time) == bytes:
             time = bytes(str(time), "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b marktk %b %b" % (self._password, player_id, time))
+
+    # !!! CUSTOM SERVER BUILD COMMANDS !!!
+    # THESE WILL NOT WORK WITH STANDARD OPENJK SERVER BUILD
+    def SvPrint(self, msg : str, target : str = "all") -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(target) == bytes:
+            target = bytes(target, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b svprint %b %b" % (self._password, target, msg))
+
+    def SvPrintCon(self, msg : str, target : str = "all") -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(target) == bytes:
+            target = bytes(target, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b svprintcon %b %b" % (self._password, target, msg))
+
+    def SvCenterPrint(self, msg : str, len : int = 1) -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(len) == int:
+            len = int(len)
+        return self.Request(b"\xff\xff\xff\xffrcon %b svcp %b %i" % (self._password, msg, len))
+
+    def ClientCenterPrint(self, pid : int, msg : str, len : int = 1) -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(pid) == int:
+            pid = int(pid)
+        if not type(len) == int:
+            len = int(len)
+        return self.Request(b"\xff\xff\xff\xffrcon %b svtcp %i %b %i" % (self._password, pid, msg, len))
