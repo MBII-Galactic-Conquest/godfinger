@@ -773,7 +773,7 @@ class MBIIServer:
                     senderClient._floodProtectionCooldown.Set(floodProtectionConfig["seconds"])
                     senderClient._lastCommand = command
 
-                if len(cmdArgs) > 0 and cmdArgs[0] == "help":
+                if len(cmdArgs) > 0 and cmdArgs[0].lower() == "help":
                     # Handle help command directly
                     self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
                     return  # Don't pass to plugins
@@ -1350,7 +1350,7 @@ class MBIIServer:
             cmdArgs = messageLower.split()
             if cmdArgs and cmdArgs[0].startswith("!"):
                 command = cmdArgs[0][1:]  # Remove the !
-                if command == "help":
+                if command.lower() == "help":
                     self.HandleSmodHelp(senderName, smodID, senderIP, cmdArgs)
                     return True  # Command handled, don't pass to plugins
             self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message, isStartup = logMessage.isStartup))
