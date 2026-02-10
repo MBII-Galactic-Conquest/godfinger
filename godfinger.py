@@ -1049,7 +1049,7 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._primarySvInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._primarySvInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}; wait 5" for msg in messages])
             else:
                 self._primarySvInterface.Say('^1[Godfinger]: ^7' + commandStr)
 
@@ -1102,7 +1102,7 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._primarySvInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._primarySvInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}; wait 5" for msg in messages])
             else:
                 self._primarySvInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
         return True
