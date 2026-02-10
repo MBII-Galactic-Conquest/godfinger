@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import re
 import time
 from datetime import datetime
 import logging
@@ -161,18 +162,19 @@ class AutomodPlugin:
         self._violation_log[player_ip].append(violation_entry)
         self._SaveViolationLog()
 
-    def _ApplyPunishment(self, client: client.Client, violation_count: int, matched_words: list, message: str):
-        """Apply punishment based on configured action"""
-        action = self.config.get("action", 0)
-        player_id = client.GetId()
-        player_name = client.GetName()
-        player_ip = client.GetIp().split(':')[0]
+    def _ApplyPunishment(self, eventClient: client.Client, violation_count: int, matched_words: list, message: str) -> bool:
+        """Apply punishment based on configured action. Returns True if punishment was applied successfully."""
+        action = int(self.config.get("action", 0))
+        player_id = int(eventClient.GetId())
+        player_name = eventClient.GetName()
+        player_ip = eventClient.GetIp().split(':')[0]
 
         action_name = ""
 
+        # Apply the punishment action
         try:
             if action == 0:  # Mute
-                duration = self.config.get("muteDuration", 5)
+                duration = int(self.config.get("muteDuration", 5))
                 self._serverData.interface.ClientMute(player_id, duration)
                 action_name = f"muted for {duration} minutes"
                 Log.info(f"Muted {player_name} (ID: {player_id}) for {duration} minutes")
@@ -183,7 +185,7 @@ class AutomodPlugin:
                 Log.info(f"Kicked {player_name} (ID: {player_id})")
 
             elif action == 2:  # Tempban
-                duration = self.config.get("tempbanDuration", 3)
+                duration = int(self.config.get("tempbanDuration", 3))
                 self._serverData.interface.Tempban(player_name, duration)
                 action_name = f"tempbanned for {duration} rounds"
                 Log.info(f"Tempbanned {player_name} for {duration} rounds")
@@ -193,16 +195,34 @@ class AutomodPlugin:
                 action_name = "permanently banned"
                 Log.info(f"Permanently banned {player_name} (IP: {player_ip})")
 
-            # Update violation log with action taken
-            self._LogViolation(player_ip, player_name, message, matched_words, violation_count, action_name)
+            else:
+                Log.error(f"Unknown action type: {action} (type: {type(action).__name__})")
+                self._serverData.interface.SvSay(self._messagePrefix + f"^1Error: Unknown action type {action}")
+                return False
 
-            # Announce (if not silent)
-            if not self.config.get("silentMode", False):
-                self._serverData.interface.SvSay(
-                    self._messagePrefix + f"^7{player_name} has been {action_name} for chat violations."
-                )
         except Exception as e:
-            Log.error(f"Error applying punishment: {e}")
+            Log.error(f"Error applying punishment to {player_name}: {type(e).__name__}: {e}")
+            try:
+                self._serverData.interface.SvSay(self._messagePrefix + f"^1Punishment failed: {type(e).__name__}: {e}")
+            except:
+                pass
+            return False
+
+        # Log and announce separately so a failure here doesn't mask a successful punishment
+        try:
+            self._LogViolation(player_ip, player_name, message, matched_words, violation_count, action_name)
+        except Exception as e:
+            Log.error(f"Error logging violation: {e}")
+
+        if not self.config.get("silentMode", False):
+            try:
+                self._serverData.interface.SvSay(
+                    self._messagePrefix + f"^7{player_name} ^7has been {action_name} for chat violations."
+                )
+            except Exception as e:
+                Log.error(f"Error announcing punishment: {e}")
+
+        return True
 
     def Start(self) -> bool:
         """Called when plugin starts"""
@@ -240,7 +260,9 @@ class AutomodPlugin:
             # Check for prohibited words
             matched_words = []
             for word in self.config.get("prohibitedWords", []):
-                if word.lower() in message_clean:
+                if not word.strip():
+                    continue
+                if re.search(r'\b' + re.escape(word.lower()) + r'\b', message_clean):
                     matched_words.append(word)
 
             # If no matches, return
@@ -266,17 +288,17 @@ class AutomodPlugin:
 
             # Check if threshold reached
             threshold = self.config.get("threshold", 3)
-            will_be_punished = False
+            punishment_applied = False
 
             if current_count >= threshold:
                 # Check if we've already punished at this count
                 if current_count not in self._session_violations[player_ip]["punished_at_counts"]:
-                    will_be_punished = True
-                    self._ApplyPunishment(client, current_count, matched_words, message)
-                    self._session_violations[player_ip]["punished_at_counts"].append(current_count)
+                    punishment_applied = self._ApplyPunishment(client, current_count, matched_words, message)
+                    if punishment_applied:
+                        self._session_violations[player_ip]["punished_at_counts"].append(current_count)
 
-            # Send private warning message ONLY if not being punished (if not silent)
-            if not self.config.get("silentMode", False) and not will_be_punished:
+            # Send private warning message if punishment wasn't applied (if not silent)
+            if not self.config.get("silentMode", False) and not punishment_applied:
                 private_msg = self.config.get("privateMessage", "You have been flagged.")
                 self._serverData.interface.SvTell(player_id, self._messagePrefix + private_msg)
 
