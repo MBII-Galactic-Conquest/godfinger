@@ -491,17 +491,27 @@ class RTV(object):
     def Say(self, saystr : str, usePrefix : bool = True):
         """Send console message to all players"""
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.Say(prefix + saystr)
+        if self._serverData.is_extended:
+            return self._serverData.interface.SvPrintCon(prefix + saystr)
+        else:
+            return self._serverData.interface.Say(prefix + saystr)
 
     def SvSay(self, saystr : str, usePrefix : bool = True):
         """Send chat message to all players"""
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.SvSay(prefix + saystr)
+        if self._serverData.is_extended:
+            return self._serverData.interface.SvPrint(prefix + saystr)
+        else:
+            return self._serverData.interface.SvSay(prefix + saystr)
     
     def SvTell(self, pid: int, saystr : str, usePrefix : bool = True):
         """Send chat message to one player given their ID"""
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.SvTell(pid, prefix + saystr)
+        if self._serverData.is_extended:
+            pid = str(pid)
+            return self._serverData.interface.SvPrint(prefix + saystr, target=pid)
+        else:
+            return self._serverData.interface.SvTell(pid, prefix + saystr)
 
     def _getAllPlayers(self):
         """Get all connected players"""
@@ -1023,7 +1033,10 @@ class RTV(object):
             capture = True
             if cmdArgs[1].lower() == "all":
                 # Batch execute all pages
-                batchCmds = [f"say {self._messagePrefix}{x}" for x in self._mapContainer._pages]
+                if self._serverData.is_extended:
+                    batchCmds = [f"svprintcon all {self._messagePrefix}{x}" for x in self._mapContainer._pages]
+                else:
+                    batchCmds = [f"say {self._messagePrefix}{x}" for x in self._mapContainer._pages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
             else:
                 # Get page from cached pages
@@ -1079,8 +1092,12 @@ class RTV(object):
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
                 # Batch output for multiple pages
-                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
-                batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
+                if self._serverData.is_extended:
+                    batchCmds = [f"svprintcon all {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
+                    batchCmds += [f"svprintcon all {self._messagePrefix}{x}" for x in mapPages]
+                else:
+                    batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
+                    batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
         else:
             self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!search <searchterm1> [searchterm2] [...]', self._themeColor)}")

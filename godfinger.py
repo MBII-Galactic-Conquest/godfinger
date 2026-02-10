@@ -227,9 +227,6 @@ class MBIIServer:
         self._primarySvInterface = None # NEW: Primary interface for status/commands
         self._gatheringExitData = False
         self._exitLogMessages = []
-        # Name change polling for Windows (PTY doesn't capture broadcast messages)
-        self._nameCheckInterval = 2.0  # Check every 2 seconds
-        self._lastNameCheck = 0
 
         startTime = time.time()
         self._status = MBIIServer.STATUS_INIT
@@ -591,6 +588,9 @@ class MBIIServer:
 
             self._FetchStatus()
 
+            is_extended = self._primarySvInterface.GetCvar("sv_extended")
+            self._serverData.is_extended = is_extended == "1"
+
             if not self._pluginManager.Start():
                 return
             self._isRunning = True
@@ -645,12 +645,6 @@ class MBIIServer:
                 message = messages.get()
                 self._ParseMessage(message)
 
-        # Periodic name change detection (fallback for when broadcast capture isn't available)
-        # Works on both Windows and Unix as a backup to immediate broadcast detection
-        currentTime = time.time()
-        if currentTime - self._lastNameCheck >= self._nameCheckInterval:
-            self._lastNameCheck = currentTime
-            self._CheckNameChanges()
 
         self._pluginManager.Loop()
 
@@ -773,7 +767,7 @@ class MBIIServer:
                     senderClient._floodProtectionCooldown.Set(floodProtectionConfig["seconds"])
                     senderClient._lastCommand = command
 
-                if len(cmdArgs) > 0 and cmdArgs[0] == "help":
+                if len(cmdArgs) > 0 and cmdArgs[0].lower() == "help":
                     # Handle help command directly
                     self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
                     return  # Don't pass to plugins
@@ -862,85 +856,6 @@ class MBIIServer:
         if cl != None:
             self._pluginManager.Event( godfingerEvent.PlayerEvent(cl, {"text":textified}, isStartup = logMessage.isStartup))
 
-    def _CheckNameChanges(self):
-        """Periodically check for name changes using status command"""
-        try:
-            # Get current player status from server
-            statusResponse = self._primarySvInterface.Status()
-            if not statusResponse:
-                return
-
-            # Parse status response for player info
-            # Status format: "num score ping name            lastmsg address               qport rate"
-            # Example: "  0    0   17 ^2Player^7           0 192.168.1.100:27961  12345 25000"
-
-            lines = statusResponse.strip().split('\n')
-            for line in lines:
-                line = line.strip()
-                if not line or line.startswith('map:') or line.startswith('num score'):
-                    continue
-
-                # Parse status line
-                parts = line.split()
-                if len(parts) < 6:
-                    continue
-
-                try:
-                    clientNum = int(parts[0])
-                except ValueError:
-                    continue
-
-                nameStartIdx = 3
-                nameEndIdx = nameStartIdx
-
-                # Find where name ends (before IP address which contains ':')
-                for i in range(nameStartIdx, len(parts)):
-                    if ':' in parts[i]:  # This is the IP:port, name ends here
-                        nameEndIdx = i
-                        break
-
-                if nameEndIdx <= nameStartIdx:
-                    continue
-
-                # Extract name parts, filtering out standalone color codes
-                nameParts = []
-                for part in parts[nameStartIdx:nameEndIdx]:
-                    # Skip standalone color codes (e.g., '^7', '^1', '^2')
-                    if part.startswith('^') and len(part) == 2:
-                        continue
-                    nameParts.append(part)
-
-                currentName = ' '.join(nameParts)
-
-                # Get client from client manager
-                cl = self._clientManager.GetClientById(clientNum)
-                if cl is None:
-                    continue
-
-                # Check if name changed
-                oldName = cl.GetName()
-                if oldName != currentName:
-                    Log.info(f"Name change detected for client {clientNum}: '{oldName}' -> '{currentName}'")
-
-                    # Update client name
-                    cl._name = currentName
-
-                    # Fire ONNAMECHANGE event
-                    self._pluginManager.Event(godfingerEvent.NameChangeEvent(
-                        cl, oldName, currentName,
-                        isStartup=False
-                    ))
-
-                    # Also fire CLIENTCHANGED event for backward compatibility
-                    self._pluginManager.Event(godfingerEvent.ClientChangedEvent(
-                        cl, {"name": oldName},
-                        isStartup=False
-                    ))
-
-        except Exception as e:
-            Log.error(f"Error in _CheckNameChanges: {e}")
-            import traceback
-            Log.error(traceback.format_exc())
 
     def OnBroadcastNameChange(self, logMessage):
         """Parse broadcast: print \"<oldname> @@@PLRENAME <newname>\" messages"""
@@ -1049,7 +964,7 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._primarySvInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._primarySvInterface.BatchExecute("b", [f"say {'^1[Godfinger]: ^7' + msg}; wait 5" for msg in messages])
             else:
                 self._primarySvInterface.Say('^1[Godfinger]: ^7' + commandStr)
 
@@ -1102,7 +1017,7 @@ class MBIIServer:
                     messages.append(msg)
                 if len(commandStr) > 0:
                     messages.append(commandStr)
-                self._primarySvInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}" for msg in messages])
+                self._primarySvInterface.BatchExecute("b", [f"smsay {'^1[Godfinger]: ^7' + msg}; wait 5" for msg in messages])
             else:
                 self._primarySvInterface.SmSay('^1[Godfinger]: ^7' + commandStr)
         return True
@@ -1291,6 +1206,16 @@ class MBIIServer:
             Log.warning(f"Could not parse userinfo string '{userInfoString}' for client {clientId}, ignoring update.")
             return
 
+
+        if "n" in userInfoDict and userInfoDict["n"] != cl.GetName():
+            oldName = cl.GetName()
+            newName = userInfoDict["n"]
+            # Fire ONNAMECHANGE event for immediate name change detection
+            self._pluginManager.Event(godfingerEvent.NameChangeEvent(
+                cl, oldName, newName,
+                isStartup=logMessage.isStartup
+            ))
+
         cl.Update(userInfoDict)
         self._pluginManager.Event(godfingerEvent.ClientChangedEvent(cl, cl.GetInfo(), isStartup=logMessage.isStartup))
 
@@ -1350,7 +1275,7 @@ class MBIIServer:
             cmdArgs = messageLower.split()
             if cmdArgs and cmdArgs[0].startswith("!"):
                 command = cmdArgs[0][1:]  # Remove the !
-                if command == "help":
+                if command.lower() == "help":
                     self.HandleSmodHelp(senderName, smodID, senderIP, cmdArgs)
                     return True  # Command handled, don't pass to plugins
             self._pluginManager.Event(godfingerEvent.SmodSayEvent(senderName, int(smodID), senderIP, message, isStartup = logMessage.isStartup))

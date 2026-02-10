@@ -22,6 +22,7 @@ class ServerData():
         self.mapName = "";
         self.mode = -1;
         self.extralives_map = {}
+        self.is_extended = False
     
     def GetInterfaceType(self):
         return self.interface.GetType();
