@@ -761,6 +761,18 @@ class RTV(object):
         # Get purchased teams from banking plugin
         teamsToChange1 = self._serverData.GetServerVar("team1_purchased_teams")
         teamsToChange2 = self._serverData.GetServerVar("team2_purchased_teams")
+        
+        # Check for team swap
+        vote_team_swap = self._serverData.GetServerVar("voteteamswap_active")
+        
+        # Determine base teams (with swap if active)
+        default_team1 = self._config.cfg.get("defaultTeam1", "LEG_Good")
+        default_team2 = self._config.cfg.get("defaultTeam2", "LEG_Evil")
+        
+        if vote_team_swap:
+            # Swap base teams
+            default_team1, default_team2 = default_team2, default_team1
+
         if teamsToChange1 != None and len(teamsToChange1) > 0:
             # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
             team_names = []
@@ -770,10 +782,11 @@ class RTV(object):
                 else:
                     team_names.append(str(t))
             teamsToChange1 = ' '.join(team_names)
-            self._serverData.interface.SetTeam1(self._config.cfg.get("defaultTeam1", "LEG_Good") + " " + teamsToChange1)
+            self._serverData.interface.SetTeam1(default_team1 + " " + teamsToChange1)
             self._serverData.SetServerVar("team1_purchased_teams", None)
         else:
-            self._serverData.interface.SetTeam1(self._config.cfg.get("defaultTeam1", "LEG_Good"))
+            self._serverData.interface.SetTeam1(default_team1)
+            
         if teamsToChange2 != None and len(teamsToChange2) > 0:
             # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
             team_names = []
@@ -783,10 +796,10 @@ class RTV(object):
                 else:
                     team_names.append(str(t))
             teamsToChange2 = ' '.join(team_names)
-            self._serverData.interface.SetTeam2(self._config.cfg.get("defaultTeam2", "LEG_Evil") + " " + teamsToChange2)
+            self._serverData.interface.SetTeam2(default_team2 + " " + teamsToChange2)
             self._serverData.SetServerVar("team2_purchased_teams", None)
         else:
-            self._serverData.interface.SetTeam2(self._config.cfg.get("defaultTeam2", "LEG_Evil"))
+            self._serverData.interface.SetTeam2(default_team2)
         self._serverData.interface.MapReload(mapToChange)
     
     def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
