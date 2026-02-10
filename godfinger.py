@@ -588,6 +588,9 @@ class MBIIServer:
 
             self._FetchStatus()
 
+            is_extended = self._primarySvInterface.GetCvar("sv_extended")
+            self._serverData.is_extended = is_extended == "1"
+
             if not self._pluginManager.Start():
                 return
             self._isRunning = True
