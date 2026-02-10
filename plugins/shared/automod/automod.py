@@ -182,18 +182,19 @@ class AutomodPlugin:
             elif action == 1:  # Kick
                 self._serverData.interface.ClientKick(player_id)
                 action_name = "kicked"
-                Log.info(f"Kicked {player_name} (ID: {player_id})")
+                Log.info(f"Kicked {player_name} (ID: {player_id}, IP: {player_ip})")
 
             elif action == 2:  # Tempban
                 duration = int(self.config.get("tempbanDuration", 3))
                 self._serverData.interface.Tempban(player_name, duration)
                 action_name = f"tempbanned for {duration} rounds"
-                Log.info(f"Tempbanned {player_name} for {duration} rounds")
+                Log.info(f"Tempbanned {player_name} (ID: {player_id}, IP: {player_ip}) for {duration} rounds")
 
             elif action == 3:  # Ban (permanent)
                 self._serverData.interface.ClientBan(player_ip)
+                self._serverData.interface.ClientKick(player_id)
                 action_name = "permanently banned"
-                Log.info(f"Permanently banned {player_name} (IP: {player_ip})")
+                Log.info(f"Permanently banned {player_name} (ID: {player_id}, IP: {player_ip})")
 
             else:
                 Log.error(f"Unknown action type: {action} (type: {type(action).__name__})")
