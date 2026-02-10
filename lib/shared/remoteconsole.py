@@ -183,7 +183,11 @@ class RCON(object):
     def ClientMute(self, player_id : int, minutes : int = 10):
         """ Mutes the client with the given ID for the given number of minutes, or 10 minutes if no duration is given. The number of minutes must be between 1-60, inclusive. """
         if 0 < minutes <= 60:   # rcon mute must be between
-            return self.Request(b"\xff\xff\xff\xffrcon %b mute %i %i" % (self._password, player_id, minutes))
+            if not type(player_id) == bytes:
+                player_id = bytes(str(player_id), "UTF-8")
+            if not type(minutes) == bytes:
+                minutes = bytes(str(minutes), "UTF-8")
+            return self.Request(b"\xff\xff\xff\xffrcon %b mute %b %b" % (self._password, player_id, minutes))
         return None
   
     def ClientUnmute(self, player_id):
