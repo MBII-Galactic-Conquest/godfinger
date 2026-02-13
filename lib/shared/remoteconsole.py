@@ -5,6 +5,7 @@ import time;
 import lib.shared.timeout as  timeout;
 import lib.shared.buffer as buffer;
 import threading;
+from lib.shared.colors import StripColorCodes
 
 Log = logging.getLogger(__name__)
 
@@ -252,15 +253,20 @@ class RCON(object):
             cvar = bytes(cvar, "UTF-8")
         if not type(val) == bytes:
             val = bytes(val, "UTF-8")
-        return self.Request(b'\xff\xff\xff\xffrcon %b %b \"%b\"' % (self._password, cvar, val))
+        return self.Request(b'\xff\xff\xff\xffrcon %b set %b \"%b\"' % (self._password, cvar, val))
 
     def GetCvar(self, cvar):
         if not type(cvar) == bytes:
             cvar = bytes(cvar, "UTF-8")
-        response = self.Request(b"\xff\xff\xff\xffrcon %b %b" % (self._password, cvar))
+        response = self.Request(b"\xff\xff\xff\xffrcon %b set %b" % (self._password, cvar))
         if response != None and len(response) > 0:
-            response = response.split(b"\"")[1]
-            response = response[2:-2].decode("UTF-8", errors="ignore")
+            response = response.decode("UTF-8", errors="ignore")
+            response = StripColorCodes(response)
+            response = response.split("\"")
+            if len(response) > 1:
+                response = response[1]
+            else:
+                response = None
         return response
 
     def SetVstr(self, vstr, val):
