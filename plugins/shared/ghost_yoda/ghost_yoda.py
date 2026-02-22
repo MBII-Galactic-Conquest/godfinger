@@ -86,7 +86,7 @@ class GhostYodaPlugin(object):
         msg = f"⚔️ {log_kill_str}"
         asyncio.run_coroutine_threadsafe(send_chat_log_to_discord(msg), client.loop)
         
-        if not event.data.get("tk", False) or event.client is None:
+        if not event.data.get("tk", False) or event.client is None or event.client == event.victim:
             return False
             
         killer_id = event.client.GetId()
