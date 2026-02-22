@@ -1301,7 +1301,8 @@ class MBIIServer:
             'command': None,
             'target_name': None,
             'target_id': None,
-            'target_ip': None
+            'target_ip': None,
+            'args': None
         }
 
         # Split the message into parts based on the command structure
@@ -1311,7 +1312,7 @@ class MBIIServer:
         if len(parts) >= 2:
             # Extract SMOD details from first part
             smod_info = parts[1].split(' (IP: ')
-            if len(smod_info) == 2:
+            if len(smod_info) >= 2:
                 # Extract name and admin ID
                 name_part = smod_info[0]
                 match = re.search(r'^(?:\^?\d+)?(.+?)\((adminID: (\d+))\)$', name_part)
@@ -1330,16 +1331,44 @@ class MBIIServer:
         # Check for target information
         if ' against ' in log_message:
             target_part = log_message.split(' against ')[1]
-            target_info = target_part.split(' (IP: ')[0]
-            target_match = re.search(r'^(?:\^?\d+)?(.+?)\((IP: .+?)\)$', target_part)
-            if target_match:
-                data['target_name'] = target_match.group(1).strip()
-                data['target_ip'] = target_match.group(2).split(':')[0]
+            
+            # Extract target IP
+            ip_match = re.search(r'\(IP:\s*([\d\.:]+)\)', target_part)
+            if ip_match:
+                data['target_ip'] = ip_match.group(1)
+            
+            # Check for "resolved to" pattern (e.g. "0 red (0 resolved to Padawan (IP: 192.168.1.1)")
+            resolved_match = re.search(r'(.*?)\s+\(\d+\s+resolved to\s+(.+?)\s*\(IP:', target_part)
+            if resolved_match:
+                target_string = resolved_match.group(1).strip()
+                data['target_name'] = resolved_match.group(2).strip()
+                
+                parts = target_string.split(maxsplit=1)
+                if len(parts) > 1 and not data.get('args'):
+                    data['args'] = parts[1]
+            else:
+                # Standard format fallback (e.g. "Padawan (IP: 192.168.1.1)")
+                name_match = re.search(r'^(?:\^?\d+)?(.+?)\s*\(IP:', target_part)
+                if name_match:
+                    name = name_match.group(1).strip()
+                    name = re.sub(r'\s*\(\d+\)$', '', name) # Remove "(0)" if present at the end
+                    data['target_name'] = name
+            
+            # Try to extract target ID
+            id_match = re.search(r'\((\d+)(?:\)| resolved to)', target_part)
+            if id_match:
+                data['target_id'] = id_match.group(1)
+        
+        # Check for arguments at the end of the line
+        args_match = re.search(r'\(args: (.+?)\)|Reason: (.+)|duration: (.+)', log_message)
+        if args_match:
+            args_str = ""
+            for i in range(1, len(args_match.groups()) + 1):
+                if args_match.group(i):
+                    args_str = args_match.group(i).strip()
+                    break
+            data['args'] = args_str
 
-                # Try to extract target ID if present
-                id_match = re.search(r'\((\d+)\)', target_info)
-                if id_match:
-                    data['target_id'] = id_match.group(1)
         self._pluginManager.Event(godfingerEvent.SmodCommandEvent(data))
 
     def OnSmodLogin(self, logMessage : logMessage.LogMessage):
