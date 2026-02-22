@@ -502,6 +502,14 @@ class MBIIServer:
         if statusStr != None:
             Log.debug(statusStr)
             splitted = statusStr.splitlines()
+            
+            if len(splitted) > 2 and splitted[1].strip().startswith("hostname:"):
+                import lib.shared.colors as colors
+                hostName = splitted[1].split(":", 1)[1].strip()
+                self._serverData.name = colors.StripColorCodes(hostName)
+            else:
+                self._serverData.name = "Unknown Godfinger Server"
+                
             versionSplit = splitted[2].split()
             version = versionSplit[2] + "_" + versionSplit[3]
             gameType = splitted[3].split()[2]
@@ -1357,7 +1365,7 @@ class MBIIServer:
                 remaining = parts[1]
 
                 # Extract admin ID (between start and next ')')
-                id_match = re.search(r'^(\d+)\)', remaining)
+                id_match = re.search(r'^\s*(\d+)\)', remaining)
                 if id_match:
                     data['smod_id'] = id_match.group(1)
 

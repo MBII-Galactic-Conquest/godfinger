@@ -21,6 +21,7 @@ class ServerData():
         self.gameType = "";
         self.mapName = "";
         self.mode = -1;
+        self.name = "";
         self.extralives_map = {}
         self.is_extended = False
     
