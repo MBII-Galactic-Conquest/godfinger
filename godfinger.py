@@ -115,6 +115,7 @@ CONFIG_FALLBACK = \
                 {
                     "port":29070,
                     "logFilename":"server.log",
+                    "qconsoleFilename": "qconsole.log",
                     "password":"fuckmylife"
                 }
             ],
@@ -271,7 +272,8 @@ class MBIIServer:
                                                                 ))
         elif cfgIface == "rcon":
             rcon_cfg = self._config.cfg["interfaces"]["rcon"]
-            global_logFilename = self._config.cfg["logFilename"]
+            global_logFilename = self._config.cfg.get("logFilename", "server.log")
+            global_qconsoleFilename = self._config.cfg.get("qconsoleFilename", None)
 
             # REFACTORED: Read shared/top-level properties
             shared_ip = rcon_cfg["ip"]
@@ -283,6 +285,7 @@ class MBIIServer:
             for idx, remote_cfg in enumerate(rcon_cfg["Remotes"]):
                 remote_ip = remote_cfg.get("ip", shared_ip)
                 remote_logFilename = remote_cfg.get("logFilename", global_logFilename)
+                remote_qconsoleFilename = remote_cfg.get("qconsoleFilename", global_qconsoleFilename)
                 remote_port = remote_cfg.get("port", 0) # Port is mandatory for Rcon, but use 0 as a safe sentinel
 
                 # NEW: Get password from remote config
@@ -292,6 +295,8 @@ class MBIIServer:
                     Log.error(f"Rcon remote #{idx+1} is missing a required 'port' setting. Skipping.")
                     continue
 
+                qconsolePath = os.path.join(self._config.cfg["MBIIPath"], remote_qconsoleFilename) if remote_qconsoleFilename else None
+
                 interface = godfingerinterface.RconInterface(
                                                                     remote_ip,\
                                                                     remote_port,\
@@ -300,9 +305,10 @@ class MBIIServer:
                                                                     os.path.join(self._config.cfg["MBIIPath"], remote_logFilename),\
                                                                     shared_logReadDelay,
                                                                     shared_testRetrospect, # Uses shared/top-level value
-                                                                    procName=self._config.cfg["serverFileName"])
+                                                                    procName=self._config.cfg["serverFileName"],
+                                                                    qconsolePath=qconsolePath)
                 self._svInterfaces.append(interface)
-                Log.info(f"Initialized RconInterface #{idx+1} on {remote_ip}:{remote_port} (Bind: {shared_bindAddress}) using log file {remote_logFilename}")
+                Log.info(f"Initialized RconInterface #{idx+1} on {remote_ip}:{remote_port} (Bind: {shared_bindAddress}) using log file {remote_logFilename}" + (f" and qconsole {remote_qconsoleFilename}" if remote_qconsoleFilename else ""))
 
         if len(self._svInterfaces) == 0:
             Log.error("Server interface(s) were not initialized properly or 'Remotes' list was empty.")
@@ -692,6 +698,21 @@ class MBIIServer:
             self.OnBroadcastNameChange(message)
             return
 
+        # NEW: Check for qconsole banned entry attempts
+        if line.startswith("SV packet "):
+            if " : connect" in line:
+                try:
+                    ip_part = line.split("SV packet ")[1].split(" : ")[0]
+                    self._last_connecting_ip = ip_part.split(":")[0]
+                except Exception:
+                    pass
+            return
+        elif line.startswith("Game rejected a connection: Banned.."):
+            if hasattr(self, "_last_connecting_ip") and self._last_connecting_ip:
+                self._pluginManager.Event(godfingerEvent.BannedEntryAttemptEvent(self._last_connecting_ip))
+                self._last_connecting_ip = None
+            return
+
         lineParse = line.split()
 
         l = len(lineParse)
@@ -744,6 +765,18 @@ class MBIIServer:
                 self.OnObjective(message)
             else:
                 return
+
+    def OnServerSay(self, logMessage : logMessage.LogMessage):
+        messageRaw = logMessage.content
+        Log.debug("Server say message %s" % messageRaw )
+
+        # Split the raw message by the quote character or colon
+        # Ex: "12: say: Server: this is a test server say"
+        parts = messageRaw.split("Server:")
+
+        if len(parts) > 1:
+            message : str = parts[1].strip()
+            self._pluginManager.Event( godfingerEvent.ServerSayEvent( message, isStartup = logMessage.isStartup ) )
 
     def OnChatMessage(self, logMessage : logMessage.LogMessage):
         messageRaw = logMessage.content
@@ -1036,6 +1069,8 @@ class MBIIServer:
         textified = logMessage.content
         Log.debug("Kill log entry %s", textified)
 
+        data = {"text": textified}
+
         # Split the log message into parts using ': ' as the delimiter, limiting to 2 splits.
         parts = textified.split(": ", 2)
 
@@ -1073,12 +1108,20 @@ class MBIIServer:
         # Get client references
         cl = self._clientManager.GetClientById(killer_pid)
         clVictim = self._clientManager.GetClientById(victim_pid)
-        if cl is None or clVictim is None:
-            Log.debug(f"Player killed NPC, ignoring kill, full line: {textified}")
+        
+        # We allow cl to be None for <world> kills (ID 1022)
+        if clVictim is None:
+            Log.debug(f"Victim is NPC/Invalid, ignoring kill, full line: {textified}")
             return False
 
-        tk_part = message_part.replace(cl.GetName(), "", 1).replace(clVictim.GetName(), "", 1).split()
-        isTK = (tk_part[0] == "teamkilled")
+        # If it's a world kill or cl is None, we skip TK check but still fire
+        isTK = False
+        if cl:
+            tk_part = message_part.replace(cl.GetName(), "", 1).replace(clVictim.GetName(), "", 1).split()
+            if len(tk_part) > 0:
+                isTK = (tk_part[0] == "teamkilled")
+
+        data["tk"] = isTK
 
         # Split the message part to isolate the kill details
         message_parts = message_part.split()
@@ -1096,7 +1139,7 @@ class MBIIServer:
                     old_team = cl.GetTeamId()
                     cl._teamId = teams.TEAM_SPEC
                     self._pluginManager.Event(godfingerEvent.ClientChangedEvent(cl, {"team": old_team}, logMessage.isStartup))
-            self._pluginManager.Event(godfingerEvent.KillEvent(cl, clVictim, weapon_str, {"tk": isTK}, logMessage.isStartup))
+            self._pluginManager.Event(godfingerEvent.KillEvent(cl, clVictim, weapon_str, data, logMessage.isStartup))
 
     def OnExit(self, logMessages : list[logMessage.LogMessage]):
         textified = self._exitLogMessages[0].content

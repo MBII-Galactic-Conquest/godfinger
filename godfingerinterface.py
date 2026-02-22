@@ -210,14 +210,22 @@ class AServerInterface(IServerInterface):
 
 
 class RconInterface(AServerInterface):
-    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.i386" if IsUnix else "mbiided.x86.exe"):
+    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "mbiided.i386" if IsUnix else "mbiided.x86.exe", qconsolePath : str = None):
         super().__init__()
         self._logReaderLock = threading.Lock()
         self._logReaderThreadControl = threadcontrol.ThreadControl()
         self._logReaderTime = readDelay
         self._logReaderThread = threading.Thread(target=self.ParseLogThreadHandler, daemon=True,
-                                                 args=(self._logReaderThreadControl, self._logReaderTime))
+                                                 args=(self._logReaderThreadControl, self._logReaderTime, logPath, False))
         self._logPath = logPath
+
+        self._qconsolePath = qconsolePath
+        if self._qconsolePath:
+            self._qconsoleReaderLock = threading.Lock()
+            self._qconsoleReaderThreadControl = threadcontrol.ThreadControl()
+            self._qconsoleReaderThread = threading.Thread(target=self.ParseLogThreadHandler, daemon=True,
+                                                     args=(self._qconsoleReaderThreadControl, self._logReaderTime, self._qconsolePath, True))
+
         self._rcon = remoteconsole.RCON((ipAddress, port), bindAddr, password)
         self._testRetrospect = testRetrospect
 
@@ -425,13 +433,15 @@ class RconInterface(AServerInterface):
             return self._rcon.UnmarkTK(player_id)
         return None
 
-    def ParseLogThreadHandler(self, control, sleepTime):
+    def ParseLogThreadHandler(self, control, sleepTime, logPath=None, is_qconsole=False):
+        if logPath is None: logPath = self._logPath
         encoding = 'utf-8' if IsUnix else 'ansi'
-        with open(self._logPath, "r", encoding=encoding, errors="replace") as log:
+        with open(logPath, "r", encoding=encoding, errors="replace") as log:
             log.seek(0, io.SEEK_END)
             while True:
                 stop = False
-                with self._logReaderLock:
+                lock = getattr(self, "_qconsoleReaderLock", self._logReaderLock) if is_qconsole else self._logReaderLock
+                with lock:
                     stop = control.stop
                 if not stop:
                     lines = log.read()
@@ -440,8 +450,12 @@ class RconInterface(AServerInterface):
                         with self._queueLock:
                             for line in linesSplit:
                                 if len(line) > 0:
-                                    line = line[7:]
-                                    self._workingMessageQueue.put(logMessage.LogMessage(line))
+                                    if not is_qconsole:
+                                        line = line[7:]
+                                        self._workingMessageQueue.put(logMessage.LogMessage(line))
+                                    else:
+                                        if line.startswith("SV packet ") or line.startswith("Game rejected "):
+                                            self._workingMessageQueue.put(logMessage.LogMessage(line))
                     if (len(linesSplit) == 1 and linesSplit[0] == ""):
                         time.sleep(sleepTime)
                 else:
@@ -501,6 +515,17 @@ class RconInterface(AServerInterface):
                     self._workingMessageQueue.put(logMessage.LogMessage(line, True))
         self._logReaderThreadControl.stop = False
         self._logReaderThread.start()
+        
+        if self._qconsolePath:
+            if not os.path.exists(self._qconsolePath):
+                try:
+                    with open(self._qconsolePath, "w", encoding="utf-8") as f:
+                        pass
+                except Exception as e:
+                    Log.error("Unable to create log file at path %s: %s", self._qconsolePath, str(e))
+            self._qconsoleReaderThreadControl.stop = False
+            self._qconsoleReaderThread.start()
+
         self._isOpened = True
         self._isReady = True
         return True
@@ -510,6 +535,12 @@ class RconInterface(AServerInterface):
             with self._logReaderLock:
                 self._logReaderThreadControl.stop = True
             self._logReaderThread.join()
+            
+            if hasattr(self, "_qconsolePath") and self._qconsolePath:
+                with self._qconsoleReaderLock:
+                    self._qconsoleReaderThreadControl.stop = True
+                self._qconsoleReaderThread.join()
+                
             self._rcon.Close()
             self._messageQueueSwap.queue.clear()
             self._workingMessageQueue.queue.clear()
