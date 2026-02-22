@@ -21,6 +21,8 @@ GODFINGER_EVENT_TYPE_SMOD_COMMAND       = 17 # An event that fires if any smod c
 GODFINGER_EVENT_TYPE_SMOD_LOGIN         = 18 # An event that fires if any successful smod login command is recorded
 GODFINGER_EVENT_TYPE_OBJECTIVE          = 19 # An event that fires if any objective is completed
 GODFINGER_EVENT_TYPE_ONNAMECHANGE       = 20 # NameChangeEvent - fires immediately on name change via broadcast message
+GODFINGER_EVENT_TYPE_BANNED_ENTRY_ATTEMPT = 21 # BannedEntryAttemptEvent - fires when qconsole logs a banned ip connection attempt
+GODFINGER_EVENT_TYPE_SERVER_SAY         = 22 # ServerSayEvent - fires when the server broadcasts a message
 
 GODFINGER_EVENT_TYPE_WD_UNAVAILABLE     = 1000 # watchdog raised event, game process is not active, happens only upon startup of GF
 GODFINGER_EVENT_TYPE_WD_EXISTING        = 1001 # watchdog raised event, game process is exiting upon GF startup
@@ -131,3 +133,15 @@ class NameChangeEvent(Event):
         self.oldName = oldName
         self.newName = newName
         super().__init__(GODFINGER_EVENT_TYPE_ONNAMECHANGE, {"name": oldName}, isStartup)
+
+class BannedEntryAttemptEvent(Event):
+    """Event fired when a connection is rejected due to ban."""
+    def __init__(self, ip : str, isStartup = False):
+        self.ip = ip
+        super().__init__(GODFINGER_EVENT_TYPE_BANNED_ENTRY_ATTEMPT, {}, isStartup)
+
+class ServerSayEvent(Event):
+    """Event fired when the server broadcasts a chat message."""
+    def __init__(self, message : str, isStartup = False):
+        self.message = message
+        super().__init__(GODFINGER_EVENT_TYPE_SERVER_SAY, {}, isStartup)
