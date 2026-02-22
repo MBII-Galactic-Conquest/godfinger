@@ -813,6 +813,8 @@ class MBIIServer:
                 if len(cmdArgs) > 0 and cmdArgs[0].lower() == "help":
                     # Handle help command directly
                     self.HandleChatHelp(senderClient, teams.TEAM_GLOBAL, cmdArgs)
+                    # Forward the message event so logger plugins (like ghost_yoda) can still see it
+                    self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
                     return  # Don't pass to plugins
             self._pluginManager.Event( godfingerEvent.MessageEvent( senderClient, message, { 'messageRaw' : messageRaw }, isStartup = logMessage.isStartup ) )
         else:
