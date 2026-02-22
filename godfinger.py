@@ -717,7 +717,9 @@ class MBIIServer:
                     self.OnSmodCommand(message)
             elif lineParse[0] == "Successful":
                 self.OnSmodLogin(message)
-            elif lineParse[1] == "say:":  # Handle say messages by players (not server)
+            elif lineParse[0] == "say:" and l > 1 and lineParse[1] == "Server:": # Handle server broadcasts
+                self.OnServerSay(message)
+            elif lineParse[1] == "say:":  # Handle say messages by players
                 self.OnChatMessage(message)
             elif lineParse[1] == "sayteam:":
                 self.OnChatMessageTeam(message)
