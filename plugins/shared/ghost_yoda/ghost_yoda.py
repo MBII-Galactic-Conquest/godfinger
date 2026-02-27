@@ -105,7 +105,7 @@ class GhostYodaPlugin(object):
 
     def HandleReportCommand(self, player, args, messageRaw):
         if len(args) < 3:
-            self._serverData.interface.SvSay(self._messagePrefix + "^7Usage: !report <target name> <reason>")
+            self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + "^7Usage: !report <target name> <reason>")
             return True
             
         target_query = args[1].lower()
@@ -120,7 +120,7 @@ class GhostYodaPlugin(object):
                 break
                 
         if not matched_client:
-            self._serverData.interface.SvSay(self._messagePrefix + f"^7Could not find a player matching '^1{target_query}^7'.")
+            self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + f"^7Could not find a player matching '^1{target_query}^7'.")
             return True
             
         # Compile report
@@ -145,7 +145,7 @@ class GhostYodaPlugin(object):
             send_report_to_discord(report_data),
             client.loop
         )
-        self._serverData.interface.SvSay(self._messagePrefix + f"^7Report against ^1{matched_client.GetName()}^7 submitted successfully.")
+        self._serverData.interface.SvTell(player.GetId(), self._messagePrefix + f"^7Report against ^1{matched_client.GetName()}^7 submitted successfully.")
         return True
 
     def ProcessSmodCommand(self, event):
@@ -331,11 +331,13 @@ async def on_message(message):
     if not SERVER_DATA:
         return
 
-    # Sanitize: strip newlines and truncate to 150 chars to prevent server overflow
-    raw = message.content.replace("\n", " ").replace("\r", "").strip()
+    # Strip newlines and non-ascii characters, cap length
+    raw = message.content.replace('\n', ' ').strip()
+    raw = raw.encode("ascii", "ignore").decode("ascii")
     if not raw:
         return
-    raw = raw[:150]
+    if len(raw) > 150:
+        raw = raw[:147] + "..."
 
     now = time.monotonic()
     user_id = message.author.id
