@@ -199,7 +199,7 @@ class GhostYodaPlugin(object):
     def ProcessClientConnect(self, event):
         """Forward client connects to Discord."""
         cl = event.client
-        msg = f"✅ ClientConnect: ({colors.StripColorCodes(cl.GetName())}) ID: {cl.GetId()} (IP: {cl.GetIP()})"
+        msg = f"✅ ClientConnect: ({colors.StripColorCodes(cl.GetName())}) ID: {cl.GetId()} (IP: {cl.GetIp()})"
         asyncio.run_coroutine_threadsafe(
             send_chat_log_to_discord(msg),
             client.loop
