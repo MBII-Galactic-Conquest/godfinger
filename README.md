@@ -55,12 +55,15 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 > - `g_statLog` is `"1"`
 > - `g_statLogFile` is `statlog.log`
 > - `sv_maxOOBRateIP` should be at least `3` to prevent rcon rate limiting. If rate limiting persists, increase this value.
-
-set com_logfile "2"
-set com_logSync "1"
-set logfile	"2"
-
-> 
+> </br>
+>
+> THEN,
+> - set `com_logfile` "2"
+> - set `com_logSync` "1"
+> - set `logfile`	"2"
+>
+> </br>
+>
 > Execute `"prepare"` script based on platform in  `./prepare/os` to install dependancy modules, run the `"start"` or `"startDebug"` script based on platform in `./start/os`, then sufficiently fill out the generated `godfingerCfg.json` in root directory.
 >
 > You may now `start` the godfinger system normally.
