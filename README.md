@@ -46,7 +46,20 @@ The possibilities of this system allow for myriad of custom logfile implements, 
 >
 > Ensure your logfile is set to `server.log` in your `server.cfg.`
 > 
-> Ensure `g_logExplicit` is `"3"`, `g_logSync` is `"1"`, `com_logChat` is `"2"`, `g_logClientInfo` is `"2"`, `g_statLog` is `"1"`, and `g_statLogFile` is `statlog.log` in your `server.cfg.`
+> Ensure the following cvars are set in your `server.cfg.`
+> 
+> - `g_logExplicit` is `"3"`
+> - `g_logSync` is `"1"`
+> - `com_logChat` is `"2"`
+> - `g_logClientInfo` is `"1"`
+> - `g_statLog` is `"1"`
+> - `g_statLogFile` is `statlog.log`
+> - `sv_maxOOBRateIP` should be at least `3` to prevent rcon rate limiting. If rate limiting persists, increase this value.
+
+set com_logfile "2"
+set com_logSync "1"
+set logfile	"2"
+
 > 
 > Execute `"prepare"` script based on platform in  `./prepare/os` to install dependancy modules, run the `"start"` or `"startDebug"` script based on platform in `./start/os`, then sufficiently fill out the generated `godfingerCfg.json` in root directory.
 >
