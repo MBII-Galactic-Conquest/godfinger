@@ -90,6 +90,8 @@ CONFIG_FALLBACK = '''{
     "showVoteCooldownTime": 5,
     "maxMapPageSize": 950,
     "maxSearchPageSize": 950,
+    "defaultTeam1": "LEG_Good",
+    "defaultTeam2": "LEG_Evil",
     "rtv": {
         "enabled": true,
         "voteTime": 180,
@@ -489,17 +491,27 @@ class RTV(object):
     def Say(self, saystr : str, usePrefix : bool = True):
         """Send console message to all players"""
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.Say(prefix + saystr)
+        if self._serverData.is_extended:
+            return self._serverData.interface.SvPrintCon(prefix + saystr)
+        else:
+            return self._serverData.interface.Say(prefix + saystr)
 
     def SvSay(self, saystr : str, usePrefix : bool = True):
         """Send chat message to all players"""
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.SvSay(prefix + saystr)
+        if self._serverData.is_extended:
+            return self._serverData.interface.SvPrint(prefix + saystr)
+        else:
+            return self._serverData.interface.SvSay(prefix + saystr)
     
     def SvTell(self, pid: int, saystr : str, usePrefix : bool = True):
         """Send chat message to one player given their ID"""
         prefix = self._messagePrefix if usePrefix else ""
-        return self._serverData.interface.SvTell(pid, prefix + saystr)
+        if self._serverData.is_extended:
+            pid = str(pid)
+            return self._serverData.interface.SvPrint(prefix + saystr, target=pid)
+        else:
+            return self._serverData.interface.SvTell(pid, prefix + saystr)
 
     def _getAllPlayers(self):
         """Get all connected players"""
@@ -749,6 +761,18 @@ class RTV(object):
         # Get purchased teams from banking plugin
         teamsToChange1 = self._serverData.GetServerVar("team1_purchased_teams")
         teamsToChange2 = self._serverData.GetServerVar("team2_purchased_teams")
+        
+        # Check for team swap
+        vote_team_swap = self._serverData.GetServerVar("voteteamswap_active")
+        
+        # Determine base teams (with swap if active)
+        default_team1 = self._config.cfg.get("defaultTeam1", "LEG_Good")
+        default_team2 = self._config.cfg.get("defaultTeam2", "LEG_Evil")
+        
+        if vote_team_swap:
+            # Swap base teams
+            default_team1, default_team2 = default_team2, default_team1
+
         if teamsToChange1 != None and len(teamsToChange1) > 0:
             # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
             team_names = []
@@ -758,10 +782,11 @@ class RTV(object):
                 else:
                     team_names.append(str(t))
             teamsToChange1 = ' '.join(team_names)
-            self._serverData.interface.SetTeam1("LEG_Good " + teamsToChange1)
+            self._serverData.interface.SetTeam1(default_team1 + " " + teamsToChange1)
             self._serverData.SetServerVar("team1_purchased_teams", None)
         else:
-            self._serverData.interface.SetTeam1("LEG_Good")
+            self._serverData.interface.SetTeam1(default_team1)
+            
         if teamsToChange2 != None and len(teamsToChange2) > 0:
             # Extract names if they are objects (new format), otherwise assume string (old format/fallback)
             team_names = []
@@ -771,10 +796,10 @@ class RTV(object):
                 else:
                     team_names.append(str(t))
             teamsToChange2 = ' '.join(team_names)
-            self._serverData.interface.SetTeam2("LEG_Evil " + teamsToChange2)
+            self._serverData.interface.SetTeam2(default_team2 + " " + teamsToChange2)
             self._serverData.SetServerVar("team2_purchased_teams", None)
         else:
-            self._serverData.interface.SetTeam2("LEG_Evil")
+            self._serverData.interface.SetTeam2(default_team2)
         self._serverData.interface.MapReload(mapToChange)
     
     def HandleChatCommand(self, player : RTVPlayer, teamId : int, cmdArgs : list[str]) -> bool:
@@ -1019,17 +1044,25 @@ class RTV(object):
             capture = True
         elif len(cmdArgs) == 2:
             capture = True
-            # Get page from cached pages
-            try:
-                page_index = int(cmdArgs[1]) - 1
-                if page_index < 0:
-                    raise ValueError
-                if page_index >= len(self._mapContainer._pages):
-                    self.SvTell(player.GetId(), f"Index out of range! (1-{len(self._mapContainer._pages)})")
+            if cmdArgs[1].lower() == "all":
+                # Batch execute all pages
+                if self._serverData.is_extended:
+                    batchCmds = [f"svprintcon all {self._messagePrefix}{x}" for x in self._mapContainer._pages]
                 else:
-                    self.Say(self._mapContainer._pages[page_index])
-            except (ValueError, IndexError):
-                self.SvTell(player.GetId(), f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
+                    batchCmds = [f"say {self._messagePrefix}{x}" for x in self._mapContainer._pages]
+                self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
+            else:
+                # Get page from cached pages
+                try:
+                    page_index = int(cmdArgs[1]) - 1
+                    if page_index < 0:
+                        raise ValueError
+                    if page_index >= len(self._mapContainer._pages):
+                        self.SvTell(player.GetId(), f"Index out of range! (1-{len(self._mapContainer._pages)})")
+                    else:
+                        self.Say(self._mapContainer._pages[page_index])
+                except (ValueError, IndexError):
+                    self.SvTell(player.GetId(), f"Invalid index {colors.ColorizeText(cmdArgs[1], self._themeColor)}!")
         return capture
 
     def HandleSearch(self, player : player.Player, teamId : int, cmdArgs : list[str]):
@@ -1072,8 +1105,12 @@ class RTV(object):
                 self.Say(f"{str(totalResults)} results for {colors.ColorizeText(searchQuery, self._themeColor)}: {mapPages[0]}")
             elif len(mapPages) > 1:
                 # Batch output for multiple pages
-                batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
-                batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
+                if self._serverData.is_extended:
+                    batchCmds = [f"svprintcon all {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
+                    batchCmds += [f"svprintcon all {self._messagePrefix}{x}" for x in mapPages]
+                else:
+                    batchCmds = [f"say {self._messagePrefix}{str(totalResults)} result(s) for {colors.ColorizeText(searchQuery, self._themeColor)}:"]
+                    batchCmds += [f"say {self._messagePrefix}{x}" for x in mapPages]
                 self._serverData.interface.BatchExecute("b", batchCmds, sleepBetweenChunks=0.1)
         else:
             self.SvTell(player.GetId(), f"Usage: {colors.ColorizeText('!search <searchterm1> [searchterm2] [...]', self._themeColor)}")
@@ -1189,8 +1226,8 @@ class RTV(object):
         # Reset siege teams
         self._serverData.SetServerVar("team1_purchased_teams", None)
         self._serverData.SetServerVar("team2_purchased_teams", None)
-        self._serverData.interface.SetTeam1("LEG_Good")
-        self._serverData.interface.SetTeam2("LEG_Evil")
+        self._serverData.interface.SetTeam1(self._config.cfg.get("defaultTeam1", "LEG_Good"))
+        self._serverData.interface.SetTeam2(self._config.cfg.get("defaultTeam2", "LEG_Evil"))
         if doMap and doMode:
             self._serverData.interface.MbMode(MBMODE_ID_MAP[self._config.cfg["rtm"]["emptyServerMode"]["mode"]], self._config.cfg["rtv"]["emptyServerMap"]["map"])
         elif doMap:

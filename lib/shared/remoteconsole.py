@@ -5,6 +5,7 @@ import time;
 import lib.shared.timeout as  timeout;
 import lib.shared.buffer as buffer;
 import threading;
+from lib.shared.colors import StripColorCodes
 
 Log = logging.getLogger(__name__)
 
@@ -133,6 +134,7 @@ class RCON(object):
                         self._Send(payload);
                         if not self._ReadResponse(responseSize, timeout):
                             Log.warn(f'Message with payload {str(payload)} not received after {timeout} seconds, will attempt to resend.')
+                            timeout *= 2;
                             continue;
                         else:
                             result = self._PopUnread();
@@ -226,30 +228,45 @@ class RCON(object):
     
     # R20.1.01 
     def SvSound(self, soundName : str) -> bytes:     
-        return self.Request(b"\xff\xff\xff\xffrcon %b snd \"%s\"" % (self._password, soundName.encode()))
+        if not type(soundName) == bytes:
+            soundName = soundName.encode()
+        return self.Request(b"\xff\xff\xff\xffrcon %b snd \"%s\"" % (self._password, soundName))
     
     # R20.1.01 
     def TeamSound(self, soundName : str, teamId : int) -> bytes:
-        return self.Request(b"\xff\xff\xff\xffrcon %b sndTeam %i \"%s\"" % (self._password, teamId, soundName.encode()))
+        if not type(soundName) == bytes:
+            soundName = soundName.encode()
+        if not type(teamId) == int:
+            teamId = int(teamId)
+        return self.Request(b"\xff\xff\xff\xffrcon %b sndTeam %i \"%s\"" % (self._password, teamId, soundName))
     
     # R20.1.01 
     def ClientSound(self, soundName : str, clientId : int) -> bytes:
-        return self.Request(b"\xff\xff\xff\xffrcon %b sndClient %i \"%s\"" % (self._password, clientId, soundName.encode()))
+        if not type(soundName) == bytes:
+            soundName = soundName.encode()
+        if not type(clientId) == int:
+            clientId = int(clientId)
+        return self.Request(b"\xff\xff\xff\xffrcon %b sndClient %i \"%s\"" % (self._password, clientId, soundName))
 
     def SetCvar(self, cvar, val):
         if not type(cvar) == bytes:
             cvar = bytes(cvar, "UTF-8")
         if not type(val) == bytes:
             val = bytes(val, "UTF-8")
-        return self.Request(b'\xff\xff\xff\xffrcon %b %b \"%b\"' % (self._password, cvar, val))
+        return self.Request(b'\xff\xff\xff\xffrcon %b set %b \"%b\"' % (self._password, cvar, val))
 
     def GetCvar(self, cvar):
         if not type(cvar) == bytes:
             cvar = bytes(cvar, "UTF-8")
-        response = self.Request(b"\xff\xff\xff\xffrcon %b %b" % (self._password, cvar))
+        response = self.Request(b"\xff\xff\xff\xffrcon %b set %b" % (self._password, cvar))
         if response != None and len(response) > 0:
-            response = response.split(b"\"")[1]
-            response = response[2:-2].decode("UTF-8", errors="ignore")
+            response = response.decode("UTF-8", errors="ignore")
+            response = StripColorCodes(response)
+            response = response.split("\"")
+            if len(response) > 1:
+                response = response[1]
+            else:
+                response = None
         return response
 
     def SetVstr(self, vstr, val):
@@ -394,6 +411,38 @@ class RCON(object):
             time = bytes(str(time), "UTF-8")
         return self.Request(b"\xff\xff\xff\xffrcon %b marktk %b %b" % (self._password, player_id, time))
 
+    # !!! CUSTOM SERVER BUILD COMMANDS !!!
+    # THESE WILL NOT WORK WITH STANDARD OPENJK SERVER BUILD
+    def SvPrint(self, msg : str, target : str = "all") -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(target) == bytes:
+            target = bytes(target, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b svprint %b %b" % (self._password, target, msg))
+
+    def SvPrintCon(self, msg : str, target : str = "all") -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(target) == bytes:
+            target = bytes(target, "UTF-8")
+        return self.Request(b"\xff\xff\xff\xffrcon %b svprintcon %b %b" % (self._password, target, msg))
+
+    def SvCenterPrint(self, msg : str, len : int = 1) -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(len) == int:
+            len = int(len)
+        return self.Request(b"\xff\xff\xff\xffrcon %b svcp %b %i" % (self._password, msg, len))
+
+    def ClientCenterPrint(self, pid : int, msg : str, len : int = 1) -> str:
+        if not type(msg) == bytes:
+            msg = bytes(msg, "UTF-8")
+        if not type(pid) == int:
+            pid = int(pid)
+        if not type(len) == int:
+            len = int(len)
+        return self.Request(b"\xff\xff\xff\xffrcon %b svtcp %i %b %i" % (self._password, pid, msg, len))
+      
     def UnmarkTK(self, player_id : int):
         # unmarktk <client> - Removes TK mark from specified client
         if not type(player_id) == bytes:

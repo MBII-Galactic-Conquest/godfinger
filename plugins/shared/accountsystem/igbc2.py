@@ -367,7 +367,7 @@ class BankingPlugin:
                                       self._handle_teamlist),
                 ("teamsearch", "ts"): ("!teamsearch <term> - Search for teams by name",
                                           self._handle_teamsearch)
-            }
+            },
             teams.TEAM_GOOD: {},
             teams.TEAM_EVIL: {},
             teams.TEAM_SPEC: {},
