@@ -1226,6 +1226,8 @@ class RTV(object):
         # Reset siege teams
         self._serverData.SetServerVar("team1_purchased_teams", None)
         self._serverData.SetServerVar("team2_purchased_teams", None)
+        self._serverData.SetServerVar("voteteamswap_active", False)
+        # Get purchased teams from banking plugin
         self._serverData.interface.SetTeam1(self._config.cfg.get("defaultTeam1", "LEG_Good"))
         self._serverData.interface.SetTeam2(self._config.cfg.get("defaultTeam2", "LEG_Evil"))
         if doMap and doMode:

@@ -99,21 +99,9 @@ class VoteteamswapPlugin:
             self._serverData.interface.SvTell(player_id, self._messagePrefix + message)
 
     def _GetCurrentTeamSwapState(self) -> str:
-        """Get current g_teamSwap value from server"""
-        try:
-            result = self._serverData.interface.GetCvar("g_teamSwap")
-            if result:
-                # Clean up the result - might contain extra formatting
-                result = result.strip()
-                if result in ["0", "1"]:
-                    return result
-                # Try to extract just the value if it contains quotes or other chars
-                for char in result:
-                    if char in ["0", "1"]:
-                        return char
-        except Exception as e:
-            Log.error(f"Error getting g_teamSwap: {e}")
-        return "0"  # Default to off if unknown
+        """Get current team swap state from server variable"""
+        state = self._serverData.GetServerVar("voteteamswap_active")
+        return "1" if state else "0"
 
     def _IsLocalhost(self, client_ip: str) -> bool:
         """Check if IP is localhost"""
@@ -182,7 +170,7 @@ class VoteteamswapPlugin:
         action = "^2ENABLE" if target_value == "1" else "^1DISABLE"
 
         self.SvSay(f"{initiator_name}^7 started a vote to {action}^7 team swap. Type ^2!1^7 for YES, ^1!2^7 for NO. (1/{votes_needed} needed)")
-        Log.info(f"VoteTeamSwap started by {initiator_name} to set g_teamSwap={target_value}")
+        Log.info(f"VoteTeamSwap started by {initiator_name} to set voteteamswap_active={target_value}")
 
     def _HandleVote(self, player_id: int, vote_yes: bool):
         """Record a player's vote"""
@@ -225,18 +213,28 @@ class VoteteamswapPlugin:
         return "pending"
 
     def _ApplyTeamSwap(self):
-        """Set g_teamSwap to the voted value"""
+        """Set voteteamswap_active server variable and swap purchased teams"""
         if self._activeVote is None:
             return
 
         target_value = self._activeVote["target_value"]
 
         try:
-            self._serverData.interface.SetCvar("g_teamSwap", target_value)
-            action = "enabled" if target_value == "1" else "disabled"
-            Log.info(f"VoteTeamSwap passed: g_teamSwap {action}")
+            is_active = (target_value == "1")
+            current_state = self._serverData.GetServerVar("voteteamswap_active")
+            
+            # Only swap vars if state actually changes
+            if is_active != current_state:
+                t1_pur = self._serverData.GetServerVar("team1_purchased_teams")
+                t2_pur = self._serverData.GetServerVar("team2_purchased_teams")
+                self._serverData.SetServerVar("team1_purchased_teams", t2_pur)
+                self._serverData.SetServerVar("team2_purchased_teams", t1_pur)
+                
+            self._serverData.SetServerVar("voteteamswap_active", is_active)
+            action = "enabled" if is_active else "disabled"
+            Log.info(f"VoteTeamSwap passed: Team Swap {action}")
         except Exception as e:
-            Log.error(f"Error setting g_teamSwap: {e}")
+            Log.error(f"Error setting team swap state: {e}")
 
     def _EndVote(self, apply_cooldown: bool = True):
         """End the current vote and clean up"""
