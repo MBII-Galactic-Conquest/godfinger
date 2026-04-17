@@ -296,20 +296,25 @@ class MBIIServer:
                     Log.error(f"Rcon remote #{idx+1} is missing a required 'port' setting. Skipping.")
                     continue
 
-                qconsolePath = os.path.join(self._config.cfg["MBIIPath"], remote_qconsoleFilename) if remote_qconsoleFilename else None
+                # Supremacy writes server.log to SupremacyPath (fs_game dir), not MBIIPath.
+                # Fall back to MBIIPath if SupremacyPath is not configured.
+                _supremacyPath = self._config.cfg.get("SupremacyPath", None)
+                _logBasePath = _supremacyPath if (_supremacyPath and _supremacyPath not in [None, "your/supremacy/path/here/"]) else self._config.cfg["MBIIPath"]
+
+                qconsolePath = os.path.join(_logBasePath, remote_qconsoleFilename) if remote_qconsoleFilename else None
 
                 interface = godfingerinterface.RconInterface(
                                                                     remote_ip,\
                                                                     remote_port,\
                                                                     shared_bindAddress,\
                                                                     remote_password,\
-                                                                    os.path.join(self._config.cfg["MBIIPath"], remote_logFilename),\
+                                                                    os.path.join(_logBasePath, remote_logFilename),\
                                                                     shared_logReadDelay,
                                                                     shared_testRetrospect, # Uses shared/top-level value
                                                                     procName=self._config.cfg["serverFileName"],
                                                                     qconsolePath=qconsolePath)
                 self._svInterfaces.append(interface)
-                Log.info(f"Initialized RconInterface #{idx+1} on {remote_ip}:{remote_port} (Bind: {shared_bindAddress}) using log file {remote_logFilename}" + (f" and qconsole {remote_qconsoleFilename}" if remote_qconsoleFilename else ""))
+                Log.info(f"Initialized RconInterface #{idx+1} on {remote_ip}:{remote_port} (Bind: {shared_bindAddress}) using log base {_logBasePath!r}, log file {remote_logFilename}" + (f" and qconsole {remote_qconsoleFilename}" if remote_qconsoleFilename else ""))
 
         if len(self._svInterfaces) == 0:
             Log.error("Server interface(s) were not initialized properly or 'Remotes' list was empty.")
