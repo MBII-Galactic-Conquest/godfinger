@@ -24,8 +24,8 @@ acknowledge that you understand and accept these risks.
 REQUIREMENTS
 ------------
 1. Windows operating system
-2. MBII game client (mbii.x86.exe) accessible on the same machine
-3. Dedicated server (mbiided.x86.exe) must be running
+2. MBII game client (SUPREMACY.x86.exe) accessible on the same machine
+3. Dedicated server (supded.x86.exe) must be running
 4. g_anticheat must be set to 0 (plugin sets this automatically)
 
 
@@ -65,10 +65,10 @@ Configuration is stored in autoclientCfg.json (auto-created on first run):
 {
     "enabled": true,
     "maxFakeClients": 4,
-    "clientExecutablePath": "C:/Path/To/GameData/mbii.x86.exe",
+    "clientExecutablePath": "C:/Path/To/GameData/SUPREMACY.x86.exe",
     "serverIP": "127.0.0.1",
     "serverPort": "29070",
-    "serverProcessName": "mbiided.x86.exe",
+    "serverProcessName": "supded.x86.exe",
     "launchDelay": 5.0,
     "healthCheckInterval": 30.0,
     "nameList": ["Trooper", "Soldier", "Recruit", "Stormtrooper", "Rebel", "Cadet", "Scout", "Apprentice", "Padawan", "Initiate", "Cultist", "Rosh", "Kyle Katarn", "Tavion", "Alora", "Luke Skywalker", "Jerec", "Desann", "Master", "Guardian"],
@@ -83,7 +83,7 @@ PARAMETERS:
   maxFakeClients        - Maximum number of fake clients to maintain when server
                           is empty. As real players join, this target decreases.
 
-  clientExecutablePath  - Full path to mbii.x86.exe game client
+  clientExecutablePath  - Full path to SUPREMACY.x86.exe game client
                           Use forward slashes (/) or escaped backslashes (\\)
 
   serverIP              - IP address for clients to connect to
@@ -92,7 +92,7 @@ PARAMETERS:
   serverPort            - Server port (default: "29070")
 
   serverProcessName     - Name of the dedicated server process to check
-                          (default: "mbiided.x86.exe")
+                          (default: "supded.x86.exe")
                           Plugin will not spawn clients unless this is running
 
   launchDelay           - Seconds to wait between spawning each client
@@ -145,7 +145,7 @@ Each fake client runs as a separate Windows process:
   - Terminated using process.terminate() when removed
   - All processes cleaned up on plugin shutdown
 
-The plugin checks that mbiided.x86.exe is running before spawning any clients.
+The plugin checks that supded.x86.exe is running before spawning any clients.
 If the server process is not detected, clients will not be spawned.
 
 
@@ -155,10 +155,10 @@ A standalone test script (spawnClient.py) is included for testing client
 spawning without Godfinger:
 
 Usage:
-  python spawnClient.py --exe "C:/Path/To/mbii.x86.exe" --ip "127.0.0.1" --count 3
+  python spawnClient.py --exe "C:/Path/To/SUPREMACY.x86.exe" --ip "127.0.0.1" --count 3
 
 Arguments:
-  --exe PATH        Path to mbii.x86.exe (required)
+  --exe PATH        Path to SUPREMACY.x86.exe (required)
   --ip IP           Server IP to connect to (required)
   --port PORT       Server port (default: 29070)
   --count N         Number of clients to spawn (default: 1)
@@ -176,8 +176,8 @@ A: This plugin only works on Windows. It cannot run on Linux/Mac.
 
 Q: Clients aren't spawning
 A: Check:
-   1. clientExecutablePath points to a valid mbii.x86.exe
-   2. mbiided.x86.exe server process is running
+   1. clientExecutablePath points to a valid SUPREMACY.x86.exe
+   2. supded.x86.exe server process is running
    3. enabled is set to true in config
    4. maxFakeClients is greater than 0
 

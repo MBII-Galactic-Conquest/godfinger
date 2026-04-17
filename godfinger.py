@@ -84,7 +84,7 @@ CONFIG_FALLBACK = \
     "MBIIPath": "your/path/here/",
     "logFilename":"server.log",
     "serverPath":"your/path/here/",
-    "serverFileName":"mbiided.x86.exe",
+    "serverFileName":"supded.x86.exe",
     "logicDelay":0.016,
     "restartOnCrash": false,
     "watchdog": {

@@ -4,7 +4,7 @@ AutoClient Plugin - Automatic fake client spawner for server population
 Spawns fake game clients to make the server appear populated.
 Fake clients are automatically removed as real players join.
 
-Windows-only plugin - requires mbiided.x86.exe to be running.
+Windows-only plugin - requires supded.x86.exe to be running.
 
 SMOD Commands:
     !toggleautoclient - Enable/disable the plugin
@@ -38,7 +38,7 @@ CONFIG_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "autoclientCfg.jso
 CONFIG_FALLBACK = """{
     "enabled": true,
     "maxFakeClients": 8,
-    "clientExecutablePath": "C:/Path/To/mbii.x86.exe",
+    "clientExecutablePath": "C:/Path/To/SUPREMACY.x86.exe",
     "serverIP": "127.0.0.1",
     "serverPort": "29070",
     "launchDelay": 15,
@@ -46,7 +46,7 @@ CONFIG_FALLBACK = """{
     "randomNamePrefix": "",
     "useRandomNames": true,
     "messagePrefix": "^6[AutoClient]^7: ",
-    "serverProcessName": "mbiided.x86.exe"
+    "serverProcessName": "supded.x86.exe"
 }"""
 
 AutoClientConfig = config.Config.fromJSON(CONFIG_DEFAULT_PATH, CONFIG_FALLBACK)
@@ -138,7 +138,7 @@ class AutoClientPlugin:
 
         try:
             # Use tasklist to check for the process
-            process_name = self.config.cfg.get("serverProcessName", "mbiided.x86.exe")
+            process_name = self.config.cfg.get("serverProcessName", "supded.x86.exe")
             result = subprocess.run(
                 ["tasklist", "/FI", f"IMAGENAME eq {process_name}"],
                 capture_output=True,
@@ -462,15 +462,15 @@ class AutoClientPlugin:
         if not IS_WINDOWS:
             return
 
-        # Use PowerShell to force kill all mbii.x86.exe processes
+        # Use PowerShell to force kill all SUPREMACY.x86.exe processes
         # This is more reliable than trying to kick/terminate individually
         try:
             subprocess.run(
-                ["powershell", "-Command", "Stop-Process -Name 'mbii.x86' -Force -ErrorAction SilentlyContinue"],
+                ["powershell", "-Command", "Stop-Process -Name 'SUPREMACY.x86' -Force -ErrorAction SilentlyContinue"],
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 timeout=10
             )
-            Log.info("AutoClient cleanup: killed all mbii.x86.exe processes")
+            Log.info("AutoClient cleanup: killed all SUPREMACY.x86.exe processes")
         except Exception as e:
             Log.error(f"Error during cleanup: {e}")
 
