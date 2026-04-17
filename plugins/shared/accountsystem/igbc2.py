@@ -56,6 +56,7 @@ CONFIG_FALLBACK = \
         "credits": 10
     },
     "MBIIPath": "your/mbii/path/here",
+    "SupremacyPath": "your/supremacy/path/here",
     "siegeteamBanList": [],
     "siegeteamBanListIsWhitelist": false,
     "priceOverride": {},
@@ -286,7 +287,10 @@ def GetAllTeams() -> list[SiegeTeam]:
         return []
 
     team_list = []
-    dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))];
+    supremacyDir = os.path.abspath(DEFAULT_CFG.cfg.get("SupremacyPath", ""))
+    dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]
+    if supremacyDir and os.path.isdir(supremacyDir):
+        dirsToProcess.append(supremacyDir)  # also scan Supremacy pk3s
     for sub_dir in dirsToProcess:
         for filename in os.listdir(sub_dir):
             if filename.endswith(".pk3"):

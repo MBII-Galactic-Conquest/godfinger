@@ -81,7 +81,8 @@ CONFIG_DEFAULT_PATH = os.path.join(os.getcwd(),"godfingerCfg.json")
 CONFIG_FALLBACK = \
 """{
     "Name":"MBII Godfinger : Consequetive Failure",
-    "MBIIPath": "your/path/here/",
+    "MBIIPath": "your/mbii/path/here/",
+    "SupremacyPath": "your/supremacy/path/here/",
     "logFilename":"server.log",
     "serverPath":"your/path/here/",
     "serverFileName":"supded.x86.exe",
@@ -177,7 +178,7 @@ class MBIIServer:
         if cfg == None:
             return False
         # Server/Game path and name are global properties, check them
-        if cfg.GetValue("MBIIPath", None) in [None, "your/path/here/"]:
+        if cfg.GetValue("MBIIPath", None) in [None, "your/mbii/path/here/"]:
             return False
         if cfg.GetValue("serverFileName", None) in [None, ""]:
             return False
@@ -329,9 +330,13 @@ class MBIIServer:
         self._database = self._dbManager.GetDatabase("Godfinger")
         self._database.Open()
 
-        # Archives
+        # Archives — load pk3s from both the MBII and Supremacy game directories
         self._pk3Manager = pk3.Pk3Manager()
-        self._pk3Manager.Initialize([self._config.cfg["MBIIPath"]])
+        pk3Dirs = [self._config.cfg["MBIIPath"]]
+        supremacyPath = self._config.cfg.get("SupremacyPath", None)
+        if supremacyPath and supremacyPath not in [None, "your/supremacy/path/here/"]:
+            pk3Dirs.append(supremacyPath)
+        self._pk3Manager.Initialize(pk3Dirs)
 
         # NEW: Open all interfaces
         for interface in self._svInterfaces:
