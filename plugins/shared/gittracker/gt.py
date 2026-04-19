@@ -835,6 +835,11 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENTDISCONNECT:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
+        # Skip update checks during startup log replay — isStartup=True means godfinger is
+        # replaying historical log entries to build state. Firing here would trigger restarts
+        # based on stale disconnect events even when players are currently connected.
+        if event.isStartup:
+            return False
         _, _, _, svnPostHookFile, winSCPScriptFile, isWinSCPBuilding, isSVNBuilding, isGFBuilding = load_config()
         CheckForSVNUpdate(isSVNBuilding, svnPostHookFile)
         CheckForWinSCPUpdate(isWinSCPBuilding, winSCPScriptFile)
