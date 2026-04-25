@@ -79,7 +79,7 @@ DEFAULT_CFG = None
 # Fallback configuration if config file doesn't exist
 CONFIG_FALLBACK = '''{
     "MBIIPath": "your/mbii/path/here",
-    "SupremacyPath": "your/supremacy/path/here",
+    "MBIIIPath": "your/mbiii/path/here",
     "pluginThemeColor": "green",
     "MessagePrefix": "[RTV]^7: ",
     "RTVPrefix": "!",
@@ -1550,10 +1550,10 @@ def GetAllMaps() -> list[Map]:
         return []
 
     mapList = []
-    supremacyDir = os.path.abspath(DEFAULT_CFG.cfg.get("SupremacyPath", ""))
+    mbiiiDir = os.path.abspath(DEFAULT_CFG.cfg.get("MBIIIPath", ""))
     dirsToProcess = [mbiiDir, os.path.normpath(os.path.join(mbiiDir, "../base"))]
-    if supremacyDir and os.path.isdir(supremacyDir):
-        dirsToProcess.append(supremacyDir)  # also scan Supremacy pk3s
+    if mbiiiDir and os.path.isdir(mbiiiDir):
+        dirsToProcess.append(mbiiiDir)  # also scan MBIII pk3s
     for sub_dir in dirsToProcess:
         for filename in os.listdir(sub_dir):
             if filename.endswith(".pk3"):

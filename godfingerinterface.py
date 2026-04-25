@@ -210,7 +210,7 @@ class AServerInterface(IServerInterface):
 
 
 class RconInterface(AServerInterface):
-    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "supded.i386" if IsUnix else "supded.x86.exe", qconsolePath : str = None):
+    def __init__(self, ipAddress : str, port : str, bindAddr : tuple, password : str, logPath : str, readDelay : int = 0.01, testRetrospect = False, procName = "MBIIIded.i386" if IsUnix else "MBIIIded.x86.exe", qconsolePath : str = None):
         super().__init__()
         self._logReaderLock = threading.Lock()
         self._logReaderThreadControl = threadcontrol.ThreadControl()

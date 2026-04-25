@@ -82,10 +82,10 @@ CONFIG_FALLBACK = \
 """{
     "Name":"MBII Godfinger : Consequetive Failure",
     "MBIIPath": "your/mbii/path/here/",
-    "SupremacyPath": "your/supremacy/path/here/",
+    "MBIIIPath": "your/mbiii/path/here/",
     "logFilename":"server.log",
     "serverPath":"your/path/here/",
-    "serverFileName":"supded.x86.exe",
+    "serverFileName":"MBIIIded.x86.exe",
     "logicDelay":0.016,
     "restartOnCrash": false,
     "watchdog": {
@@ -296,10 +296,10 @@ class MBIIServer:
                     Log.error(f"Rcon remote #{idx+1} is missing a required 'port' setting. Skipping.")
                     continue
 
-                # Supremacy writes server.log to SupremacyPath (fs_game dir), not MBIIPath.
-                # Fall back to MBIIPath if SupremacyPath is not configured.
-                _supremacyPath = self._config.cfg.get("SupremacyPath", None)
-                _logBasePath = _supremacyPath if (_supremacyPath and _supremacyPath not in [None, "your/supremacy/path/here/"]) else self._config.cfg["MBIIPath"]
+                # MBIII writes server.log to MBIIIPath (fs_game dir), not MBIIPath.
+                # Fall back to MBIIPath if MBIIIPath is not configured.
+                _mbiiiPath = self._config.cfg.get("MBIIIPath", None)
+                _logBasePath = _mbiiiPath if (_mbiiiPath and _mbiiiPath not in [None, "your/mbiii/path/here/"]) else self._config.cfg["MBIIPath"]
 
                 qconsolePath = os.path.join(_logBasePath, remote_qconsoleFilename) if remote_qconsoleFilename else None
 
@@ -335,12 +335,12 @@ class MBIIServer:
         self._database = self._dbManager.GetDatabase("Godfinger")
         self._database.Open()
 
-        # Archives — load pk3s from both the MBII and Supremacy game directories
+        # Archives — load pk3s from both the MBII and MBIII game directories
         self._pk3Manager = pk3.Pk3Manager()
         pk3Dirs = [self._config.cfg["MBIIPath"]]
-        supremacyPath = self._config.cfg.get("SupremacyPath", None)
-        if supremacyPath and supremacyPath not in [None, "your/supremacy/path/here/"]:
-            pk3Dirs.append(supremacyPath)
+        mbiiiPath = self._config.cfg.get("MBIIIPath", None)
+        if mbiiiPath and mbiiiPath not in [None, "your/mbiii/path/here/"]:
+            pk3Dirs.append(mbiiiPath)
         self._pk3Manager.Initialize(pk3Dirs)
 
         # NEW: Open all interfaces
