@@ -14,6 +14,8 @@ class Client(object):
         self._ip = address[:address.rfind(":")];
         self._teamId = teams.TEAM_SPEC;
         self._jaguid = "";
+        self._steamid = "";
+        self._steampersona = "";
         self._userinfo = {};
         self._lastNonSpecTeamId = None;
         self._floodProtectionCooldown = Timeout()
@@ -36,6 +38,12 @@ class Client(object):
 
     def GetInfo(self) -> dict[str, str]:
         return self._userinfo;
+
+    def GetSteamId(self) -> str:
+        return self._steamid;
+
+    def GetSteamPersona(self) -> str:
+        return self._steampersona;
 
     def GetLastNonSpecTeamId(self) -> int:
         return self._lastNonSpecTeamId;

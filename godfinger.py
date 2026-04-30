@@ -771,6 +771,10 @@ class MBIIServer:
                 self.OnClientDisconnect(message)
             elif lineParse[0] == "ClientUserinfoChanged:":
                 self.OnClientUserInfoChanged(message)
+            elif lineParse[0] == "ClientSteamID:":
+                self.OnClientSteamID(message)
+            elif lineParse[0] == "ClientSteamPersona:":
+                self.OnClientSteamPersona(message)
             elif line.endswith(") completed the objective!"):
                 self.OnObjective(message)
             else:
@@ -900,6 +904,14 @@ class MBIIServer:
                         if cl._jaguid != vars["ja_guid"]:
                             changedOld["ja_guid"] = cl._jaguid
                             cl._jaguid = vars["ja_guid"]
+
+                    if "cl_steamid" in vars:
+                        if cl._steamid != vars["cl_steamid"]:
+                            changedOld["cl_steamid"] = cl._steamid
+                            cl._steamid = vars["cl_steamid"]
+
+                    if "cl_steamname" in vars:
+                        cl._steampersona = vars["cl_steamname"]
                 if len(changedOld) > 0 :
                     self._pluginManager.Event( godfingerEvent.ClientChangedEvent(cl, changedOld, isStartup = logMessage.isStartup ) ) # a spawned client changed
                 else:
@@ -1216,6 +1228,44 @@ class MBIIServer:
             self._pluginManager.Event( godfingerEvent.ClientConnectEvent( newClient, None, isStartup = logMessage.isStartup ) )
         else:
             pass
+
+    def OnClientSteamID(self, logMessage : logMessage.LogMessage):
+        lineParse = logMessage.content.split()
+        # format: ClientSteamID: <clientNum> <steamid64>
+        if len(lineParse) < 3:
+            return
+        try:
+            clientId = int(lineParse[1])
+        except ValueError:
+            Log.warning(f"ClientSteamID: could not parse client id from '{logMessage.content}'")
+            return
+        steamId = lineParse[2].strip()
+        cl = self._clientManager.GetClientById(clientId)
+        if cl is None:
+            Log.warning(f"ClientSteamID: no client with id {clientId}")
+            return
+        with cl._lock:
+            cl._steamid = steamId
+
+    def OnClientSteamPersona(self, logMessage : logMessage.LogMessage):
+        lineParse = logMessage.content.split()
+        # format: ClientSteamPersona: <clientNum> <persona name (may contain spaces)>
+        if len(lineParse) < 3:
+            return
+        try:
+            clientId = int(lineParse[1])
+        except ValueError:
+            Log.warning(f"ClientSteamPersona: could not parse client id from '{logMessage.content}'")
+            return
+        persona = " ".join(lineParse[2:]).strip()
+        cl = self._clientManager.GetClientById(clientId)
+        if cl is None:
+            Log.warning(f"ClientSteamPersona: no client with id {clientId}")
+            return
+        with cl._lock:
+            cl._steampersona = persona
+        self._pluginManager.Event(godfingerEvent.ClientSteamIntegrationEvent(
+            cl, cl._steamid, persona, isStartup=logMessage.isStartup))
 
     def OnClientBegin(self, logMessage : logMessage.LogMessage ):
         textified = logMessage.content

@@ -23,6 +23,7 @@ GODFINGER_EVENT_TYPE_OBJECTIVE          = 19 # An event that fires if any object
 GODFINGER_EVENT_TYPE_ONNAMECHANGE       = 20 # NameChangeEvent - fires immediately on name change via broadcast message
 GODFINGER_EVENT_TYPE_BANNED_ENTRY_ATTEMPT = 21 # BannedEntryAttemptEvent - fires when qconsole logs a banned ip connection attempt
 GODFINGER_EVENT_TYPE_SERVER_SAY         = 22 # ServerSayEvent - fires when the server broadcasts a message
+GODFINGER_EVENT_TYPE_CLIENT_STEAM_INTEGRATION = 23 # ClientSteamIntegrationEvent : client, steamId : str, steamPersona : str — fires when full Steam identity is known for a connecting player
 
 GODFINGER_EVENT_TYPE_WD_UNAVAILABLE     = 1000 # watchdog raised event, game process is not active, happens only upon startup of GF
 GODFINGER_EVENT_TYPE_WD_EXISTING        = 1001 # watchdog raised event, game process is exiting upon GF startup
@@ -145,3 +146,11 @@ class ServerSayEvent(Event):
     def __init__(self, message : str, isStartup = False):
         self.message = message
         super().__init__(GODFINGER_EVENT_TYPE_SERVER_SAY, {}, isStartup)
+
+class ClientSteamIntegrationEvent(Event):
+    """Event fired when full Steam identity (ID + persona) is known for a connecting player."""
+    def __init__(self, cl : client.Client, steamId : str, steamPersona : str, isStartup = False):
+        self.client      = cl
+        self.steamId     = steamId
+        self.steamPersona = steamPersona
+        super().__init__(GODFINGER_EVENT_TYPE_CLIENT_STEAM_INTEGRATION, {}, isStartup)

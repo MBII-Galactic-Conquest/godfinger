@@ -22,6 +22,12 @@ class Player():
     def GetTeamId(self) -> int:
         return self._client.GetTeamId();
 
+    def GetSteamId(self) -> str:
+        return self._client.GetSteamId();
+
+    def GetSteamPersona(self) -> str:
+        return self._client.GetSteamPersona();
+
     def __repr__(self):
         s = f"{self.GetName()} (ID : {str(self.GetId())})"
         return s
