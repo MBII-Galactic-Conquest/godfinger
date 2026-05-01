@@ -12,8 +12,6 @@ import time
 
 SERVER_DATA = None;
 Log = logging.getLogger(__name__);
-g_steamverify    = False;
-g_steam_forcename = False;
 
 ## !! Check soundscatalog.txt !! ##
 ## Sound paths are not based on local, but use PK3 file hierarchy #
@@ -122,7 +120,7 @@ def CL_PlayerStart(PLAYERSTART_SOUND_PATH, cl : client.Client):
     global PluginInstance
 
     ID = cl.GetId()
-    NAME = ClientsData[ID].steamTrueName if (g_steamverify and g_steam_forcename and ID in ClientsData and ClientsData[ID].steamTrueName) else cl.GetName()
+    NAME = ClientsData[ID].steamTrueName if (ID in ClientsData and ClientsData[ID].steamTrueName) else cl.GetName()
 
     if PLAYERSTART_SOUND_PATH is None or PLAYERSTART_SOUND_PATH == "" or PLAYERSTART_SOUND_PATH == PLACEHOLDER:
         Log.error(f"{PLAYERSTART_SOUND_PATH} is null or using placeholder, exiting...")
@@ -226,14 +224,10 @@ def OnEvent(event) -> bool:
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SERVER_EMPTY:
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_INIT:
-        global g_steamverify, g_steam_forcename
-        vars = event.data.get("vars", {})
-        g_steamverify     = bool(int(vars.get("g_steamverify",    "0") or "0"))
-        g_steam_forcename = bool(int(vars.get("g_steam_forcename", "0") or "0"))
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_CLIENT_STEAM_INTEGRATION:
         ID = event.client.GetId()
-        if g_steamverify and g_steam_forcename and ID in ClientsData and event.steamPersona:
+        if ID in ClientsData and event.steamPersona:
             ClientsData[ID].steamTrueName = event.steamPersona
         return False;
     elif event.type == godfingerEvent.GODFINGER_EVENT_TYPE_SHUTDOWN:
