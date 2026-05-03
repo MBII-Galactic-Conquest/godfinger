@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 # === CONFIG ===
-target_file = "mbiided.i386"
+target_file = "supded.i386"
 max_depth = 25
 
 # NEW: Define all server instances needed.

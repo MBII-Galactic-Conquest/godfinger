@@ -6,8 +6,8 @@ import psutil # Ensure you have psutil installed: pip install psutil
 
 # --- Configuration ---
 # Define the process names to target
-MBIIDED_PROCESS_NAME_WIN = "MBIIIded.x86.exe"
-MBIIDED_PROCESS_NAME_LINUX = "MBIIIded.i386"
+MBIIDED_PROCESS_NAME_WIN = "supded.x86.exe"
+MBIIDED_PROCESS_NAME_LINUX = "supded.i386"
 GODFINGER_PROCESS_MARKER = "godfinger.py" # Used to find the main Godfinger Python process
 
 # Global wait parameters (can be tuned here if needed)
@@ -60,7 +60,7 @@ def terminate_target_process(process_name, cmdline_marker=None, cwd_check_path=N
     This function is designed to be robust in identifying specific processes.
 
     Args:
-        process_name (str): The expected base name of the process (e.g., "python", "MBIIIded.x86.exe").
+        process_name (str): The expected base name of the process (e.g., "python", "supded.x86.exe").
         cmdline_marker (str, optional): A unique string found in the process's command line
                                         (e.g., "godfinger.py" for Python scripts).
         cwd_check_path (str, optional): An absolute path. If provided, processes will only be targeted
